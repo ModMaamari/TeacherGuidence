@@ -174,6 +174,17 @@ non-zero if any student-visible guidance leaked hidden gold data.
 
 ---
 
+## 5b. Explore trajectories in the web UI
+
+After a run, launch the trajectory explorer to browse episodes, the plan-review phase,
+and every step (with a toggle to reveal teacher-private data):
+
+```bash
+agentsim viewer --output-root data/simulation_output --port 8000
+```
+
+See [`TEACHER_GUIDANCE_UI.md`](TEACHER_GUIDANCE_UI.md) for the full UI guide.
+
 ## 6. Guidance levels
 
 | Level | Name | Student sees |
