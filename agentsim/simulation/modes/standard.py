@@ -68,7 +68,26 @@ class StandardRunner:
         
         query = dataset_sample["query"]
         gold_answer = dataset_sample["answer"]
-        
+
+        # Inject Teacher Guidance metadata when the template defines mode_config.
+        # This is additive: workflows that ignore these keys are unaffected.
+        mode_config = self.template.mode_config or {}
+        if mode_config:
+            initial_metadata = dict(initial_metadata or {})
+            initial_metadata.setdefault("sample_id", sample_id or dataset_sample.get("id"))
+            initial_metadata.update({
+                "dataset_sample": dataset_sample,
+                "gold": dataset_sample.get("gold", {"answer": dataset_sample.get("answer")}),
+                "gold_answer": dataset_sample.get("answer"),
+                "retrieval_scope": dataset_sample.get("retrieval_scope", {}),
+                "student_model": mode_config.get("student_model"),
+                "teacher_model": mode_config.get("teacher_model"),
+                "guidance": mode_config.get("guidance", {"level": 0}),
+                "plan_review_config": mode_config.get("plan_review", {}),
+                "corpus_path": mode_config.get("corpus_path"),
+                "retrieval_backend": mode_config.get("retrieval_backend", "hotpot_local"),
+            })
+
         # Use the workflow executor provided (with trace exporter) or create new one
         if self.workflow_executor:
             self.workflow_executor.parallel_consultants = self.parallel_consultants

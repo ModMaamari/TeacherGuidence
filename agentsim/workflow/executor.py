@@ -165,7 +165,12 @@ class WorkflowExecutor:
                 
                 # Increment step counter
                 context.increment_step()
-                
+
+                # Allow any component to terminate the workflow early by returning FINISH.
+                if message.stop_condition == "FINISH":
+                    logger.info(f"Stopping workflow because {comp_type} returned FINISH")
+                    break
+
             except Exception as e:
                 logger.error(f"Error executing component {comp_type}: {e}", exc_info=True)
                 
@@ -324,7 +329,11 @@ class WorkflowExecutor:
             llm_input=result.metadata.get("llm_input"),
             llm_output=result.metadata.get("llm_output"),
             rationale_tag=result.metadata.get("rationale_tag", ""),
-            stop_condition="CONTINUE" if result.success else "ERROR",
+            stop_condition=(
+                "ERROR" if not result.success
+                else "FINISH" if verdict == "FINISH"
+                else "CONTINUE"
+            ),
             # Expose component metadata (e.g., retriever queries/k/corpus) to traces
             tool_input=result.metadata or {},
             tool_output=result.data,
