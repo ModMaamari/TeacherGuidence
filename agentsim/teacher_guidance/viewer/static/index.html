@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teacher Guidance — Trajectory Explorer</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="hide-private">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">TG</div>
+      <div class="brand-text">
+        <h1>Trajectory Explorer</h1>
+        <span class="brand-sub">Teacher Guidance dataset</span>
+      </div>
+    </div>
+
+    <div class="topbar-controls">
+      <label class="field">
+        <span>Run</span>
+        <select id="run-select"></select>
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="private-toggle" />
+        <span>Show teacher-private</span>
+      </label>
+    </div>
+  </header>
+
+  <div id="run-stats" class="run-stats"></div>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <input type="search" id="episode-search" placeholder="Filter questions…" />
+        <span id="episode-count" class="muted"></span>
+      </div>
+      <ul id="episode-list" class="episode-list"></ul>
+    </aside>
+
+    <section id="detail" class="detail">
+      <div class="empty-state">
+        <h2>Select an episode</h2>
+        <p>Pick a run, then a question on the left to inspect its full trajectory.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
