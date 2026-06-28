@@ -25,10 +25,20 @@ def _iter_strings(obj: Any):
             yield from _iter_strings(v)
 
 
+def _boundary_pattern(needle: str) -> str:
+    """Match ``needle`` only when it is not flanked by word characters.
+
+    This prevents a short token like ``no`` from matching inside ``noted`` while still
+    matching the standalone word ``no`` (including ``No.``), and works for phrases and
+    doc ids alike.
+    """
+    return r"(?<!\w)" + re.escape(needle.strip()) + r"(?!\w)"
+
+
 def _contains(haystack: str, needle: str) -> bool:
     if not needle or not needle.strip():
         return False
-    return re.search(re.escape(needle.strip()), haystack, flags=re.IGNORECASE) is not None
+    return re.search(_boundary_pattern(needle), haystack, flags=re.IGNORECASE) is not None
 
 
 def detect_leakage(
@@ -77,7 +87,7 @@ def _sanitize_string(
 ) -> str:
     for needle, placeholder in replacements:
         if needle and needle.strip() and _contains(text, needle):
-            text = re.sub(re.escape(needle.strip()), placeholder, text, flags=re.IGNORECASE)
+            text = re.sub(_boundary_pattern(needle), placeholder, text, flags=re.IGNORECASE)
             applied.append(placeholder)
     return text
 

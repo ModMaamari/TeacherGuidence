@@ -64,6 +64,47 @@ def test_hidden_doc_id_removed():
     assert report["hidden_doc_id_leaked"] is True
 
 
+def test_noted_does_not_leak_no():
+    # The UI false positive: gold answer "no" must not match the word "noted".
+    report = detect_leakage(
+        {"feedback": "Your uncertainties are reasonable. Proceed with the plan."},
+        "no", [], [], [],
+    )
+    assert report["gold_answer_leaked"] is False
+
+
+def test_standalone_no_still_detected_and_sanitized():
+    rendered = {"feedback": "No, they are not the same."}
+    visibility = {
+        "gold_answer": "no",
+        "gold_titles": [],
+        "gold_doc_ids": [],
+        "retrieved_titles": [],
+        "retrieved_doc_ids": [],
+        "hidden_spans": [],
+    }
+    clean, report = sanitize_rendered_guidance(rendered, visibility, _cfg())
+    assert report["gold_answer_leaked"] is True
+    assert "[answer hidden]" in clean["feedback"]
+    # the standalone "No" is replaced, nothing else mangled
+    assert "they are not the same" in clean["feedback"]
+
+
+def test_word_boundary_does_not_mangle_substrings():
+    rendered = {"feedback": "I noted the cannot-do nothing knowledge."}
+    visibility = {
+        "gold_answer": "no",
+        "gold_titles": [],
+        "gold_doc_ids": [],
+        "retrieved_titles": [],
+        "retrieved_doc_ids": [],
+        "hidden_spans": [],
+    }
+    clean, report = sanitize_rendered_guidance(rendered, visibility, _cfg())
+    assert report["gold_answer_leaked"] is False
+    assert clean["feedback"] == "I noted the cannot-do nothing knowledge."
+
+
 def test_permissive_policy_does_not_sanitize():
     rendered = {"feedback": "The answer is Delhi."}
     visibility = {
