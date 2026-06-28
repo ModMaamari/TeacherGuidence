@@ -286,6 +286,9 @@ async def cmd_simulate(template_id: str, validate_only: bool = False):
         dataset = _load_dataset(template.datasets[0])
         
         # Check for checkpoint to resume
+        # Ensure the output directory exists before writing the checkpoint, so
+        # templates with a nested output_dir do not fail on first run.
+        Path(template.output_dir).mkdir(parents=True, exist_ok=True)
         checkpoint_path = Path(template.output_dir) / f"checkpoint_{template.id}.json"
         completed_samples = set()
         dataset_name = template.datasets[0].name
