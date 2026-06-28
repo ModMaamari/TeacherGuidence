@@ -90,3 +90,35 @@ def test_enabled_flow_records_and_sanitizes():
     # revised plan stored and added verification
     assert ctx.metadata["revised_plan"]["steps"][1]["intended_tool"] == "verify"
     assert record["metrics"]["revised_covers_verification"] is True
+
+
+def test_accept_plan_skips_revision():
+    initial = json.dumps({
+        "plan_summary": "search then verify then answer",
+        "steps": [{"step_id": 1, "goal": "find", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+        "uncertainties": [], "stop_condition": "have answer",
+    })
+    review = json.dumps({
+        "plan_review_enabled": True, "review_guidance_level": 3,
+        "student_visible": {"score_continuous": 1.0, "feedback": "Well-structured. Proceed."},
+        "private_diagnosis": {"plan_valid": True},
+        "teacher_decision": "accept_plan",
+    })
+    # If the revision branch were taken, this would be returned (and detected).
+    revised = json.dumps({"revision_summary": "SHOULD NOT BE USED", "plan_summary": "x", "steps": []})
+
+    ctx = _context({"enabled": True, "review_guidance_level": 3})
+    stub = StubLLM(initial, review, revised)
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    result = asyncio.run(comp.execute(ctx))
+
+    assert result.data["verdict"] == "PROCEED"
+    record = ctx.metadata["plan_review"]
+    assert record["revision_skipped"] is True
+    assert record["revised_student_plan_raw"] is None
+    # revised plan == initial plan (no extra LLM call)
+    assert ctx.metadata["revised_plan"]["plan_summary"] == "search then verify then answer"
+    assert "SHOULD NOT BE USED" not in json.dumps(ctx.metadata["revised_plan"])
+    # exactly two LLM calls were made (initial plan + teacher review), not three
+    assert stub.calls == 2
+    assert record["metrics"]["revision_skipped"] is True

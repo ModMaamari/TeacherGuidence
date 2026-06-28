@@ -18,10 +18,12 @@ def compute_plan_review_metrics(
     initial_tools = _tools_in_plan(initial_plan)
     revised_tools = _tools_in_plan(revised_plan)
     private = (review_full or {}).get("private_diagnosis", {}) or {}
+    decision = (review_full or {}).get("teacher_decision")
     return {
         "initial_step_count": len(initial_tools),
         "revised_step_count": len(revised_tools),
         "plan_changed": initial_tools != revised_tools,
+        "revision_skipped": decision == "accept_plan",
         "initial_tools": initial_tools,
         "revised_tools": revised_tools,
         "initial_covers_verification": "verify" in initial_tools,

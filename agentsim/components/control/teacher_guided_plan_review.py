@@ -127,16 +127,24 @@ class TeacherGuidedPlanReview(ControlComponent):
             review_full, review_guidance, _preflight_visibility(context)
         )
 
-        # 3. Revised plan (student).
-        revision_prompt = build_revised_plan_prompt(state, initial_plan, rendered_feedback, config)
-        revision_raw = await self.llm_client.get_completion(
-            prompt=revision_prompt, model=student_model, temperature=student_temp,
-            max_tokens=context.metadata.get("student_plan_max_tokens", 900),
-        )
-        revised_plan, _ = parse_revised_plan(revision_raw)
+        # 3. Revised plan (student). If the teacher accepted the plan, there is nothing
+        # to revise — reuse the initial plan and skip the extra LLM call (saves cost).
+        revision_skipped = review_full.get("teacher_decision") == "accept_plan"
+        if revision_skipped:
+            revision_prompt = None
+            revision_raw = None
+            revised_plan = dict(initial_plan) if isinstance(initial_plan, dict) else initial_plan
+        else:
+            revision_prompt = build_revised_plan_prompt(state, initial_plan, rendered_feedback, config)
+            revision_raw = await self.llm_client.get_completion(
+                prompt=revision_prompt, model=student_model, temperature=student_temp,
+                max_tokens=context.metadata.get("student_plan_max_tokens", 900),
+            )
+            revised_plan, _ = parse_revised_plan(revision_raw)
 
         record = {
             "enabled": True,
+            "revision_skipped": revision_skipped,
             "initial_student_plan_prompt": initial_prompt,
             "initial_student_plan_raw": initial_raw,
             "initial_student_plan": initial_plan,
@@ -155,7 +163,8 @@ class TeacherGuidedPlanReview(ControlComponent):
 
         logger.info(
             f"[TG plan_review] review_level={review_guidance.level} "
-            f"decision={review_full.get('teacher_decision')}"
+            f"decision={review_full.get('teacher_decision')} "
+            f"revision_skipped={revision_skipped}"
         )
 
         return ComponentResult(
