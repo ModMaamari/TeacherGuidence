@@ -14,6 +14,7 @@ def _context():
             "sample_id": "sample_001",
             "student_model": "student",
             "teacher_model": "teacher",
+            "budget": 5,
             "guidance": {"level": 3},
             "gold": {
                 "qid": "q1",
@@ -63,6 +64,9 @@ def test_export_writes_all_files(tmp_path):
 
     assert episode["final_answer"] == "Delhi"
     assert episode["stop_reason"] == "teacher_accept"
+    # budget (5) and used_steps (1 step in the synthetic context) are distinct
+    assert episode["budget"] == 5
+    assert episode["used_steps"] == 1
 
 
 def test_one_episode_and_one_sft_row_per_step(tmp_path):

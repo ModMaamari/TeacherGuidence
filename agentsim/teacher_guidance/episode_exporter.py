@@ -80,6 +80,12 @@ class TeacherGuidanceEpisodeExporter:
         guidance = md.get("guidance", {}) or {}
         plan_review = md.get("plan_review", {"enabled": False})
 
+        # Budget = max student tool-use steps the episode was allowed; used_steps =
+        # how many the student actually took before stopping. These are distinct.
+        budget = md.get("budget")
+        if budget is None:
+            budget = len(steps)
+
         return {
             "episode_id": f"{md.get('sample_id', context.task_id)}",
             "qid": gold.get("qid", md.get("retrieval_scope", {}).get("qid", context.task_id)),
@@ -87,7 +93,8 @@ class TeacherGuidanceEpisodeExporter:
             "gold_answer": gold.get("answer", ""),
             "dataset": "hotpotqa",
             "split": md.get("split", "validation"),
-            "budget": int(guidance.get("budget", md.get("budget", len(steps)))) if isinstance(guidance, dict) else len(steps),
+            "budget": int(budget),
+            "used_steps": len(steps),
             "guidance_level": int(guidance.get("level", 0)) if isinstance(guidance, dict) else 0,
             "student_model": md.get("student_model", ""),
             "teacher_model": md.get("teacher_model", ""),

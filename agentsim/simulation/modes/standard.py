@@ -80,6 +80,7 @@ class StandardRunner:
                 "gold": dataset_sample.get("gold", {"answer": dataset_sample.get("answer")}),
                 "gold_answer": dataset_sample.get("answer"),
                 "retrieval_scope": dataset_sample.get("retrieval_scope", {}),
+                "budget": mode_config.get("budget"),
                 "student_model": mode_config.get("student_model"),
                 "teacher_model": mode_config.get("teacher_model"),
                 "guidance": mode_config.get("guidance", {"level": 0}),
