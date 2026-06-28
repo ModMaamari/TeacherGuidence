@@ -1,0 +1,61 @@
+id: hotpot_teacher_guidance_b5_g1
+name: "HotpotQA Teacher Guidance B=5 G=1"
+mode: standard
+
+# teacher_models drives the default LLM client model. The actual student/teacher
+# models used per call come from mode_config.student_model / mode_config.teacher_model.
+teacher_models:
+  - name: student
+    model_id: gpt-4o-mini
+    role: teacher
+    temperature: 0.2
+
+consultant_models: []
+
+workflows:
+  - hotpot_teacher_guided_b5
+
+datasets:
+  - name: hotpot_questions
+    path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_questions.jsonl
+    num_samples: 10
+    sample_strategy: sequential
+
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+
+verification:
+  enabled: false
+
+mode_config:
+  budget: 5
+  student_model: gpt-4o-mini
+  teacher_model: gpt-4o
+  corpus_path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_corpus.jsonl
+  retrieval_backend: hotpot_local
+  guidance:
+    level: 1
+    name: continuous_reward_only
+    score_mode: continuous
+    max_feedback_words: 60
+    expose_next_action_hint: false
+    expose_tool_hint: false
+    expose_query_hint: false
+    expose_doc_title_hint: false
+    expose_gold_answer_hint: false
+    leak_policy: strict
+
+  plan_review:
+    enabled: false
+    review_guidance_level: null
+    max_initial_plan_steps: 6
+    max_revised_plan_steps: 6
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+
+output_dir: ./data/simulation_output/hotpot_teacher_guidance_b5_g1

@@ -161,9 +161,10 @@ class SimulationLoader:
                 # Check last component is finalizer/synthesis
                 if workflow.components:
                     last_comp = workflow.components[-1]
-                    if last_comp.get("type") not in ["finalizer", "answer_drafter"]:
+                    terminal_types = ["finalizer", "answer_drafter", "teacher_guided_agent_step"]
+                    if last_comp.get("type") not in terminal_types:
                         errors.append(
-                            f"Workflow '{wf_id}': Last component must be finalizer or answer_drafter, "
+                            f"Workflow '{wf_id}': Last component must be one of {terminal_types}, "
                             f"got '{last_comp.get('type')}'"
                         )
             except FileNotFoundError:

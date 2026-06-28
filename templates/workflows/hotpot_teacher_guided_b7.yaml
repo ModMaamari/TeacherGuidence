@@ -1,0 +1,23 @@
+id: hotpot_teacher_guided_b7
+name: "HotpotQA Teacher-Guided Agent, B=7"
+description: "Student chooses retrieval-agent actions; teacher evaluates with configurable guidance."
+reasoning_style: teacher_guided
+
+components:
+  - type: teacher_guided_agent_step
+    config: {step_index: 1, budget: 7, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 2, budget: 7, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 3, budget: 7, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 4, budget: 7, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 5, budget: 7, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 6, budget: 7, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 7, budget: 7, force_finish: true}
+
+config:
+  max_steps: 7
