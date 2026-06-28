@@ -48,6 +48,14 @@ def main():
     sim_parser = subparsers.add_parser('simulate', help='Run simulation')
     sim_parser.add_argument('template', help='Simulation template ID')
     sim_parser.add_argument('--validate-only', action='store_true', help='Only validate')
+
+    # Teacher Guidance trajectory explorer (web UI)
+    viewer_parser = subparsers.add_parser('viewer', help='Launch the trajectory explorer web UI')
+    viewer_parser.add_argument('--output-root', default='data/simulation_output',
+                               help='Directory containing run outputs')
+    viewer_parser.add_argument('--host', default='127.0.0.1', help='Bind host')
+    viewer_parser.add_argument('--port', type=int, default=8000, help='Bind port')
+    viewer_parser.add_argument('--no-browser', action='store_true', help='Do not open a browser')
     
     # Discover models
     discover_parser = subparsers.add_parser('discover', help='Discover available models from endpoints')
@@ -103,6 +111,9 @@ def main():
         cmd_info()
     elif args.command == 'simulate':
         asyncio.run(cmd_simulate(args.template, args.validate_only))
+    elif args.command == 'viewer':
+        from agentsim.teacher_guidance.viewer.server import serve
+        serve(args.output_root, args.host, args.port, open_browser=not args.no_browser)
     elif args.command == 'discover':
         asyncio.run(cmd_discover(args))
     elif args.command == 'seed-select':
