@@ -402,6 +402,16 @@ async def cmd_simulate(template_id: str, validate_only: bool = False):
                     result=result,
                     run_id=f"{run_uuid}_{dataset_name}_{sample_id}"
                 )
+
+                # Teacher Guidance: export clean episode-level files when the run
+                # produced teacher-guided steps.
+                tg_context = result.get("context")
+                if tg_context is not None and "teacher_guided_steps" in tg_context.metadata:
+                    from agentsim.teacher_guidance.episode_exporter import (
+                        TeacherGuidanceEpisodeExporter,
+                    )
+                    TeacherGuidanceEpisodeExporter().export_episode(tg_context, str(sample_dir))
+
                 print(f"  ✓ Exported")
                 
                 # Mark sample as completed (checkpoint)
