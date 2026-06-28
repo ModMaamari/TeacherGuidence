@@ -18,7 +18,7 @@ from agentsim.components.processing import reranker, deduplicator, filter, extra
 from agentsim.components.planning import planner, query_formulator
 from agentsim.components.synthesis import answer_drafter, finalizer
 from agentsim.components.verification import fact_checker, attribution
-from agentsim.components.control import condition
+from agentsim.components.control import condition, teacher_guided_agent_step
 
 __all__ = ["BaseComponent", "ComponentCategory"]
 
