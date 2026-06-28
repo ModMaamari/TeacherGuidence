@@ -16,7 +16,31 @@ async function getJSON(url) {
   if (!r.ok) throw new Error(url + " -> " + r.status);
   return r.json();
 }
-function badge(text, cls) { return `<span class="badge ${cls || ""}">${esc(text)}</span>`; }
+function badge(text, cls, tip) {
+  const t = tip ? ` title="${esc(tip)}"` : "";
+  return `<span class="badge ${cls || ""}"${t}>${esc(text)}</span>`;
+}
+function cleanModel(m) { return String(m == null ? "" : m).replace(/^custom\//, ""); }
+
+// Hover explanations for UI elements (shown as native tooltips).
+const TIP = {
+  episodes: "Number of question trajectories collected in this run.",
+  guidance: "Guidance level 0–4: how much of the teacher's evaluation the student was shown. G3 = diagnostic feedback (score + explanation, no explicit next action).",
+  correct: "Answer correct: the gold answer appears in the student's final answer (handles 'answer + explanation'). Robust alternative to strict exact match.",
+  em: "Exact match: the student's normalized final answer equals the gold answer exactly.",
+  f1: "Token-level F1 overlap between the student's final answer and the gold answer.",
+  doc_recall: "Supporting-document recall: fraction of the gold supporting documents the student retrieved.",
+  fact_recall: "Supporting-fact recall: fraction of gold supporting sentences appearing verbatim in the student's extracted spans.",
+  budget: "Budget: the maximum number of tool-use steps the student was allowed for this question.",
+  used_steps: "Used steps: how many tool-use steps the student actually took before finishing.",
+  stop_reason: "Why the episode ended — teacher_accept (teacher accepted a finish) or budget_forced_finish (ran out of budget).",
+  student: "Student model: solves the task with tools and never sees the gold answer.",
+  teacher: "Teacher model: sees gold metadata and scores each step; how much it can tell the student is gated by the guidance level.",
+  plan_review: "Plan review: before acting, the student drafts a plan, the teacher reviews it, and the student revises it (revision is skipped if the teacher accepts the plan).",
+  leakage: "Leakage guard: detects and sanitizes any gold answer / title / doc-id that the teacher's student-visible feedback tried to reveal.",
+  step_tool: "The tool the student invoked this step (search, extract, verify, synthesize, decompose, reformulate, finish).",
+  guidance_box: "Exactly what the student saw after this step — the rendered guidance allowed at this guidance level.",
+};
 
 // ---------- runs ----------
 async function init() {
@@ -59,18 +83,23 @@ function renderRunStats(run) {
   if (!run) { box.innerHTML = ""; return; }
   const stops = Object.entries(run.stop_reasons || {})
     .map(([k, v]) => `${k}: ${v}`).join(" · ") || "—";
+  const meanCorrect = run.mean_correct != null ? run.mean_correct : run.mean_exact_match;
   box.innerHTML = [
-    stat(run.num_episodes, "episodes"),
-    stat("G" + (run.guidance_level ?? "?"), "guidance"),
-    stat(pct(run.mean_exact_match), "mean EM"),
-    stat(num(run.mean_f1), "mean F1"),
-    stat(pct(run.mean_doc_recall), "doc recall"),
-    `<div class="stat" style="min-width:auto"><span class="v" style="font-size:13px">${esc(run.student_model)}</span><span class="k">student</span></div>`,
-    `<div class="stat" style="min-width:auto"><span class="v" style="font-size:13px">${esc(run.teacher_model)}</span><span class="k">teacher</span></div>`,
-    `<div class="stat" style="min-width:auto"><span class="v" style="font-size:12px">${esc(stops)}</span><span class="k">stop reasons</span></div>`,
+    stat(run.num_episodes, "episodes", TIP.episodes),
+    stat("G" + (run.guidance_level ?? "?"), "guidance", TIP.guidance),
+    stat(pct(meanCorrect), "mean correct", TIP.correct),
+    stat(pct(run.mean_exact_match), "mean EM", TIP.em),
+    stat(num(run.mean_f1), "mean F1", TIP.f1),
+    stat(pct(run.mean_doc_recall), "doc recall", TIP.doc_recall),
+    `<div class="stat" style="min-width:auto" title="${esc(TIP.student)}"><span class="v" style="font-size:13px">${esc(cleanModel(run.student_model))}</span><span class="k">student</span></div>`,
+    `<div class="stat" style="min-width:auto" title="${esc(TIP.teacher)}"><span class="v" style="font-size:13px">${esc(cleanModel(run.teacher_model))}</span><span class="k">teacher</span></div>`,
+    `<div class="stat" style="min-width:auto" title="${esc(TIP.stop_reason)}"><span class="v" style="font-size:12px">${esc(stops)}</span><span class="k">stop reasons</span></div>`,
   ].join("");
 }
-function stat(v, k) { return `<div class="stat"><span class="v">${esc(v)}</span><span class="k">${esc(k)}</span></div>`; }
+function stat(v, k, tip) {
+  const t = tip ? ` title="${esc(tip)}"` : "";
+  return `<div class="stat"${t}><span class="v">${esc(v)}</span><span class="k">${esc(k)}</span></div>`;
+}
 
 // ---------- episode list ----------
 function renderEpisodeList(filter) {
@@ -79,11 +108,12 @@ function renderEpisodeList(filter) {
   document.getElementById("episode-count").textContent = `${items.length}/${state.episodes.length}`;
   const ul = document.getElementById("episode-list");
   ul.innerHTML = items.map((e) => {
-    const emBadge = e.exact_match ? badge("EM ✓", "good") : badge("EM ✗", "bad");
+    const correct = e.answer_correct != null ? e.answer_correct : e.exact_match;
+    const okBadge = correct ? badge("✓ correct", "good", TIP.correct) : badge("✗ incorrect", "bad", TIP.correct);
     const active = e.qid === state.currentQid ? "active" : "";
     return `<li class="episode-item ${active}" data-qid="${esc(e.qid)}">
       <div class="q">${esc(e.query)}</div>
-      <div class="meta">${emBadge}${badge("F1 " + num(e.f1))}${badge(e.num_steps + " steps")}${badge(e.stop_reason || "—")}</div>
+      <div class="meta">${okBadge}${badge("F1 " + num(e.f1), "", TIP.f1)}${badge(e.num_steps + " steps", "", TIP.used_steps)}${badge(e.stop_reason || "—", "", TIP.stop_reason)}</div>
     </li>`;
   }).join("");
   ul.querySelectorAll(".episode-item").forEach((li) =>
@@ -107,7 +137,9 @@ function goldValue(text) {
 
 function renderEpisodeDetail(ep) {
   const fm = ep.final_metrics || {};
-  const matchCls = fm.exact_match ? "match" : "nomatch";
+  const correct = fm.answer_correct != null ? fm.answer_correct : fm.exact_match;
+  const matchCls = correct ? "match" : "nomatch";
+  const usedSteps = ep.used_steps != null ? ep.used_steps : (ep.steps || []).length;
   const header = `
     <div class="ep-header">
       <div class="qid">${esc(ep.qid)}</div>
@@ -117,37 +149,42 @@ function renderEpisodeDetail(ep) {
           <div class="lbl">Gold answer · teacher-private</div>
           <div class="val">${goldValue(ep.gold_answer)}</div>
         </div>
-        <div class="answer-card final ${matchCls}">
-          <div class="lbl">Final answer · ${fm.exact_match ? "exact match" : "no match"}</div>
+        <div class="answer-card final ${matchCls}" title="${esc(TIP.correct)}">
+          <div class="lbl">Final answer · ${correct ? "correct" : "incorrect"}</div>
           <div class="val">${esc(ep.final_answer) || "<span class='redacted'>(none)</span>"}</div>
         </div>
       </div>
       <div class="chips">
-        ${metric(fm.exact_match ? "1" : "0", "EM")}
-        ${metric(num(fm.f1), "F1")}
-        ${metric(pct(fm.supporting_doc_recall), "doc recall")}
-        ${metric(pct(fm.supporting_fact_recall), "fact recall")}
+        ${metric(correct ? "✓" : "✗", "correct", TIP.correct)}
+        ${metric(fm.exact_match ? "1" : "0", "EM", TIP.em)}
+        ${metric(num(fm.f1), "F1", TIP.f1)}
+        ${metric(pct(fm.supporting_doc_recall), "doc recall", TIP.doc_recall)}
+        ${metric(pct(fm.supporting_fact_recall), "fact recall", TIP.fact_recall)}
       </div>
       <div class="meta-line">
-        <span>budget <b>${esc(ep.budget)}</b></span>
-        <span>guidance <b>G${esc(ep.guidance_level)}</b></span>
-        <span>stop <b>${esc(ep.stop_reason)}</b></span>
-        <span>student <code>${esc(ep.student_model)}</code></span>
-        <span>teacher <code>${esc(ep.teacher_model)}</code></span>
+        <span title="${esc(TIP.budget)}">budget <b>${esc(ep.budget)}</b></span>
+        <span title="${esc(TIP.used_steps)}">used steps <b>${esc(usedSteps)}</b></span>
+        <span title="${esc(TIP.guidance)}">guidance <b>G${esc(ep.guidance_level)}</b></span>
+        <span title="${esc(TIP.stop_reason)}">stop <b>${esc(ep.stop_reason)}</b></span>
+        <span title="${esc(TIP.student)}">student <code>${esc(cleanModel(ep.student_model))}</code></span>
+        <span title="${esc(TIP.teacher)}">teacher <code>${esc(cleanModel(ep.teacher_model))}</code></span>
       </div>
     </div>`;
 
   const planHtml = renderPlanReview(ep.plan_review || {});
   const stepsHtml = `
     <div class="section">
-      <h3>Trajectory · ${(ep.steps || []).length} steps</h3>
+      <h3 title="${esc(TIP.used_steps)}">Trajectory · ${usedSteps} used steps of budget ${esc(ep.budget)}</h3>
       <div class="timeline">${(ep.steps || []).map(renderStep).join("")}</div>
     </div>`;
 
   document.getElementById("detail").innerHTML = header + planHtml + stepsHtml;
 }
 
-function metric(v, k) { return `<span class="metric"><span class="mv">${esc(v)}</span><span class="mk">${esc(k)}</span></span>`; }
+function metric(v, k, tip) {
+  const t = tip ? ` title="${esc(tip)}"` : "";
+  return `<span class="metric"${t}><span class="mv">${esc(v)}</span><span class="mk">${esc(k)}</span></span>`;
+}
 
 function planStepsList(steps) {
   if (!steps || !steps.length) return `<div class="redacted">—</div>`;
@@ -166,12 +203,13 @@ function renderPlanReview(pr) {
   const leaked = ["gold_answer_leaked", "hidden_title_leaked", "hidden_doc_id_leaked", "hidden_span_leaked"]
     .some((k) => leak[k]);
   const leakBadge = leaked
-    ? badge("guard fired · sanitized", "warn")
-    : badge("no leakage", "good");
+    ? badge("guard fired · sanitized", "warn", TIP.leakage)
+    : badge("no leakage", "good", TIP.leakage);
+  const skipBadge = pr.revision_skipped ? badge("revision skipped · plan accepted", "accent", TIP.plan_review) : "";
 
   return `
   <div class="section">
-    <h3>Plan review ${leakBadge}</h3>
+    <h3 title="${esc(TIP.plan_review)}">Plan review ${leakBadge}${skipBadge}</h3>
     <div class="panel">
       <div class="plan-grid">
         <div class="plan-col">
@@ -260,7 +298,7 @@ function renderStep(s) {
   <div class="step">
     <div class="step-head">
       <span class="t">Step ${esc(s.t)}</span>
-      ${badge(action.tool || "?", "tool")}
+      ${badge(action.tool || "?", "tool", TIP.step_tool)}
       ${decision.category ? badge(decision.category) : ""}
       ${s.stop_condition === "FINISH" ? badge("FINISH", "accent") : ""}
       ${leakBadge}
@@ -280,7 +318,7 @@ function renderStep(s) {
         ${renderObservation(s.tool_observation)}
       </div>
       <div class="block">
-        <div class="blk-label">Student-visible guidance</div>
+        <div class="blk-label" title="${esc(TIP.guidance_box)}">Student-visible guidance</div>
         ${guidanceHtml}
       </div>
       <div class="block">

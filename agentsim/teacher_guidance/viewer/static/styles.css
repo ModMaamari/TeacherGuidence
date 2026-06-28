@@ -25,6 +25,9 @@
 
 * { box-sizing: border-box; }
 
+[title] { cursor: help; }
+.episode-item[title], .toggle, .field select { cursor: pointer; }
+
 body {
   margin: 0;
   font-family: var(--sans);
