@@ -11,7 +11,18 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from agentsim.teacher_guidance.metrics import cover_match
+
 EPISODE_FILENAME = "teacher_guidance_episodes.jsonl"
+
+
+def _answer_correct(ep: Dict[str, Any]) -> bool:
+    """Correctness for an episode, computed on the fly for older runs that only
+    stored ``exact_match``."""
+    fm = ep.get("final_metrics", {}) or {}
+    if "answer_correct" in fm:
+        return bool(fm["answer_correct"])
+    return cover_match(ep.get("final_answer", ""), ep.get("gold_answer", ""))
 
 
 def _read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -55,6 +66,7 @@ def _episode_summary(ep: Dict[str, Any]) -> Dict[str, Any]:
         "gold_answer": ep.get("gold_answer", ""),
         "final_answer": ep.get("final_answer", ""),
         "exact_match": bool(fm.get("exact_match", False)),
+        "answer_correct": _answer_correct(ep),
         "f1": float(fm.get("f1", 0.0) or 0.0),
         "supporting_doc_recall": float(fm.get("supporting_doc_recall", 0.0) or 0.0),
         "stop_reason": ep.get("stop_reason", ""),
@@ -87,6 +99,7 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
         if not episodes:
             continue
         em = [1.0 if (e.get("final_metrics", {}) or {}).get("exact_match") else 0.0 for e in episodes]
+        correct = [1.0 if _answer_correct(e) else 0.0 for e in episodes]
         f1 = [float((e.get("final_metrics", {}) or {}).get("f1", 0.0) or 0.0) for e in episodes]
         doc = [float((e.get("final_metrics", {}) or {}).get("supporting_doc_recall", 0.0) or 0.0) for e in episodes]
         stop_reasons: Dict[str, int] = {}
@@ -103,6 +116,7 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
                 "student_model": first.get("student_model", ""),
                 "teacher_model": first.get("teacher_model", ""),
                 "mean_exact_match": _mean(em),
+                "mean_correct": _mean(correct),
                 "mean_f1": _mean(f1),
                 "mean_doc_recall": _mean(doc),
                 "stop_reasons": stop_reasons,
@@ -146,5 +160,8 @@ def get_episode(output_root: str | Path, run_id: str, qid: str) -> Optional[Dict
     for episode_file in _episode_files_for_run(output_root, run_id):
         for ep in _read_jsonl(episode_file):
             if str(ep.get("qid")) == str(qid):
+                fm = ep.setdefault("final_metrics", {})
+                if "answer_correct" not in fm:
+                    fm["answer_correct"] = _answer_correct(ep)
                 return ep
     return None

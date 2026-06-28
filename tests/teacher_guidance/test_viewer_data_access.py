@@ -72,3 +72,32 @@ def test_traversal_is_rejected(output_root):
 
 def test_empty_root(tmp_path):
     assert da.find_runs(tmp_path / "nope") == []
+
+
+def test_answer_correct_retroactive(tmp_path):
+    # Old-style episode: final_metrics has exact_match=False (gold "no" vs wrapped answer)
+    # and NO answer_correct field. The viewer should still mark it correct.
+    ep = {
+        "qid": "qX",
+        "query": "were both french filmmakers?",
+        "gold_answer": "no",
+        "final_answer": "No. One was a New Zealand filmmaker.",
+        "guidance_level": 3,
+        "steps": [{"t": 1}],
+        "final_metrics": {"exact_match": False, "f1": 0.1, "supporting_doc_recall": 1.0},
+        "stop_reason": "teacher_accept",
+    }
+    sd = tmp_path / "sim_y" / "runZ" / "ds" / "sample_001"
+    sd.mkdir(parents=True)
+    (sd / da.EPISODE_FILENAME).write_text(json.dumps(ep) + "\n", encoding="utf-8")
+
+    summary = da.get_run_episodes(tmp_path, "sim_y/runZ")[0]
+    assert summary["exact_match"] is False
+    assert summary["answer_correct"] is True
+
+    full = da.get_episode(tmp_path, "sim_y/runZ", "qX")
+    assert full["final_metrics"]["answer_correct"] is True
+
+    run = next(r for r in da.find_runs(tmp_path) if r["run_id"] == "sim_y/runZ")
+    assert run["mean_correct"] == 1.0
+    assert run["mean_exact_match"] == 0.0

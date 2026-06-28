@@ -3,6 +3,7 @@
 from agentsim.teacher_guidance.metrics import (
     normalize_answer,
     exact_match,
+    cover_match,
     f1_score,
     supporting_doc_recall,
     supporting_fact_recall,
@@ -29,6 +30,29 @@ def test_f1_partial_overlap():
 def test_f1_value():
     # precision 1/2, recall 1/1 -> F1 = 2*0.5*1/1.5 = 0.6667
     assert round(f1_score("Delhi city", "Delhi"), 4) == 0.6667
+
+
+def test_cover_match_answer_plus_explanation():
+    # The exact case from the UI: gold "no", student answered "No. <explanation>"
+    pred = "No. Roger Donaldson is an Australian-born New Zealand filmmaker, while Andre Cayatte was a French filmmaker."
+    assert exact_match(pred, "no") is False
+    assert cover_match(pred, "no") is True
+
+
+def test_cover_match_entity_contained():
+    assert cover_match("The answer is The Oberoi Group.", "The Oberoi Group") is True
+    assert cover_match("It is located in Delhi today", "Delhi") is True
+
+
+def test_cover_match_short_gold_must_lead():
+    # incidental "no" deep in a wrong answer must NOT count
+    assert cover_match("There is no clear winner", "no") is False
+    assert cover_match("No, definitely", "no") is True
+
+
+def test_cover_match_negative():
+    assert cover_match("Mumbai", "Delhi") is False
+    assert cover_match("", "Delhi") is False
 
 
 def test_supporting_doc_recall():

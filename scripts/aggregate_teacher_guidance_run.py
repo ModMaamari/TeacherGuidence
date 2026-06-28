@@ -39,6 +39,10 @@ def main() -> None:
         return
 
     em = [1.0 if e["final_metrics"].get("exact_match") else 0.0 for e in episodes]
+    correct = [
+        1.0 if e["final_metrics"].get("answer_correct", e["final_metrics"].get("exact_match")) else 0.0
+        for e in episodes
+    ]
     f1 = [float(e["final_metrics"].get("f1", 0.0)) for e in episodes]
     doc_recall = [float(e["final_metrics"].get("supporting_doc_recall", 0.0)) for e in episodes]
     fact_recall = [float(e["final_metrics"].get("supporting_fact_recall", 0.0)) for e in episodes]
@@ -66,6 +70,7 @@ def main() -> None:
     print(f"Student / Teacher model: {episodes[0].get('student_model')} / {episodes[0].get('teacher_model')}")
     print("-" * 48)
     print(f"Exact match (mean):      {_mean(em)}")
+    print(f"Answer correct (mean):   {_mean(correct)}")
     print(f"F1 (mean):               {_mean(f1)}")
     print(f"Supporting doc recall:   {_mean(doc_recall)}")
     print(f"Supporting fact recall:  {_mean(fact_recall)}")

@@ -34,6 +34,37 @@ def exact_match(pred: str, gold: str) -> bool:
     return normalize_answer(pred) == normalize_answer(gold)
 
 
+def cover_match(pred: str, gold: str) -> bool:
+    """Robust-but-cheap correctness: does the prediction contain the gold answer?
+
+    Handles the common "answer + explanation" pattern (gold ``no`` vs prediction
+    ``No. Roger Donaldson is ...``) without an LLM:
+
+    * exact normalized equality, or
+    * the gold answer appears as a contiguous span of normalized tokens in the
+      prediction.
+
+    A short yes/no-style gold (single token <= 3 chars) must *lead* the prediction, to
+    avoid matching an incidental ``no`` deep inside a longer answer.
+    """
+    p = normalize_answer(pred)
+    g = normalize_answer(gold)
+    if not g:
+        return False
+    if p == g:
+        return True
+    pt = p.split()
+    gt = g.split()
+    if not pt or not gt or len(gt) > len(pt):
+        return False
+    if len(gt) == 1 and len(gt[0]) <= 3:
+        return pt[0] == gt[0]
+    for i in range(len(pt) - len(gt) + 1):
+        if pt[i : i + len(gt)] == gt:
+            return True
+    return False
+
+
 def f1_score(pred: str, gold: str) -> float:
     pred_tokens = normalize_answer(pred).split()
     gold_tokens = normalize_answer(gold).split()
@@ -137,6 +168,7 @@ def compute_final_metrics(
 ) -> Dict[str, Any]:
     return {
         "exact_match": exact_match(final_answer, gold_answer),
+        "answer_correct": cover_match(final_answer, gold_answer),
         "f1": round(f1_score(final_answer, gold_answer), 4),
         "supporting_doc_recall": round(
             supporting_doc_recall(set(retrieved_doc_ids), set(gold_doc_ids)), 4
