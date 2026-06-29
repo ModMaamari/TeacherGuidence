@@ -162,13 +162,9 @@ class TeacherGuidedAgentStep(ControlComponent):
         if plan_tracker is not None:
             state["expected_plan_step"] = plan_tracker.expected_step()
         student_prompt = build_student_prompt(state, guidance_config, force_finish)
-        student_raw = await self.llm_client.get_completion(
-            prompt=student_prompt,
-            model=student_model,
-            temperature=student_temp,
-            max_tokens=context.metadata.get("student_max_tokens", 1200),
+        student_action, student_raw, parse_info, repair_attempts = await self._student_action_with_repair(
+            context, student_prompt, student_model, student_temp
         )
-        student_action, parse_info = parse_student_action(student_raw)
 
         if force_finish and student_action.action.tool != "finish":
             student_action = _force_finish_action(context)
@@ -221,6 +217,7 @@ class TeacherGuidedAgentStep(ControlComponent):
             "t": step_index,
             "student_prompt": student_prompt,
             "student_raw": student_raw,
+            "student_repair_attempts": repair_attempts,
             "student_action": student_action.to_dict(),
             "tool_observation": tool_observation,
             "teacher_prompt": teacher_prompt,
@@ -266,6 +263,38 @@ class TeacherGuidedAgentStep(ControlComponent):
             },
             execution_time_ms=(time.time() - start) * 1000,
         )
+
+    async def _student_action_with_repair(self, context, student_prompt, student_model, student_temp):
+        """Call the student; if the action is unparseable or has an invalid tool, re-ask
+        it (up to student_max_repair_attempts) with a generic, gold-free correction note.
+
+        Returns ``(student_action, final_raw, parse_info, repair_attempts)``.
+        """
+        max_repairs = int(context.metadata.get("student_max_repair_attempts", 1))
+        max_tokens = context.metadata.get("student_max_tokens", 1200)
+        prompt = student_prompt
+        attempts = 0
+        student_raw = await self.llm_client.get_completion(
+            prompt=prompt, model=student_model, temperature=student_temp, max_tokens=max_tokens,
+        )
+        student_action, parse_info = parse_student_action(student_raw)
+
+        while (not parse_info.get("json_valid") or not parse_info.get("action_valid")) and attempts < max_repairs:
+            attempts += 1
+            problems = ", ".join(parse_info.get("errors", [])) or "the output was not a single valid JSON action"
+            correction = (
+                f"\n\nYour previous response was not a valid action ({problems}). "
+                "Return ONLY one corrected JSON object that matches the action schema exactly: "
+                "a valid action.tool from the allowed list, with no text outside the JSON."
+            )
+            student_raw = await self.llm_client.get_completion(
+                prompt=prompt + correction, model=student_model, temperature=student_temp, max_tokens=max_tokens,
+            )
+            student_action, parse_info = parse_student_action(student_raw)
+
+        if attempts:
+            logger.info(f"[TG step] student action repaired after {attempts} retry(s); valid={parse_info.get('action_valid')}")
+        return student_action, student_raw, parse_info, attempts
 
     def _update_done(self, context, student_action, teacher_decision, force_finish) -> bool:
         if force_finish:

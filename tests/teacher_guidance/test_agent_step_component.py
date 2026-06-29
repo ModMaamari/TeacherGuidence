@@ -106,6 +106,36 @@ def test_force_finish_overrides_and_stops(tmp_path):
     assert ctx.metadata["teacher_guided_steps"][0]["student_action"]["action"]["tool"] == "finish"
 
 
+def test_student_repair_retry_on_invalid_action(tmp_path):
+    # First student output is invalid (bad tool); a retry returns a valid action.
+    bad = json.dumps({"thought": "hmm", "decision": {"category": "need_retrieval"},
+                      "action": {"tool": "google_it", "params": {}}, "new_facts_extracted": []})
+    good = json.dumps({"thought": "search", "decision": {"category": "need_retrieval"},
+                       "action": {"tool": "search", "params": {"query": "Oberoi HQ", "k": 2}},
+                       "new_facts_extracted": []})
+    teacher = json.dumps({"guidance_level": 3, "student_visible": {"score_continuous": 0.6, "feedback": "ok"},
+                          "private_diagnosis": {}, "teacher_decision": "continue"})
+
+    class RepairStub:
+        def __init__(self): self.student_calls = 0
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                return teacher
+            self.student_calls += 1
+            # invalid first, valid on the correction retry
+            return bad if "previous response was not a valid action" not in prompt else good
+
+    ctx = _context(tmp_path)
+    stub = RepairStub()
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["student_repair_attempts"] == 1
+    assert step["student_action"]["action"]["tool"] == "search"  # ended valid
+    assert stub.student_calls == 2  # one retry
+
+
 def test_guidance_does_not_leak_gold_answer(tmp_path):
     student = json.dumps({
         "thought": "finish", "decision": {"category": "finish", "parametric_knowledge_used": False},
