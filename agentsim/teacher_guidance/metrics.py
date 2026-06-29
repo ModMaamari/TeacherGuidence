@@ -34,18 +34,32 @@ def exact_match(pred: str, gold: str) -> bool:
     return normalize_answer(pred) == normalize_answer(gold)
 
 
-def cover_match(pred: str, gold: str) -> bool:
-    """Robust-but-cheap correctness: does the prediction contain the gold answer?
+def _is_contiguous_span(needle: list, hay: list) -> bool:
+    if not needle or len(needle) > len(hay):
+        return False
+    for i in range(len(hay) - len(needle) + 1):
+        if hay[i : i + len(needle)] == needle:
+            return True
+    return False
 
-    Handles the common "answer + explanation" pattern (gold ``no`` vs prediction
-    ``No. Roger Donaldson is ...``) without an LLM:
+
+def _has_number(tokens: list) -> bool:
+    return any(any(ch.isdigit() for ch in tok) for tok in tokens)
+
+
+def cover_match(pred: str, gold: str) -> bool:
+    """Robust-but-cheap correctness, in both directions, without an LLM.
+
+    Accepts when:
 
     * exact normalized equality, or
-    * the gold answer appears as a contiguous span of normalized tokens in the
-      prediction.
-
-    A short yes/no-style gold (single token <= 3 chars) must *lead* the prediction, to
-    avoid matching an incidental ``no`` deep inside a longer answer.
+    * the gold answer appears as a contiguous token span in the prediction
+      (the "answer + explanation" pattern: gold ``no`` vs ``No. Roger Donaldson ...``;
+      a short yes/no-style gold must *lead* the prediction), or
+    * the prediction is the salient core of a longer gold (gold ``22 episodes`` vs
+      prediction ``22``): the prediction is a contiguous token span of the gold and is
+      "salient" — it contains a number or covers at least half the gold tokens. This
+      avoids accepting a partial entity (``York`` vs ``New York City``).
     """
     p = normalize_answer(pred)
     g = normalize_answer(gold)
@@ -55,13 +69,22 @@ def cover_match(pred: str, gold: str) -> bool:
         return True
     pt = p.split()
     gt = g.split()
-    if not pt or not gt or len(gt) > len(pt):
+    if not pt or not gt:
         return False
-    if len(gt) == 1 and len(gt[0]) <= 3:
-        return pt[0] == gt[0]
-    for i in range(len(pt) - len(gt) + 1):
-        if pt[i : i + len(gt)] == gt:
+
+    # Direction 1: gold contained in the prediction.
+    if len(gt) <= len(pt):
+        if len(gt) == 1 and len(gt[0]) <= 3:
+            if pt[0] == gt[0]:
+                return True
+        elif _is_contiguous_span(gt, pt):
             return True
+
+    # Direction 2: prediction is the salient core of a longer gold.
+    if len(pt) < len(gt) and _is_contiguous_span(pt, gt):
+        if _has_number(pt) or 2 * len(pt) >= len(gt):
+            return True
+
     return False
 
 

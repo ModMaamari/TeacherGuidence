@@ -50,6 +50,21 @@ def test_cover_match_short_gold_must_lead():
     assert cover_match("No, definitely", "no") is True
 
 
+def test_cover_match_prediction_is_core_of_gold():
+    # The UI case: gold "22 episodes.", student answered "22"
+    assert exact_match("22", "22 episodes.") is False
+    assert cover_match("22", "22 episodes.") is True
+    # number-bearing core inside a longer gold
+    assert cover_match("1996", "the year 1996 census") is True
+    # half-coverage core
+    assert cover_match("Delhi", "Delhi, India") is True
+
+
+def test_cover_match_partial_entity_rejected():
+    # a partial entity that is neither numeric nor half the gold must NOT count
+    assert cover_match("York", "New York City") is False
+
+
 def test_cover_match_negative():
     assert cover_match("Mumbai", "Delhi") is False
     assert cover_match("", "Delhi") is False
