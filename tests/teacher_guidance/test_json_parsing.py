@@ -86,3 +86,20 @@ def test_plan_review_config_new_fields():
     assert o.planner == "teacher" and o.planning_steps == 3 and o.formal_plan is True
     # planning_steps is clamped to >= 1
     assert PlanReviewConfig.from_mode_config({"plan_review": {"planning_steps": 0}}).planning_steps == 1
+
+
+def test_repair_trailing_comma():
+    obj, info = parse_json_object('{"action": {"tool": "search", "params": {"k": 5,},},}')
+    assert info["json_valid"] and info["repaired"]
+    assert obj["action"]["tool"] == "search"
+
+
+def test_repair_curly_quotes():
+    obj, info = parse_json_object('{“action”: {“tool”: “finish”}}')
+    assert info["json_valid"] and info["repaired"]
+    assert obj["action"]["tool"] == "finish"
+
+
+def test_valid_json_not_marked_repaired():
+    obj, info = parse_json_object('{"a": 1}')
+    assert info["json_valid"] and info["repaired"] is False

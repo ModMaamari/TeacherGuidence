@@ -11,6 +11,7 @@ them as dataset labels (``json_valid``, ``errors``).
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from agentsim.teacher_guidance.schemas import (
@@ -69,24 +70,44 @@ def extract_first_json_object(raw: str) -> Optional[str]:
     return None
 
 
+def _repair_json(text: str) -> str:
+    """Apply safe, common repairs for small-model JSON glitches.
+
+    Only conservative fixes that do not change well-formed JSON: normalise curly quotes
+    to straight quotes and remove trailing commas before ``}``/``]``.
+    """
+    repaired = (
+        text.replace("“", '"').replace("”", '"')
+        .replace("‘", "'").replace("’", "'")
+    )
+    repaired = re.sub(r",(\s*[}\]])", r"\1", repaired)
+    return repaired
+
+
 def parse_json_object(raw: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Parse the first JSON object from ``raw``.
 
-    Returns ``(obj, info)`` where ``info`` has ``json_valid`` and ``errors``.
-    On failure ``obj`` is ``{}``.
+    Returns ``(obj, info)`` where ``info`` has ``json_valid``, ``errors``, and
+    ``repaired`` (True if a repair pass was needed). On failure ``obj`` is ``{}``.
     """
-    info: Dict[str, Any] = {"json_valid": False, "errors": []}
+    info: Dict[str, Any] = {"json_valid": False, "errors": [], "repaired": False}
 
     candidate = extract_first_json_object(raw)
     if candidate is None:
         info["errors"].append("no_json_object_found")
         return {}, info
 
+    obj = None
     try:
         obj = json.loads(candidate)
-    except json.JSONDecodeError as exc:
-        info["errors"].append(f"json_decode_error: {exc}")
-        return {}, info
+    except json.JSONDecodeError:
+        # Try a conservative repair pass before giving up.
+        try:
+            obj = json.loads(_repair_json(candidate))
+            info["repaired"] = True
+        except json.JSONDecodeError as exc:
+            info["errors"].append(f"json_decode_error: {exc}")
+            return {}, info
 
     if not isinstance(obj, dict):
         info["errors"].append("json_not_object")
