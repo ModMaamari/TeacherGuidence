@@ -8,10 +8,36 @@ extracted spans against retrieved text, and records all state on ``context.metad
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 
 from agentsim.workflow.context import EvidenceSpan
 from agentsim.teacher_guidance.schemas import StudentAction, ToolObservation
+
+_QUOTE_CHARS = "\"'“”‘’`"
+
+
+def clean_span(span: str) -> str:
+    """Strip wrapping quotes and collapse whitespace from a student-provided span.
+
+    Small models often wrap extract targets in literal quotes (e.g. '"English stage and
+    film director"'), which breaks naive substring validation. We strip those and
+    normalise whitespace without otherwise altering the text, so grounding is preserved.
+    """
+    s = (span or "").strip()
+    while len(s) >= 2 and s[0] in _QUOTE_CHARS and s[-1] in _QUOTE_CHARS:
+        s = s[1:-1].strip()
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip().lower()
+
+
+def span_in_text(span: str, doc_text: str) -> bool:
+    """True if the cleaned span appears in the doc text (whitespace- and case-tolerant)."""
+    cleaned = clean_span(span)
+    return bool(cleaned) and _norm(cleaned) in _norm(doc_text)
 
 
 def _scope(context: Any) -> Dict[str, Any]:
@@ -36,8 +62,9 @@ def _ingest_facts(context: Any, action: StudentAction) -> List[Dict[str, Any]]:
     stored: List[Dict[str, Any]] = []
     for fact in action.new_facts_extracted:
         evidence = context.get_evidence_by_id(fact.doc_id)
-        if evidence and fact.span and fact.span.strip() and fact.span.strip() in evidence.text:
-            entry = {"doc_id": fact.doc_id, "span": fact.span, "fact": fact.fact}
+        if evidence and span_in_text(fact.span, evidence.text):
+            cleaned = clean_span(fact.span)
+            entry = {"doc_id": fact.doc_id, "span": cleaned, "fact": fact.fact or cleaned}
             context.metadata.setdefault("extracted_facts", []).append(entry)
             stored.append(entry)
     return stored
@@ -79,16 +106,17 @@ def _do_extract(context: Any, params: Dict[str, Any]) -> ToolObservation:
 
     for span in target_facts:
         span_text = str(span)
+        cleaned = clean_span(span_text)
         matched_doc = None
         # Prefer the explicitly named docs, else any retrieved doc.
         search_ids = doc_ids if doc_ids else context.metadata.get("retrieved_doc_ids", [])
         for doc_id in search_ids:
             evidence = context.get_evidence_by_id(doc_id)
-            if evidence and span_text.strip() and span_text.strip() in evidence.text:
+            if evidence and span_in_text(span_text, evidence.text):
                 matched_doc = doc_id
                 break
         if matched_doc:
-            entry = {"doc_id": matched_doc, "span": span_text, "fact": span_text}
+            entry = {"doc_id": matched_doc, "span": cleaned, "fact": cleaned}
             context.metadata.setdefault("extracted_facts", []).append(entry)
             extracted.append(entry)
         else:

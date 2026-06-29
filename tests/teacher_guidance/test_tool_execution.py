@@ -66,6 +66,30 @@ def test_extract_accepts_verbatim_span(context, retriever):
     assert any(f["span"] == "headquartered in Delhi" for f in context.metadata["extracted_facts"])
 
 
+def test_extract_tolerates_wrapping_quotes(context, retriever):
+    # The exact failure from the local run: the student wrapped the span in quotes.
+    execute_student_tool(context, _action("search", {"query": "Delhi", "k": 2}), retriever)
+    obs = execute_student_tool(
+        context,
+        _action("extract", {"doc_ids": ["q1::doc1"], "target_facts": ['"headquartered in Delhi"']}),
+        retriever,
+    )
+    assert obs["status"] == "ok"
+    # stored span has the quotes stripped
+    assert obs["extracted"][0]["span"] == "headquartered in Delhi"
+
+
+def test_extract_tolerates_case_and_whitespace(context, retriever):
+    execute_student_tool(context, _action("search", {"query": "Delhi", "k": 2}), retriever)
+    obs = execute_student_tool(
+        context,
+        _action("extract", {"doc_ids": ["q1::doc1"], "target_facts": ["  HEADQUARTERED   in   Delhi "]}),
+        retriever,
+    )
+    assert obs["status"] == "ok"
+    assert obs["extracted"][0]["span"] == "HEADQUARTERED in Delhi"
+
+
 def test_extract_rejects_paraphrase(context, retriever):
     execute_student_tool(context, _action("search", {"query": "Delhi", "k": 2}), retriever)
     obs = execute_student_tool(
