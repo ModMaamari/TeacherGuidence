@@ -160,6 +160,41 @@ def test_planning_loop_respects_max_rounds():
     assert record["metrics"]["revisions_done"] == 2
 
 
+def test_teacher_planner_authors_and_sanitizes_plan():
+    # Teacher writes the plan and (wrongly) puts the gold answer in a step goal.
+    teacher_plan = json.dumps({
+        "plan_summary": "Search for both, then compare professions.",
+        "steps": [
+            {"step_id": 1, "goal": "search for the answer Delhi", "intended_tool": "search", "rationale": "x", "depends_on": []},
+            {"step_id": 2, "goal": "verify", "intended_tool": "verify", "rationale": "y", "depends_on": [1]},
+        ],
+        "uncertainties": [], "stop_condition": "verified",
+    })
+
+    class TeacherStub:
+        def __init__(self): self.calls = 0
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            self.calls += 1
+            return teacher_plan
+
+    ctx = _context({"enabled": True, "planner": "teacher"})
+    stub = TeacherStub()
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    result = asyncio.run(comp.execute(ctx))
+
+    assert result.data["verdict"] == "PROCEED"
+    record = ctx.metadata["plan_review"]
+    assert record["planner"] == "teacher"
+    assert record["initial_student_plan"] is None
+    # exactly one LLM call (teacher) — no student drafting/revision
+    assert stub.calls == 1
+    # the revised plan is the teacher plan, with the gold answer sanitized out
+    plan_text = json.dumps(ctx.metadata["revised_plan"])
+    assert "Delhi" not in plan_text
+    assert record["leakage_check"]["gold_answer_leaked"] is True
+    assert ctx.metadata["revised_plan"]["steps"][1]["intended_tool"] == "verify"
+
+
 def test_accept_plan_skips_revision():
     initial = json.dumps({
         "plan_summary": "search then verify then answer",

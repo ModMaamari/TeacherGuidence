@@ -169,6 +169,44 @@ def build_initial_plan_prompt(state: Dict[str, Any], plan_review_config: PlanRev
     return "\n\n".join(parts)
 
 
+def build_teacher_plan_prompt(
+    state: Dict[str, Any],
+    gold: Dict[str, Any],
+    guidance_config: GuidanceConfig,
+    plan_review_config: PlanReviewConfig,
+) -> str:
+    """Teacher-planner mode: the teacher authors the full plan the student will follow.
+
+    The plan is shown to the student, so it must NOT contain the gold answer, hidden
+    gold titles, or hidden doc ids (the code sanitizes the plan afterwards regardless).
+    """
+    parts: List[str] = []
+    parts.append(
+        "You are a teacher writing a complete, retrieval-oriented plan FOR THE STUDENT to "
+        "follow. You can see the gold metadata, which is PRIVATE: do NOT reveal the gold "
+        "answer, hidden gold titles, or hidden doc ids in the plan — describe how to "
+        "retrieve and verify evidence, not the answer itself."
+    )
+    parts.append(_TOOL_REFERENCE)
+    parts.append(f"Question: {state.get('question', '')}")
+    parts.append("Gold metadata (PRIVATE — for your planning only):")
+    parts.append(_json(gold))
+    parts.append(
+        f"Produce at most {plan_review_config.max_initial_plan_steps} ordered steps the "
+        "student should execute with the tools above."
+    )
+    parts.append(
+        "Return ONLY a JSON object:\n"
+        "{\n"
+        '  "plan_summary": "...",\n'
+        '  "steps": [{"step_id": 1, "goal": "...", "intended_tool": "search", "rationale": "...", "depends_on": []}],\n'
+        '  "uncertainties": ["..."],\n'
+        '  "stop_condition": "..."\n'
+        "}"
+    )
+    return "\n\n".join(parts)
+
+
 def build_plan_review_prompt(
     state: Dict[str, Any],
     gold: Dict[str, Any],

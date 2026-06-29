@@ -29,11 +29,13 @@ from agentsim.teacher_guidance.prompts import (
     build_initial_plan_prompt,
     build_plan_review_prompt,
     build_revised_plan_prompt,
+    build_teacher_plan_prompt,
 )
 from agentsim.teacher_guidance.guidance_policy import (
     render_student_guidance,
     derive_plan_review_guidance_config,
 )
+from agentsim.teacher_guidance.leakage import sanitize_rendered_guidance
 from agentsim.teacher_guidance.plan_review import compute_plan_review_metrics
 
 
@@ -104,6 +106,14 @@ class TeacherGuidedPlanReview(ControlComponent):
         student_temp = context.metadata.get("student_temperature", 0.2)
         teacher_temp = context.metadata.get("teacher_temperature", 0.1)
         state = build_student_visible_state(context, step_index=0, budget=0)
+
+        # Teacher-planner mode: the teacher authors the whole plan; the student just
+        # follows it. No student drafting/revision.
+        if config.planner == "teacher":
+            return await self._teacher_planner(
+                context, state, gold, review_guidance, config,
+                teacher_model, teacher_temp, start,
+            )
 
         # 1. Initial plan (student).
         initial_prompt = build_initial_plan_prompt(state, config)
@@ -209,6 +219,60 @@ class TeacherGuidedPlanReview(ControlComponent):
                 "llm_output": initial_raw,
                 "rationale_tag": "TEACHER_GUIDED_PLAN_REVIEW",
                 "private_reasoning": "Preflight plan review",
+            },
+            execution_time_ms=(time.time() - start) * 1000,
+        )
+
+    async def _teacher_planner(
+        self, context, state, gold, review_guidance, config, teacher_model, teacher_temp, start
+    ) -> ComponentResult:
+        plan_prompt = build_teacher_plan_prompt(state, gold, review_guidance, config)
+        plan_raw = await self.llm_client.get_completion(
+            prompt=plan_prompt, model=teacher_model, temperature=teacher_temp,
+            max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
+        )
+        teacher_plan, _ = parse_student_plan(plan_raw)
+
+        # The teacher-authored plan is student-visible, so sanitize any leaked gold.
+        clean_plan, leakage = sanitize_rendered_guidance(
+            teacher_plan, _preflight_visibility(context), review_guidance
+        )
+
+        steps = clean_plan.get("steps", []) if isinstance(clean_plan, dict) else []
+        record = {
+            "enabled": True,
+            "planner": "teacher",
+            "planning_steps": config.planning_steps,
+            "num_planning_rounds": 0,
+            "revision_skipped": True,
+            "initial_student_plan": None,
+            "teacher_plan_prompt": plan_prompt,
+            "teacher_plan_raw": plan_raw,
+            "teacher_authored_plan": teacher_plan,
+            "revised_student_plan": clean_plan,
+            "student_visible_plan_feedback": None,
+            "leakage_check": leakage,
+            "metrics": {
+                "planner": "teacher",
+                "plan_step_count": len(steps),
+                "num_planning_rounds": 0,
+                "revisions_done": 0,
+                "revision_skipped": True,
+            },
+        }
+        context.metadata["plan_review"] = record
+        context.metadata["revised_plan"] = clean_plan
+
+        logger.info(f"[TG plan_review] planner=teacher steps={len(steps)}")
+
+        return ComponentResult(
+            success=True,
+            data={"plan_review": record, "verdict": "PROCEED"},
+            metadata={
+                "llm_input": plan_prompt,
+                "llm_output": plan_raw,
+                "rationale_tag": "TEACHER_GUIDED_PLAN_REVIEW",
+                "private_reasoning": "Teacher-authored plan",
             },
             execution_time_ms=(time.time() - start) * 1000,
         )
