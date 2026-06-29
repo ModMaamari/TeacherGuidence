@@ -81,6 +81,13 @@ def build_student_prompt(
         parts.append("Your current revised plan (follow it unless evidence requires deviating):")
         parts.append(_json(state["revised_plan"]))
 
+    if state.get("expected_plan_step") is not None:
+        parts.append(
+            "The plan step you are expected to execute now (your action.tool should "
+            "match its intended_tool unless tool results require otherwise):"
+        )
+        parts.append(_json(state["expected_plan_step"]))
+
     parts.append("Previous actions: " + _json(state.get("previous_actions", [])))
     parts.append("Retrieved documents so far (previews only): " + _json(state.get("retrieved_docs", [])))
     parts.append("Extracted facts so far: " + _json(state.get("extracted_facts", [])))

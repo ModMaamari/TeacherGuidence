@@ -20,8 +20,9 @@ from agentsim.components.base import ComponentSpec, ComponentResult, ComponentRe
 from agentsim.components.control.base import ControlComponent
 from agentsim.workflow.context import WorkflowContext
 
-from agentsim.teacher_guidance.schemas import GuidanceConfig, StudentAction
+from agentsim.teacher_guidance.schemas import GuidanceConfig, PlanReviewConfig, StudentAction
 from agentsim.teacher_guidance.local_retrieval import HotpotLocalRetriever
+from agentsim.teacher_guidance.plan_execution import PlanTracker
 from agentsim.teacher_guidance.json_utils import parse_student_action, parse_teacher_evaluation
 from agentsim.teacher_guidance.prompts import (
     build_student_visible_state,
@@ -35,6 +36,24 @@ from agentsim.teacher_guidance.metrics import compute_step_metrics
 
 def _guidance_config(context: WorkflowContext) -> GuidanceConfig:
     return GuidanceConfig.from_mode_config({"guidance": context.metadata.get("guidance", {})})
+
+
+def get_plan_tracker(context: WorkflowContext) -> Optional[PlanTracker]:
+    """Return a per-episode PlanTracker when formal-plan tracking is enabled and a plan
+    exists, creating it on first use."""
+    pr_config = PlanReviewConfig.from_mode_config(
+        {"plan_review": context.metadata.get("plan_review_config", {})}
+    )
+    if not pr_config.formal_plan:
+        return None
+    plan = context.metadata.get("revised_plan")
+    if not plan:
+        return None
+    tracker = getattr(context, "_tg_plan_tracker", None)
+    if tracker is None:
+        tracker = PlanTracker(plan)
+        context._tg_plan_tracker = tracker
+    return tracker
 
 
 def get_retriever(context: WorkflowContext) -> HotpotLocalRetriever:
@@ -139,6 +158,9 @@ class TeacherGuidedAgentStep(ControlComponent):
 
         # --- Student turn ---
         state = build_student_visible_state(context, step_index, budget)
+        plan_tracker = get_plan_tracker(context)
+        if plan_tracker is not None:
+            state["expected_plan_step"] = plan_tracker.expected_step()
         student_prompt = build_student_prompt(state, guidance_config, force_finish)
         student_raw = await self.llm_client.get_completion(
             prompt=student_prompt,
@@ -150,6 +172,12 @@ class TeacherGuidedAgentStep(ControlComponent):
 
         if force_finish and student_action.action.tool != "finish":
             student_action = _force_finish_action(context)
+
+        # Programmatically verify this action against the formal plan (if enabled).
+        plan_adherence_info = None
+        if plan_tracker is not None:
+            plan_adherence_info = plan_tracker.record(student_action.action.tool)
+            context.metadata["plan_adherence"] = plan_tracker.adherence()
 
         tool_observation = execute_student_tool(context, student_action, retriever)
 
@@ -184,6 +212,8 @@ class TeacherGuidedAgentStep(ControlComponent):
             retrieved_doc_ids=set(context.metadata.get("retrieved_doc_ids", []) or []),
             gold_doc_ids=gold_doc_ids,
         )
+        if plan_adherence_info is not None:
+            step_metrics.update(plan_adherence_info)
 
         done = self._update_done(context, student_action, teacher_eval.teacher_decision, force_finish)
 

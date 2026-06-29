@@ -114,6 +114,7 @@ class TeacherGuidanceEpisodeExporter:
             ],
             "final_answer": final_answer,
             "final_metrics": final_metrics,
+            "plan_adherence": md.get("plan_adherence"),
             "stop_reason": md.get("stop_reason", "error"),
         }
 
