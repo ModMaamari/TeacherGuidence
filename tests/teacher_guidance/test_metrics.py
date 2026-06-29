@@ -74,6 +74,17 @@ def test_cover_match_prefix_token():
     assert cover_match("Saint Bartholomew the Apostle", "Bart") is False
 
 
+def test_ampersand_normalized_to_and():
+    # gold uses "and", student used "&"
+    assert normalize_answer("Centers for Medicare & Medicaid Services") == \
+        normalize_answer("Centers for Medicare and Medicaid Services")
+
+
+def test_cover_match_ampersand_in_verbose_answer():
+    pred = "The program is administered by the Centers for Medicare & Medicaid Services (CMS)."
+    assert cover_match(pred, "Centers for Medicare and Medicaid Services") is True
+
+
 def test_cover_match_negative():
     assert cover_match("Mumbai", "Delhi") is False
     assert cover_match("", "Delhi") is False

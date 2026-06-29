@@ -27,7 +27,11 @@ def normalize_answer(text: str) -> str:
     def remove_punc(s: str) -> str:
         return "".join(ch for ch in s if ch not in set(string.punctuation))
 
-    return white_space_fix(remove_articles(remove_punc((text or "").lower())))
+    def normalize_ampersand(s: str) -> str:
+        # Treat "&" as the word "and" so "Medicare & Medicaid" == "Medicare and Medicaid".
+        return s.replace("&", " and ")
+
+    return white_space_fix(remove_articles(remove_punc(normalize_ampersand((text or "").lower()))))
 
 
 def exact_match(pred: str, gold: str) -> bool:
