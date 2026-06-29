@@ -116,3 +116,10 @@ def test_student_prompt_has_format_example_without_gold():
     # the example is a placeholder, not dataset content, and never the gold answer
     assert "Delhi" not in prompt
     assert "<your search terms>" in prompt
+
+
+def test_validate_finish_requires_answer():
+    ok, errors = validate_student_action({"action": {"tool": "finish", "params": {}}})
+    assert not ok and any("finish_missing_answer" in e for e in errors)
+    ok2, _ = validate_student_action({"action": {"tool": "finish", "params": {"answer": "Delhi"}}})
+    assert ok2

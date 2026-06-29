@@ -96,7 +96,9 @@ def _visibility(context: WorkflowContext, retriever: HotpotLocalRetriever) -> Di
 
 
 def _force_finish_action(context: WorkflowContext) -> StudentAction:
-    answer = context.metadata.get("draft_answer") or context.metadata.get("candidate_final_answer") or ""
+    from agentsim.teacher_guidance.tool_executor import derive_final_answer
+
+    answer = derive_final_answer(context)
     return StudentAction.from_dict(
         {
             "thought": "Budget exhausted; committing best available answer.",

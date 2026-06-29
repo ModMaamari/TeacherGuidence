@@ -132,8 +132,14 @@ def validate_student_action(obj: Dict[str, Any]) -> Tuple[bool, List[str]]:
         tool = action.get("tool")
         if tool not in TOOLS:
             errors.append(f"invalid_tool:{tool}")
-        if "params" in action and not isinstance(action.get("params"), dict):
+        params = action.get("params")
+        if "params" in action and not isinstance(params, dict):
             errors.append("params_not_object")
+        # A finish action must carry a non-empty answer.
+        if tool == "finish":
+            answer = (params or {}).get("answer") if isinstance(params, dict) else None
+            if not (isinstance(answer, str) and answer.strip()):
+                errors.append("finish_missing_answer")
 
     decision = obj.get("decision")
     if isinstance(decision, dict):

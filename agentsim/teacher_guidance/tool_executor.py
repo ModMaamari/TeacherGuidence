@@ -152,8 +152,21 @@ def _do_synthesize(context: Any) -> ToolObservation:
     return ToolObservation(tool="synthesize", status="ok", data={"draft_answer": draft})
 
 
+def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -> str:
+    """Best non-empty final answer: the student's answer, else the draft, else the
+    extracted facts, else a last-resort placeholder. Never empty."""
+    params = params or {}
+    answer = str(params.get("answer", "") or "").strip()
+    if not answer:
+        answer = str(context.metadata.get("draft_answer", "") or "").strip()
+    if not answer:
+        facts = context.metadata.get("extracted_facts", []) or []
+        answer = " ".join(str(f.get("fact", "")).strip() for f in facts).strip()
+    return answer or "unknown"
+
+
 def _do_finish(context: Any, params: Dict[str, Any]) -> ToolObservation:
-    answer = str(params.get("answer", "") or context.metadata.get("draft_answer", "") or "")
+    answer = derive_final_answer(context, params)
     citations = params.get("citations", []) or []
     context.metadata["candidate_final_answer"] = answer
     context.metadata["final_answer"] = answer

@@ -112,8 +112,10 @@ def build_student_prompt(
 
     if force_finish:
         parts.append(
-            "You are at the final budget step. You MUST use action.tool = \"finish\". "
-            "Return the best final answer using only retrieved/extracted evidence."
+            "You are at the final budget step. You MUST use action.tool = \"finish\" and "
+            "you MUST include a non-empty \"answer\" string with your best answer, even if "
+            "you are uncertain — never leave the answer empty. Base it on the "
+            "retrieved/extracted evidence."
         )
 
     parts.append(_STUDENT_ACTION_SCHEMA)

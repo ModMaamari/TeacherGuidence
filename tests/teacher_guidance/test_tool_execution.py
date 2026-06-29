@@ -117,6 +117,20 @@ def test_finish_sets_final_answer(context, retriever):
     assert context.metadata["final_answer"] == "Delhi"
 
 
+def test_finish_never_empty_uses_draft(context, retriever):
+    context.metadata["draft_answer"] = "Delhi"
+    obs = execute_student_tool(context, _action("finish", {}), retriever)
+    assert obs["answer"] == "Delhi"
+    assert context.metadata["final_answer"] == "Delhi"
+
+
+def test_finish_never_empty_last_resort(context, retriever):
+    # no answer, no draft, no facts -> still non-empty
+    obs = execute_student_tool(context, _action("finish", {"citations": []}), retriever)
+    assert obs["answer"] and obs["answer"] != ""
+    assert context.metadata["final_answer"]
+
+
 def test_new_facts_validated_against_evidence(context, retriever):
     execute_student_tool(context, _action("search", {"query": "Delhi", "k": 2}), retriever)
     # valid span via new_facts_extracted on a non-extract tool (synthesize)
