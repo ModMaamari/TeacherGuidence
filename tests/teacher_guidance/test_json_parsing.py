@@ -73,3 +73,16 @@ def test_validate_teacher_evaluation_rejects_bad_decision():
     )
     assert not ok
     assert any("invalid_teacher_decision" in e for e in errors)
+
+
+def test_plan_review_config_new_fields():
+    from agentsim.teacher_guidance.schemas import PlanReviewConfig
+    # defaults
+    d = PlanReviewConfig.from_mode_config({"plan_review": {"enabled": True}})
+    assert d.planner == "student" and d.planning_steps == 1 and d.formal_plan is False
+    # overrides
+    o = PlanReviewConfig.from_mode_config({"plan_review": {
+        "enabled": True, "planner": "teacher", "planning_steps": 3, "formal_plan": True}})
+    assert o.planner == "teacher" and o.planning_steps == 3 and o.formal_plan is True
+    # planning_steps is clamped to >= 1
+    assert PlanReviewConfig.from_mode_config({"plan_review": {"planning_steps": 0}}).planning_steps == 1

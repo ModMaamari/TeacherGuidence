@@ -296,6 +296,9 @@ class GuidanceConfig:
 @dataclass
 class PlanReviewConfig:
     enabled: bool = False
+    planner: str = "student"  # "student" | "teacher"
+    planning_steps: int = 1  # max student review->revise rounds before tool use
+    formal_plan: bool = False  # track student adherence to the plan programmatically
     review_guidance_level: Optional[int] = None  # None means reuse guidance.level
     max_initial_plan_steps: int = 6
     max_revised_plan_steps: int = 6
@@ -312,6 +315,9 @@ class PlanReviewConfig:
         rgl = block.get("review_guidance_level", None)
         return cls(
             enabled=bool(block.get("enabled", False)),
+            planner=str(block.get("planner", "student")),
+            planning_steps=max(1, int(block.get("planning_steps", 1) or 1)),
+            formal_plan=bool(block.get("formal_plan", False)),
             review_guidance_level=(int(rgl) if rgl is not None else None),
             max_initial_plan_steps=int(block.get("max_initial_plan_steps", 6) or 6),
             max_revised_plan_steps=int(block.get("max_revised_plan_steps", 6) or 6),
