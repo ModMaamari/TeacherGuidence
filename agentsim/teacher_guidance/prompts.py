@@ -36,6 +36,16 @@ _STUDENT_ACTION_SCHEMA = """Return ONLY a JSON object with this shape (no prose 
   "new_facts_extracted": [{"doc_id": "...", "span": "verbatim span", "fact": "grounded fact"}]
 }"""
 
+# A single neutral example, included only to reinforce the JSON FORMAT. Its content is
+# generic and unrelated to any dataset question, so it cannot leak gold information.
+_STUDENT_EXAMPLE = """Format example only (your content and tool will differ):
+{
+  "thought": "I should retrieve evidence about the topic before answering.",
+  "decision": {"category": "need_retrieval", "parametric_knowledge_used": false},
+  "action": {"tool": "search", "params": {"query": "<your search terms>", "k": 5}},
+  "new_facts_extracted": []
+}"""
+
 
 def build_student_visible_state(context: Any, step_index: int, budget: int) -> Dict[str, Any]:
     """Assemble the student-visible state dict from a workflow context.
@@ -107,6 +117,7 @@ def build_student_prompt(
         )
 
     parts.append(_STUDENT_ACTION_SCHEMA)
+    parts.append(_STUDENT_EXAMPLE)
     return "\n\n".join(parts)
 
 

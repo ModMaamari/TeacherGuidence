@@ -103,3 +103,16 @@ def test_repair_curly_quotes():
 def test_valid_json_not_marked_repaired():
     obj, info = parse_json_object('{"a": 1}')
     assert info["json_valid"] and info["repaired"] is False
+
+
+def test_student_prompt_has_format_example_without_gold():
+    from agentsim.teacher_guidance.prompts import build_student_prompt
+    from agentsim.teacher_guidance.schemas import GuidanceConfig
+    state = {"question": "Where is the Oberoi Group HQ?", "step": 1, "budget": 5,
+             "previous_actions": [], "retrieved_docs": [], "extracted_facts": [],
+             "draft_answer": None, "sub_questions": [], "previous_teacher_guidance": None}
+    prompt = build_student_prompt(state, GuidanceConfig(level=3), force_finish=False)
+    assert "Format example only" in prompt
+    # the example is a placeholder, not dataset content, and never the gold answer
+    assert "Delhi" not in prompt
+    assert "<your search terms>" in prompt
