@@ -113,41 +113,75 @@ class TeacherGuidedPlanReview(ControlComponent):
         )
         initial_plan, _ = parse_student_plan(initial_raw)
 
-        # 2. Teacher plan review.
-        review_prompt = build_plan_review_prompt(
-            state, gold, initial_plan, review_guidance, config
-        )
-        review_raw = await self.llm_client.get_completion(
-            prompt=review_prompt, model=teacher_model, temperature=teacher_temp,
-            max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
-        )
-        review_full, _ = parse_teacher_plan_review(review_raw)
+        # 2. Planning loop: teacher review -> student revision, up to planning_steps
+        #    rounds or until the teacher accepts the plan (whichever comes first).
+        current_plan = dict(initial_plan) if isinstance(initial_plan, dict) else initial_plan
+        rounds = []
+        review_full = {}
+        rendered_feedback = {}
+        leakage = {}
+        review_prompt = review_raw = revision_prompt = revision_raw = None
+        revisions_done = 0
 
-        rendered_feedback, leakage = render_student_guidance(
-            review_full, review_guidance, _preflight_visibility(context)
-        )
+        for round_idx in range(1, config.planning_steps + 1):
+            review_prompt = build_plan_review_prompt(
+                state, gold, current_plan, review_guidance, config
+            )
+            review_raw = await self.llm_client.get_completion(
+                prompt=review_prompt, model=teacher_model, temperature=teacher_temp,
+                max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
+            )
+            review_full, _ = parse_teacher_plan_review(review_raw)
+            rendered_feedback, leakage = render_student_guidance(
+                review_full, review_guidance, _preflight_visibility(context)
+            )
+            accepted = review_full.get("teacher_decision") == "accept_plan"
+            round_rec = {
+                "round": round_idx,
+                "teacher_plan_review_prompt": review_prompt,
+                "teacher_plan_review_raw": review_raw,
+                "teacher_plan_review_full": review_full,
+                "student_visible_plan_feedback": rendered_feedback,
+                "leakage_check": leakage,
+                "accepted": accepted,
+            }
+            if accepted:
+                round_rec["revised_student_plan"] = current_plan
+                rounds.append(round_rec)
+                break
 
-        # 3. Revised plan (student). If the teacher accepted the plan, there is nothing
-        # to revise — reuse the initial plan and skip the extra LLM call (saves cost).
-        revision_skipped = review_full.get("teacher_decision") == "accept_plan"
-        if revision_skipped:
-            revision_prompt = None
-            revision_raw = None
-            revised_plan = dict(initial_plan) if isinstance(initial_plan, dict) else initial_plan
-        else:
-            revision_prompt = build_revised_plan_prompt(state, initial_plan, rendered_feedback, config)
+            revision_prompt = build_revised_plan_prompt(state, current_plan, rendered_feedback, config)
             revision_raw = await self.llm_client.get_completion(
                 prompt=revision_prompt, model=student_model, temperature=student_temp,
                 max_tokens=context.metadata.get("student_plan_max_tokens", 900),
             )
             revised_plan, _ = parse_revised_plan(revision_raw)
+            round_rec["revised_student_plan_prompt"] = revision_prompt
+            round_rec["revised_student_plan_raw"] = revision_raw
+            round_rec["revised_student_plan"] = revised_plan
+            rounds.append(round_rec)
+            current_plan = revised_plan
+            revisions_done += 1
+
+        revised_plan = current_plan
+        revision_skipped = revisions_done == 0
+
+        metrics = compute_plan_review_metrics(initial_plan, revised_plan, review_full)
+        metrics["num_planning_rounds"] = len(rounds)
+        metrics["revisions_done"] = revisions_done
+        metrics["revision_skipped"] = revision_skipped
 
         record = {
             "enabled": True,
+            "planner": "student",
+            "planning_steps": config.planning_steps,
+            "num_planning_rounds": len(rounds),
             "revision_skipped": revision_skipped,
             "initial_student_plan_prompt": initial_prompt,
             "initial_student_plan_raw": initial_raw,
             "initial_student_plan": initial_plan,
+            "rounds": rounds,
+            # Top-level fields reflect the final round (kept for backward compatibility).
             "teacher_plan_review_prompt": review_prompt,
             "teacher_plan_review_raw": review_raw,
             "teacher_plan_review_full": review_full,
@@ -156,14 +190,14 @@ class TeacherGuidedPlanReview(ControlComponent):
             "revised_student_plan_raw": revision_raw,
             "revised_student_plan": revised_plan,
             "leakage_check": leakage,
-            "metrics": compute_plan_review_metrics(initial_plan, revised_plan, review_full),
+            "metrics": metrics,
         }
         context.metadata["plan_review"] = record
         context.metadata["revised_plan"] = revised_plan
 
         logger.info(
-            f"[TG plan_review] review_level={review_guidance.level} "
-            f"decision={review_full.get('teacher_decision')} "
+            f"[TG plan_review] planner=student rounds={len(rounds)} "
+            f"final_decision={review_full.get('teacher_decision')} "
             f"revision_skipped={revision_skipped}"
         )
 

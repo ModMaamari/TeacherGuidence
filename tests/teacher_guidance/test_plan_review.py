@@ -92,6 +92,74 @@ def test_enabled_flow_records_and_sanitizes():
     assert record["metrics"]["revised_covers_verification"] is True
 
 
+class SequencedStub:
+    """Returns the initial plan, then a sequence of teacher reviews, with revisions."""
+
+    def __init__(self, initial, reviews, revised):
+        self.initial = initial
+        self.reviews = list(reviews)
+        self.revised = revised
+        self.review_i = 0
+        self.calls = 0
+
+    async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+        self.calls += 1
+        if "teacher reviewing" in prompt:
+            r = self.reviews[min(self.review_i, len(self.reviews) - 1)]
+            self.review_i += 1
+            return r
+        if "Revise your plan" in prompt:
+            return self.revised
+        return self.initial
+
+
+def test_multistep_planning_loop_runs_until_accept():
+    initial = json.dumps({
+        "plan_summary": "v0", "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+        "uncertainties": [], "stop_condition": "done",
+    })
+    revise = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 0.5, "feedback": "revise"},
+                         "private_diagnosis": {}, "teacher_decision": "revise_plan"})
+    accept = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 1.0, "feedback": "good"},
+                         "private_diagnosis": {}, "teacher_decision": "accept_plan"})
+    revised = json.dumps({"revision_summary": "r", "plan_summary": "v1",
+                          "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+                          "teacher_feedback_used": [], "stop_condition": "done"})
+
+    ctx = _context({"enabled": True, "review_guidance_level": 3, "planning_steps": 3})
+    # round 1 revise -> round 2 accept (stops before round 3)
+    stub = SequencedStub(initial, [revise, accept], revised)
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    result = asyncio.run(comp.execute(ctx))
+
+    record = ctx.metadata["plan_review"]
+    assert record["num_planning_rounds"] == 2
+    assert record["metrics"]["revisions_done"] == 1
+    assert record["revision_skipped"] is False
+    # calls: initial + (review+revise) + review(accept) = 4
+    assert stub.calls == 4
+    assert record["rounds"][-1]["accepted"] is True
+
+
+def test_planning_loop_respects_max_rounds():
+    initial = json.dumps({"plan_summary": "v0", "steps": [], "uncertainties": [], "stop_condition": "x"})
+    revise = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 0.4, "feedback": "again"},
+                         "private_diagnosis": {}, "teacher_decision": "revise_plan"})
+    revised = json.dumps({"revision_summary": "r", "plan_summary": "vN", "steps": [],
+                          "teacher_feedback_used": [], "stop_condition": "x"})
+    ctx = _context({"enabled": True, "review_guidance_level": 3, "planning_steps": 2})
+    stub = SequencedStub(initial, [revise, revise], revised)
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+    record = ctx.metadata["plan_review"]
+    # never accepted -> exactly planning_steps rounds, each with a revision
+    assert record["num_planning_rounds"] == 2
+    assert record["metrics"]["revisions_done"] == 2
+
+
 def test_accept_plan_skips_revision():
     initial = json.dumps({
         "plan_summary": "search then verify then answer",
