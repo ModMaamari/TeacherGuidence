@@ -1,0 +1,60 @@
+id: hotpot_tg_b5_g3_planning_plus_openrouter
+name: "HotpotQA Teacher Guidance B=5 G=3 — multistep planning + formal plan (OpenRouter)"
+mode: standard
+
+# Showcases the extended planning options. Uses OpenRouter via the `custom` provider
+# (set CUSTOM_LLM_ENDPOINT / CUSTOM_LLM_API_KEY in .env).
+teacher_models:
+  - name: student
+    model_id: custom/qwen/qwen3.7-plus
+    role: teacher
+    temperature: 0.2
+
+consultant_models: []
+
+workflows:
+  - hotpot_teacher_guided_b5_plan_review
+
+datasets:
+  - name: hotpot_questions
+    path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_questions.jsonl
+    num_samples: 10
+    sample_strategy: sequential
+
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+
+verification:
+  enabled: false
+
+mode_config:
+  budget: 5
+  student_model: custom/qwen/qwen3.7-plus
+  teacher_model: custom/z-ai/glm-5.2
+  corpus_path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_corpus.jsonl
+  retrieval_backend: hotpot_local
+
+  guidance:
+    level: 3
+    name: diagnostic_feedback
+    score_mode: continuous
+    max_feedback_words: 60
+    leak_policy: strict
+
+  plan_review:
+    enabled: true
+    planner: student          # "student" (loop) or "teacher" (teacher writes the plan)
+    planning_steps: 2         # up to 2 review->revise rounds, or until the teacher accepts
+    formal_plan: true         # track student adherence to the plan programmatically
+    review_guidance_level: 3
+    max_initial_plan_steps: 6
+    max_revised_plan_steps: 6
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+
+output_dir: ./data/simulation_output/hotpot_tg_b5_g3_planning_plus_openrouter

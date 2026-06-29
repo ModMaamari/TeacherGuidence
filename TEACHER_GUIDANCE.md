@@ -185,6 +185,30 @@ agentsim viewer --output-root data/simulation_output --port 8000
 
 See [`TEACHER_GUIDANCE_UI.md`](TEACHER_GUIDANCE_UI.md) for the full UI guide.
 
+## 5c. Planning options
+
+The `plan_review` block supports three planning controls:
+
+- **`planner`** — `student` (the student drafts the plan, the teacher reviews it) or
+  `teacher` (the teacher writes the full plan for the student to follow; the plan is
+  sanitized for leakage before the student sees it).
+- **`planning_steps`** — for the student planner, the maximum number of
+  review → revise rounds. The loop stops early as soon as the teacher returns
+  `accept_plan`. `planning_steps: 1` reproduces the original single-round behaviour.
+- **`formal_plan`** — when `true`, the finalized plan is treated as a formal, ordered
+  list of steps. The current expected step is surfaced in the student prompt, and each
+  executed action is checked against the plan's expected tool. Per-step
+  `expected_tool` / `plan_step_followed` labels and an episode-level `plan_adherence`
+  score are recorded. The student still chooses every action — this is a deterministic
+  verifier, not a rewrite.
+
+A ready-to-run example combining all three is
+`hotpot_tg_b5_g3_planning_plus_openrouter`:
+
+```bash
+agentsim simulate hotpot_tg_b5_g3_planning_plus_openrouter
+```
+
 ## 6. Guidance levels
 
 | Level | Name | Student sees |
