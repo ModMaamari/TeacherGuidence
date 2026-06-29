@@ -65,6 +65,15 @@ def test_cover_match_partial_entity_rejected():
     assert cover_match("York", "New York City") is False
 
 
+def test_cover_match_prefix_token():
+    # The UI case: gold "KXII", student answered "...is KXII-TV (virtual channel 12)..."
+    pred = "The CBS-affiliated station serving Pontotoc County is KXII-TV (virtual channel 12)."
+    assert exact_match(pred, "KXII") is False
+    assert cover_match(pred, "KXII") is True
+    # a weak prefix (covers < 60% of the token) must NOT count
+    assert cover_match("Saint Bartholomew the Apostle", "Bart") is False
+
+
 def test_cover_match_negative():
     assert cover_match("Mumbai", "Delhi") is False
     assert cover_match("", "Delhi") is False

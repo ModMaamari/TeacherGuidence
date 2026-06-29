@@ -85,6 +85,17 @@ def cover_match(pred: str, gold: str) -> bool:
         if _has_number(pt) or 2 * len(pt) >= len(gt):
             return True
 
+    # Direction 3: a single-token gold is a strong prefix of a prediction token
+    # (gold "KXII" vs prediction token "KXII-TV" -> "kxiitv"). Requires the shorter to
+    # be a prefix of the longer and to cover >= 60% of it, so "KXII"/"KXII-TV" matches
+    # but "Bart"/"Bartholomew" does not.
+    if len(gt) == 1 and len(gt[0]) >= 4:
+        gtok = gt[0]
+        for tok in pt:
+            shorter, longer = sorted([gtok, tok], key=len)
+            if longer.startswith(shorter) and len(shorter) / len(longer) >= 0.6:
+                return True
+
     return False
 
 
