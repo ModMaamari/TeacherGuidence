@@ -36,6 +36,9 @@ class Config:
     # Ollama
     OLLAMA_ENDPOINT: str = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
     OLLAMA_ENABLED: bool = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
+    # Hybrid "thinking" mode for Ollama models (Qwen3, etc.). Off by default because
+    # this framework expects JSON-only outputs.
+    OLLAMA_THINK: bool = os.getenv("OLLAMA_THINK", "false").lower() == "true"
     
     # ============================================
     # Default Models

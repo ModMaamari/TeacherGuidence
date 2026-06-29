@@ -269,6 +269,11 @@ class LLMClient:
                     "model": model_name,
                     "prompt": prompt,
                     "stream": False,
+                    # Disable hybrid "thinking" mode (e.g. Qwen3): this framework asks
+                    # for JSON-only outputs, so reasoning preambles waste tokens and can
+                    # leave the response empty if num_predict is exhausted while thinking.
+                    # Ignored by non-thinking models.
+                    "think": config.OLLAMA_THINK,
                     "options": {
                         "temperature": temperature,
                         "num_predict": max_tokens or config.LLM_MAX_TOKENS

@@ -1,0 +1,68 @@
+id: hotpot_tg_b10_g3_plan_review_qwen_local
+name: "HotpotQA Teacher Guidance B=10 G=3 + plan review (local Qwen3.5-4B student / GLM-5.2 teacher)"
+mode: standard
+
+# Student runs locally via Ollama (GPU); teacher runs on OpenRouter via the `custom`
+# provider. The two use different providers, so they hit different endpoints:
+#   student -> ollama/qwen3.5:4b      (OLLAMA_ENDPOINT, default http://127.0.0.1:11434)
+#   teacher -> custom/z-ai/glm-5.2    (CUSTOM_LLM_ENDPOINT=https://openrouter.ai/api)
+teacher_models:
+  - name: student
+    model_id: ollama/qwen3.5:4b
+    role: teacher
+    temperature: 0.2
+
+consultant_models: []
+
+workflows:
+  - hotpot_teacher_guided_b10_plan_review
+
+datasets:
+  # Same 10 questions as the previous session (do NOT regenerate this file).
+  - name: hotpot_questions
+    path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_questions.jsonl
+    num_samples: 10
+    sample_strategy: sequential
+
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+
+verification:
+  enabled: false
+
+mode_config:
+  budget: 10
+  student_model: ollama/qwen3.5:4b
+  teacher_model: custom/z-ai/glm-5.2
+  corpus_path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_corpus.jsonl
+  retrieval_backend: hotpot_local
+
+  guidance:
+    level: 3
+    name: diagnostic_feedback
+    score_mode: continuous
+    max_feedback_words: 60
+    expose_next_action_hint: false
+    expose_tool_hint: false
+    expose_query_hint: false
+    expose_doc_title_hint: false
+    expose_gold_answer_hint: false
+    leak_policy: strict
+
+  plan_review:
+    enabled: true
+    planner: student
+    planning_steps: 1
+    formal_plan: false
+    review_guidance_level: 3
+    max_initial_plan_steps: 6
+    max_revised_plan_steps: 6
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+
+output_dir: ./data/simulation_output/hotpot_tg_b10_g3_plan_review_qwen_local
