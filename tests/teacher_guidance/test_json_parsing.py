@@ -123,3 +123,18 @@ def test_validate_finish_requires_answer():
     assert not ok and any("finish_missing_answer" in e for e in errors)
     ok2, _ = validate_student_action({"action": {"tool": "finish", "params": {"answer": "Delhi"}}})
     assert ok2
+
+
+def test_plan_prompts_are_budget_aware():
+    from agentsim.teacher_guidance.prompts import build_initial_plan_prompt
+    from agentsim.teacher_guidance.schemas import PlanReviewConfig
+    cfg = PlanReviewConfig(enabled=True, max_initial_plan_steps=6)
+    state = {"question": "q?", "budget": 5}
+    prompt = build_initial_plan_prompt(state, cfg)
+    assert "budget of 5 tool-use steps" in prompt
+    # step cap is min(max_initial_plan_steps=6, budget=5) = 5
+    assert "at most 5 steps" in prompt
+    # without a budget, falls back to the configured max
+    no_budget = build_initial_plan_prompt({"question": "q?", "budget": 0}, cfg)
+    assert "at most 6 steps" in no_budget
+    assert "budget of" not in no_budget

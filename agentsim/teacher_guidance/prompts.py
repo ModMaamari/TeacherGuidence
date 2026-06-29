@@ -165,6 +165,24 @@ def build_teacher_prompt(
     return "\n\n".join(parts)
 
 
+def _plan_step_cap(state: Dict[str, Any], plan_review_config: PlanReviewConfig) -> int:
+    """Cap the plan length at the smaller of the configured max and the step budget."""
+    budget = int(state.get("budget") or 0)
+    cap = plan_review_config.max_initial_plan_steps
+    return min(cap, budget) if budget > 0 else cap
+
+
+def _budget_clause(state: Dict[str, Any]) -> str:
+    budget = int(state.get("budget") or 0)
+    if budget <= 0:
+        return ""
+    return (
+        f"You have a budget of {budget} tool-use steps for this question. Your plan MUST be "
+        f"executable within {budget} steps (at most {budget} steps; fewer is fine), and the "
+        "final step must be 'finish'."
+    )
+
+
 def build_initial_plan_prompt(state: Dict[str, Any], plan_review_config: PlanReviewConfig) -> str:
     parts: List[str] = []
     parts.append(
@@ -173,8 +191,11 @@ def build_initial_plan_prompt(state: Dict[str, Any], plan_review_config: PlanRev
     )
     parts.append(_TOOL_REFERENCE)
     parts.append(f"Question: {state.get('question', '')}")
+    budget_clause = _budget_clause(state)
+    if budget_clause:
+        parts.append(budget_clause)
     parts.append(
-        f"Produce at most {plan_review_config.max_initial_plan_steps} steps describing how to "
+        f"Produce at most {_plan_step_cap(state, plan_review_config)} steps describing how to "
         "retrieve and verify evidence (not a final answer)."
     )
     parts.append(
@@ -211,8 +232,11 @@ def build_teacher_plan_prompt(
     parts.append(f"Question: {state.get('question', '')}")
     parts.append("Gold metadata (PRIVATE — for your planning only):")
     parts.append(_json(gold))
+    budget_clause = _budget_clause(state)
+    if budget_clause:
+        parts.append(budget_clause)
     parts.append(
-        f"Produce at most {plan_review_config.max_initial_plan_steps} ordered steps the "
+        f"Produce at most {_plan_step_cap(state, plan_review_config)} ordered steps the "
         "student should execute with the tools above."
     )
     parts.append(
@@ -244,6 +268,13 @@ def build_plan_review_prompt(
     parts.append(_json(gold))
     parts.append("Student initial plan:")
     parts.append(_json(initial_plan))
+    budget = int(state.get("budget") or 0)
+    if budget > 0:
+        parts.append(
+            f"The student has a budget of {budget} tool-use steps. A plan that needs more "
+            f"than {budget} steps cannot be fully executed — if so, ask the student to "
+            "tighten it to fit the budget."
+        )
     allowed = []
     if plan_review_config.allow_teacher_to_suggest_tools:
         allowed.append("suggest tools")
@@ -286,8 +317,13 @@ def build_revised_plan_prompt(
     parts.append(_json(initial_plan))
     parts.append("Teacher feedback (student-visible only):")
     parts.append(_json(rendered_plan_feedback))
+    budget_clause = _budget_clause(state)
+    if budget_clause:
+        parts.append(budget_clause)
+    revised_cap = min(plan_review_config.max_revised_plan_steps, int(state.get("budget") or 0)) \
+        if int(state.get("budget") or 0) > 0 else plan_review_config.max_revised_plan_steps
     parts.append(
-        f"Produce at most {plan_review_config.max_revised_plan_steps} steps.\n"
+        f"Produce at most {revised_cap} steps.\n"
         "Return ONLY a JSON object:\n"
         "{\n"
         '  "revision_summary": "...",\n'

@@ -105,7 +105,8 @@ class TeacherGuidedPlanReview(ControlComponent):
         teacher_model = context.metadata.get("teacher_model")
         student_temp = context.metadata.get("student_temperature", 0.2)
         teacher_temp = context.metadata.get("teacher_temperature", 0.1)
-        state = build_student_visible_state(context, step_index=0, budget=0)
+        budget = int(context.metadata.get("budget") or 0)
+        state = build_student_visible_state(context, step_index=0, budget=budget)
 
         # Teacher-planner mode: the teacher authors the whole plan; the student just
         # follows it. No student drafting/revision.
