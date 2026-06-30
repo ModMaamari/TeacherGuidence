@@ -116,8 +116,10 @@ function renderEpisodeList(filter) {
       <div class="meta">${okBadge}${badge("F1 " + num(e.f1), "", TIP.f1)}${badge(e.num_steps + " steps", "", TIP.used_steps)}${badge(e.stop_reason || "—", "", TIP.stop_reason)}</div>
     </li>`;
   }).join("");
-  ul.querySelectorAll(".episode-item").forEach((li) =>
-    li.addEventListener("click", () => loadEpisode(li.dataset.qid)));
+  ul.querySelectorAll(".episode-item").forEach((li) => {
+    li.addEventListener("click", () => loadEpisode(li.dataset.qid));
+    li.addEventListener("dblclick", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  });
 }
 
 // ---------- episode detail ----------
