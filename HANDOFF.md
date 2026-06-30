@@ -28,10 +28,6 @@ Central design rules (kept stable):
   validates extracted spans against retrieved text.
 - The final step is forced to `finish` when the budget is exhausted.
 
-Source-of-truth design docs (outside the repo, on the original dev machine):
-`D:\AgentsResearch\AgentSim-TeacherGuidence\Teacher_Guidance_Process_Report.md` and
-`AgentSim_Fork_Implementation_Plan.md`. They are NOT committed.
-
 ---
 
 ## 2. Where the code lives
