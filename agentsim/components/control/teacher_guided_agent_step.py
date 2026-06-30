@@ -184,13 +184,9 @@ class TeacherGuidedAgentStep(ControlComponent):
         teacher_prompt = build_teacher_prompt(
             state, gold, student_action.to_dict(), tool_observation, guidance_config
         )
-        teacher_raw = await self.llm_client.get_completion(
-            prompt=teacher_prompt,
-            model=teacher_model,
-            temperature=teacher_temp,
-            max_tokens=context.metadata.get("teacher_max_tokens", 1000),
+        teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts = await self._teacher_eval_with_repair(
+            context, teacher_prompt, teacher_model, teacher_temp
         )
-        teacher_eval, teacher_parse = parse_teacher_evaluation(teacher_raw)
         teacher_full = {
             "guidance_level": teacher_eval.guidance_level,
             "student_visible": teacher_eval.student_visible,
@@ -224,6 +220,7 @@ class TeacherGuidedAgentStep(ControlComponent):
             "tool_observation": tool_observation,
             "teacher_prompt": teacher_prompt,
             "teacher_raw": teacher_raw,
+            "teacher_repair_attempts": teacher_repair_attempts,
             "teacher_full": teacher_full,
             "student_visible_guidance": rendered_guidance,
             "leakage_check": leakage,
@@ -297,6 +294,47 @@ class TeacherGuidedAgentStep(ControlComponent):
         if attempts:
             logger.info(f"[TG step] student action repaired after {attempts} retry(s); valid={parse_info.get('action_valid')}")
         return student_action, student_raw, parse_info, attempts
+
+    async def _teacher_eval_with_repair(self, context, teacher_prompt, teacher_model, teacher_temp):
+        """Call the teacher for a per-step evaluation; if the response fails to parse
+        into a valid evaluation (often a reasoning model burning its token budget on
+        hidden reasoning before emitting JSON, leaving the response truncated), retry up
+        to teacher_max_repair_attempts with a corrective note and a larger token budget.
+
+        Returns ``(teacher_eval, final_raw, parse_info, repair_attempts)``.
+        """
+        max_repairs = int(context.metadata.get("teacher_max_repair_attempts", 1))
+        base_tokens = context.metadata.get("teacher_max_tokens", 1000)
+        retry_tokens = context.metadata.get("teacher_max_tokens_retry", 2000)
+
+        prompt = teacher_prompt
+        attempts = 0
+        teacher_raw = await self.llm_client.get_completion(
+            prompt=prompt, model=teacher_model, temperature=teacher_temp, max_tokens=base_tokens,
+        )
+        teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)
+
+        while (not parse_info.get("json_valid") or not parse_info.get("eval_valid")) and attempts < max_repairs:
+            attempts += 1
+            problems = ", ".join(parse_info.get("errors", [])) or "the output was not one complete, valid JSON object"
+            correction = (
+                f"\n\nYour previous response was not a valid evaluation ({problems}); it may "
+                "have been cut off before the JSON object was complete. Return ONLY one "
+                "complete, corrected JSON object matching the schema exactly, with no text "
+                "outside the JSON."
+            )
+            teacher_raw = await self.llm_client.get_completion(
+                prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
+                max_tokens=retry_tokens,
+            )
+            teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)
+
+        if attempts:
+            logger.info(
+                f"[TG step] teacher evaluation repaired after {attempts} retry(s); "
+                f"valid={parse_info.get('eval_valid')}"
+            )
+        return teacher_eval, teacher_raw, parse_info, attempts
 
     def _update_done(self, context, student_action, teacher_decision, force_finish) -> bool:
         if force_finish:
