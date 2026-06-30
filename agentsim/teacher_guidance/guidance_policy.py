@@ -19,6 +19,16 @@ from typing import Any, Dict, Tuple
 from agentsim.teacher_guidance.schemas import GuidanceConfig
 from agentsim.teacher_guidance.leakage import sanitize_rendered_guidance
 
+# Shown in place of a blank feedback string at levels 2-4 — covers both a total
+# teacher-response parse failure and a structurally-valid-but-empty response (neither
+# of which is distinguishable from "the model legitimately had nothing to say", so we
+# treat any blank feedback the same way rather than threading a parse-failure flag
+# through this function's signature).
+FALLBACK_FEEDBACK = (
+    "No detailed feedback is available for this round. Rely on the score above and "
+    "continue using your own judgment."
+)
+
 
 def truncate(text: str, max_words: int) -> str:
     if not text:
@@ -61,7 +71,9 @@ def render_student_guidance(
         visible.get("score_continuous", private.get("score_continuous", 0.0)) or 0.0
     )
     feedback = visible.get("feedback", "") or ""
+    feedback_missing = not feedback.strip()
     max_words = guidance_config.max_feedback_words
+    shown_feedback = FALLBACK_FEEDBACK if feedback_missing else truncate(feedback, max_words)
 
     level = guidance_config.level
     if level == 0:
@@ -71,23 +83,25 @@ def render_student_guidance(
     elif level == 2:
         rendered = {
             "score": round(score_continuous, 3),
-            "feedback": truncate(feedback, max_words),
+            "feedback": shown_feedback,
         }
     elif level == 3:
         rendered = {
             "score": round(score_continuous, 3),
-            "feedback": truncate(feedback, max_words),
+            "feedback": shown_feedback,
         }
     elif level == 4:
         rendered = {
             "score": round(score_continuous, 3),
-            "feedback": truncate(feedback, max_words),
+            "feedback": shown_feedback,
             "hint": _sanitize_hint(visible.get("hint"), guidance_config),
         }
     else:
         raise ValueError(f"Unknown guidance level: {level}")
 
-    return sanitize_rendered_guidance(rendered, visibility, guidance_config)
+    rendered, leakage = sanitize_rendered_guidance(rendered, visibility, guidance_config)
+    leakage["feedback_fallback_used"] = feedback_missing and level in (2, 3, 4)
+    return rendered, leakage
 
 
 def derive_plan_review_guidance_config(
