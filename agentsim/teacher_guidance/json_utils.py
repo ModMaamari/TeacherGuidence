@@ -210,10 +210,9 @@ def parse_student_plan(raw: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
 def parse_teacher_plan_review(raw: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     obj, info = parse_json_object(raw)
-    if info["json_valid"]:
-        valid, errors = validate_teacher_plan_review(obj)
-        info["review_valid"] = valid
-        info["errors"] = list(info.get("errors", [])) + [e for e in errors if e not in info.get("errors", [])]
+    valid, errors = validate_teacher_plan_review(obj) if info["json_valid"] else (False, info["errors"])
+    info["review_valid"] = valid
+    info["errors"] = list(info.get("errors", [])) + [e for e in errors if e not in info.get("errors", [])]
     return obj, info
 
 
