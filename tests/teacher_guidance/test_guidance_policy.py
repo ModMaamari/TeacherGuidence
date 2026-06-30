@@ -5,6 +5,7 @@ from agentsim.teacher_guidance.guidance_policy import (
     render_student_guidance,
     truncate,
     derive_plan_review_guidance_config,
+    FALLBACK_FEEDBACK,
 )
 
 
@@ -87,6 +88,37 @@ def test_gold_answer_never_leaks_in_feedback():
     assert "Delhi" not in rendered["feedback"]
     assert "[answer hidden]" in rendered["feedback"]
     assert report["gold_answer_leaked"] is True
+
+
+def test_blank_feedback_gets_fallback_at_levels_2_to_4():
+    broken = {"student_visible": {"score_continuous": 0.4, "feedback": ""}, "private_diagnosis": {}}
+    for level in (2, 3, 4):
+        rendered, leakage = render_student_guidance(broken, _cfg(level), VISIBILITY)
+        assert rendered["feedback"] == FALLBACK_FEEDBACK
+        assert leakage["feedback_fallback_used"] is True
+
+
+def test_total_parse_failure_gets_fallback():
+    # {} simulates a totally unparseable/truncated teacher response.
+    rendered, leakage = render_student_guidance({}, _cfg(3), VISIBILITY)
+    assert rendered["feedback"] == FALLBACK_FEEDBACK
+    assert leakage["feedback_fallback_used"] is True
+
+
+def test_levels_0_1_unaffected_by_fallback():
+    rendered, leakage = render_student_guidance({}, _cfg(0), VISIBILITY)
+    assert rendered == {"score": 0}
+    assert leakage["feedback_fallback_used"] is False
+
+    rendered1, leakage1 = render_student_guidance({}, _cfg(1), VISIBILITY)
+    assert "feedback" not in rendered1
+    assert leakage1["feedback_fallback_used"] is False
+
+
+def test_real_feedback_not_replaced_by_fallback():
+    rendered, leakage = render_student_guidance(TEACHER_FULL, _cfg(3), VISIBILITY)
+    assert rendered["feedback"] != FALLBACK_FEEDBACK
+    assert leakage["feedback_fallback_used"] is False
 
 
 def test_derive_plan_review_guidance_overrides_level():

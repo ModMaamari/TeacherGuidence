@@ -6,6 +6,7 @@ import json
 from agentsim.components.base import ComponentRegistry
 from agentsim.workflow.context import WorkflowContext
 from agentsim.components.control.teacher_guided_plan_review import TeacherGuidedPlanReview
+from agentsim.teacher_guidance.guidance_policy import FALLBACK_FEEDBACK
 
 
 def _context(plan_review_config):
@@ -193,6 +194,82 @@ def test_teacher_planner_authors_and_sanitizes_plan():
     assert "Delhi" not in plan_text
     assert record["leakage_check"]["gold_answer_leaked"] is True
     assert ctx.metadata["revised_plan"]["steps"][1]["intended_tool"] == "verify"
+
+
+class TruncatedReviewStub:
+    """Initial plan ok; first teacher review is truncated garbage, retry succeeds."""
+
+    def __init__(self, initial, bad_review, good_review):
+        self.initial, self.bad_review, self.good_review = initial, bad_review, good_review
+        self.review_calls = 0
+
+    async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+        if "teacher reviewing" in prompt:
+            self.review_calls += 1
+            if self.review_calls == 1:
+                return self.bad_review
+            return self.good_review
+        return self.initial
+
+
+def test_teacher_plan_review_repairs_truncated_response():
+    initial = json.dumps({
+        "plan_summary": "v0", "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search",
+        "rationale": "x", "depends_on": []}], "uncertainties": [], "stop_condition": "done",
+    })
+    # Unterminated JSON, mirroring the real truncation observed in production.
+    bad_review = '{"plan_review_enabled": true, "student_visible": {"score_continuous": 0.5, "feedback": "this gets cu'
+    good_review = json.dumps({
+        "plan_review_enabled": True, "review_guidance_level": 3,
+        "student_visible": {"score_continuous": 0.8, "feedback": "Solid plan, add a verification step."},
+        "private_diagnosis": {}, "teacher_decision": "accept_plan",
+    })
+    ctx = _context({"enabled": True, "review_guidance_level": 3})
+    stub = TruncatedReviewStub(initial, bad_review, good_review)
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    result = asyncio.run(comp.execute(ctx))
+
+    record = ctx.metadata["plan_review"]
+    assert record["rounds"][0]["teacher_plan_review_repair_attempts"] == 1
+    assert record["teacher_plan_review_repair_attempts"] == 1
+    assert record["student_visible_plan_feedback"]["feedback"] != ""
+    assert "verification" in record["student_visible_plan_feedback"]["feedback"]
+    assert stub.review_calls == 2
+    assert result.data["verdict"] == "PROCEED"
+
+
+class AlwaysTruncatedReviewStub:
+    """Every teacher review call returns truncated garbage (retries exhausted)."""
+
+    def __init__(self, initial, bad_review):
+        self.initial, self.bad_review = initial, bad_review
+        self.review_calls = 0
+
+    async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+        if "teacher reviewing" in prompt:
+            self.review_calls += 1
+            return self.bad_review
+        return self.initial
+
+
+def test_teacher_plan_review_falls_back_when_repair_exhausted():
+    initial = json.dumps({
+        "plan_summary": "v0", "steps": [], "uncertainties": [], "stop_condition": "done",
+    })
+    bad_review = '{"student_visible": {"feedback": "always cut off h'
+    ctx = _context({"enabled": True, "review_guidance_level": 3})
+    stub = AlwaysTruncatedReviewStub(initial, bad_review)
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    record = ctx.metadata["plan_review"]
+    # default teacher_max_repair_attempts is 1 -> base call + 1 retry = 2 calls
+    assert stub.review_calls == 2
+    assert record["teacher_plan_review_repair_attempts"] == 1
+    assert record["teacher_plan_review_full"] == {}
+    # the guidance_policy fallback kicks in: never blank, even with retries exhausted
+    assert record["student_visible_plan_feedback"]["feedback"] == FALLBACK_FEEDBACK
+    assert record["leakage_check"]["feedback_fallback_used"] is True
 
 
 def test_accept_plan_skips_revision():

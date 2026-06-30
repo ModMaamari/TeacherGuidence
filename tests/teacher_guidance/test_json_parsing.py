@@ -5,6 +5,7 @@ from agentsim.teacher_guidance.json_utils import (
     parse_json_object,
     parse_student_action,
     parse_teacher_evaluation,
+    parse_teacher_plan_review,
     validate_student_action,
     validate_teacher_evaluation,
 )
@@ -65,6 +66,25 @@ def test_parse_teacher_evaluation_valid():
     assert info["json_valid"] and info["eval_valid"]
     assert ev.teacher_decision == "continue"
     assert ev.student_visible["score_continuous"] == 0.35
+
+
+def test_parse_teacher_plan_review_sets_review_valid_on_failure():
+    # Truncated JSON (no closing brace) must not be marked review_valid, even though
+    # review_valid was previously only ever set inside the json_valid branch.
+    obj, info = parse_teacher_plan_review('{"student_visible": {"feedback": "cut off mid')
+    assert info["json_valid"] is False
+    assert info["review_valid"] is False
+
+
+def test_parse_teacher_plan_review_valid():
+    raw = """{
+      "plan_review_enabled": true, "review_guidance_level": 3,
+      "student_visible": {"score_continuous": 0.8, "feedback": "Solid plan."},
+      "private_diagnosis": {}, "teacher_decision": "accept_plan"
+    }"""
+    obj, info = parse_teacher_plan_review(raw)
+    assert info["json_valid"] and info["review_valid"]
+    assert obj["teacher_decision"] == "accept_plan"
 
 
 def test_validate_teacher_evaluation_rejects_bad_decision():

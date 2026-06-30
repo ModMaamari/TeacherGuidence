@@ -7,6 +7,7 @@ import pytest
 
 from agentsim.workflow.context import WorkflowContext
 from agentsim.components.control.teacher_guided_agent_step import TeacherGuidedAgentStep
+from agentsim.teacher_guidance.guidance_policy import FALLBACK_FEEDBACK
 
 
 CORPUS = [
@@ -134,6 +135,72 @@ def test_student_repair_retry_on_invalid_action(tmp_path):
     assert step["student_repair_attempts"] == 1
     assert step["student_action"]["action"]["tool"] == "search"  # ended valid
     assert stub.student_calls == 2  # one retry
+
+
+def test_teacher_eval_repairs_truncated_response(tmp_path):
+    student = json.dumps({
+        "thought": "search", "decision": {"category": "need_retrieval", "parametric_knowledge_used": False},
+        "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
+        "new_facts_extracted": [],
+    })
+    # Unterminated JSON, mirroring the real truncation observed in production.
+    bad_teacher = '{"guidance_level": 3, "student_visible": {"score_continuous": 0.7, "feedback": "cut off h'
+    good_teacher = json.dumps({
+        "guidance_level": 3,
+        "student_visible": {"score_binary": 1, "score_continuous": 0.7, "feedback": "Good retrieval."},
+        "private_diagnosis": {"retrieved_gold_doc": True},
+        "teacher_decision": "continue",
+    })
+
+    class TeacherRepairStub:
+        def __init__(self):
+            self.teacher_calls = 0
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                self.teacher_calls += 1
+                return bad_teacher if self.teacher_calls == 1 else good_teacher
+            return student
+
+    ctx = _context(tmp_path)
+    stub = TeacherRepairStub()
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    result = asyncio.run(comp.execute(ctx))
+
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["teacher_repair_attempts"] == 1
+    assert stub.teacher_calls == 2
+    assert result.data["student_visible_guidance"]["feedback"] == "Good retrieval."
+
+
+def test_teacher_eval_falls_back_when_repair_exhausted(tmp_path):
+    student = json.dumps({
+        "thought": "search", "decision": {"category": "need_retrieval", "parametric_knowledge_used": False},
+        "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
+        "new_facts_extracted": [],
+    })
+    bad_teacher = '{"student_visible": {"feedback": "always cut off h'
+
+    class AlwaysBadTeacherStub:
+        def __init__(self):
+            self.teacher_calls = 0
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                self.teacher_calls += 1
+                return bad_teacher
+            return student
+
+    ctx = _context(tmp_path)
+    stub = AlwaysBadTeacherStub()
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    result = asyncio.run(comp.execute(ctx))
+
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert stub.teacher_calls == 2  # base call + 1 retry (default max)
+    assert step["teacher_repair_attempts"] == 1
+    assert result.data["student_visible_guidance"]["feedback"] == FALLBACK_FEEDBACK
+    assert step["leakage_check"]["feedback_fallback_used"] is True
 
 
 def test_guidance_does_not_leak_gold_answer(tmp_path):
