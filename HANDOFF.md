@@ -6,6 +6,82 @@
 
 ---
 
+## 0. Quick start from scratch (new machine) — runbook for an AI agent
+
+Follow these steps top to bottom. They bring the project up from nothing. Read §3–§5
+for the *why* behind each choice.
+
+### 0.1 Clone and check out the branch
+```bash
+git clone https://github.com/ModMaamari/TeacherGuidence
+cd TeacherGuidence
+git checkout feature/teacher-guidance
+git pull
+```
+
+### 0.2 Python env (use 3.10–3.12, NOT 3.13/3.14)
+```powershell
+# Windows (PowerShell). On macOS/Linux use the bash equivalents.
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1          # macOS/Linux: source .venv/bin/activate
+python -m pip install -U pip
+pip install -e .                       # agentsim + deps (torch CPU build is fine)
+pip install datasets pytest
+python -m pytest tests/teacher_guidance -q   # expect: all passing (97 at handoff time)
+```
+If `py -3.12` is missing: install Python 3.12 (Windows: `winget install Python.Python.3.12`).
+If pytest's temp dir errors on Windows, add `--basetemp=<writable dir>`.
+
+### 0.3 Local student model via Ollama (GPU) — optional but used by the local templates
+```powershell
+winget install Ollama.Ollama        # macOS/Linux: see https://ollama.com/download
+# (re-open shell so PATH/server are live; the server listens on 127.0.0.1:11434)
+ollama pull qwen3.5:4b              # ~3.4 GB Q4; needs ~4 GB+ VRAM (8 GB GPU is plenty)
+```
+Skip this if you will only run the all-cloud templates (`*_openrouter`).
+
+### 0.4 Create `.env` at the repo root (git-ignored; supply your own keys)
+```ini
+# Teacher = OpenRouter via the OpenAI-compatible `custom` provider.
+# Endpoint must NOT include /v1 (the client appends it).
+CUSTOM_LLM_ENDPOINT=https://openrouter.ai/api
+CUSTOM_LLM_API_KEY=sk-or-v1-REPLACE_ME
+
+# Student = local Ollama (only needed for the *_qwen_local templates).
+OLLAMA_ENABLED=true
+OLLAMA_ENDPOINT=http://127.0.0.1:11434
+
+# Teacher Guidance runs use token_overlap similarity (no embedding model needed).
+SIMILARITY_METRIC=token_overlap
+LLM_TIMEOUT=300
+LLM_MAX_RETRIES=3
+LLM_MAX_TOKENS=1500
+```
+Get an OpenRouter key at <https://openrouter.ai/keys>. The student (`ollama/...`) and
+teacher (`custom/...`) use different providers, so these two endpoints never collide.
+
+### 0.5 Build the dataset (10 fixed HotpotQA questions)
+```bash
+python scripts/prepare_hotpot_teacher_guidance.py \
+  --subset distractor --split validation --limit 10 --shuffle \
+  --out_dir data/datasets/hotpot_teacher_guidance
+```
+`data/` is git-ignored, so the dataset and all run outputs do NOT come with the clone —
+you regenerate them here.
+
+### 0.6 Run, view, score (set PYTHONUTF8=1 on Windows for the ✓/✗ glyphs)
+```powershell
+$env:PYTHONUTF8="1"
+agentsim simulate hotpot_tg_b5_g3_plan_review_qwen_local --validate-only
+agentsim simulate hotpot_tg_b5_g3_plan_review_qwen_local        # or a *_openrouter template
+agentsim viewer --port 8000
+python scripts/aggregate_teacher_guidance_run.py --run-dir data/simulation_output/<run_dir>
+python scripts/validate_teacher_guidance_run.py  --run-dir data/simulation_output/<run_dir>
+```
+All-cloud alternative (no Ollama needed): `agentsim simulate hotpot_tg_b5_g3_plan_review_openrouter`.
+
+---
+
 ## 1. What this project is
 
 A **Teacher Guidance** pipeline added to AgentSim that generates step-level
