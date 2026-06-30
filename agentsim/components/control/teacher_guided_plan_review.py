@@ -138,11 +138,9 @@ class TeacherGuidedPlanReview(ControlComponent):
             review_prompt = build_plan_review_prompt(
                 state, gold, current_plan, review_guidance, config
             )
-            review_raw = await self.llm_client.get_completion(
-                prompt=review_prompt, model=teacher_model, temperature=teacher_temp,
-                max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
+            review_full, review_raw, _, review_repair_attempts = await self._teacher_review_with_repair(
+                context, review_prompt, teacher_model, teacher_temp
             )
-            review_full, _ = parse_teacher_plan_review(review_raw)
             rendered_feedback, leakage = render_student_guidance(
                 review_full, review_guidance, _preflight_visibility(context)
             )
@@ -152,6 +150,7 @@ class TeacherGuidedPlanReview(ControlComponent):
                 "teacher_plan_review_prompt": review_prompt,
                 "teacher_plan_review_raw": review_raw,
                 "teacher_plan_review_full": review_full,
+                "teacher_plan_review_repair_attempts": review_repair_attempts,
                 "student_visible_plan_feedback": rendered_feedback,
                 "leakage_check": leakage,
                 "accepted": accepted,
@@ -196,6 +195,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             "teacher_plan_review_prompt": review_prompt,
             "teacher_plan_review_raw": review_raw,
             "teacher_plan_review_full": review_full,
+            "teacher_plan_review_repair_attempts": rounds[-1]["teacher_plan_review_repair_attempts"] if rounds else 0,
             "student_visible_plan_feedback": rendered_feedback,
             "revised_student_plan_prompt": revision_prompt,
             "revised_student_plan_raw": revision_raw,
@@ -223,6 +223,47 @@ class TeacherGuidedPlanReview(ControlComponent):
             },
             execution_time_ms=(time.time() - start) * 1000,
         )
+
+    async def _teacher_review_with_repair(self, context, review_prompt, teacher_model, teacher_temp):
+        """Call the teacher for plan review; if the response fails to parse into a valid
+        review object (often a reasoning model burning its token budget on hidden
+        reasoning before emitting JSON, leaving the response truncated), retry up to
+        teacher_max_repair_attempts with a corrective note and a larger token budget.
+
+        Returns (review_full, final_raw, parse_info, repair_attempts).
+        """
+        max_repairs = int(context.metadata.get("teacher_max_repair_attempts", 1))
+        base_tokens = context.metadata.get("teacher_plan_review_max_tokens", 1000)
+        retry_tokens = context.metadata.get("teacher_plan_review_max_tokens_retry", 2000)
+
+        prompt = review_prompt
+        attempts = 0
+        review_raw = await self.llm_client.get_completion(
+            prompt=prompt, model=teacher_model, temperature=teacher_temp, max_tokens=base_tokens,
+        )
+        review_full, parse_info = parse_teacher_plan_review(review_raw)
+
+        while (not parse_info.get("json_valid") or not parse_info.get("review_valid")) and attempts < max_repairs:
+            attempts += 1
+            problems = ", ".join(parse_info.get("errors", [])) or "the output was not one complete, valid JSON object"
+            correction = (
+                f"\n\nYour previous response was not a valid plan review ({problems}); it may "
+                "have been cut off before the JSON object was complete. Return ONLY one "
+                "complete, corrected JSON object matching the schema exactly, with no text "
+                "outside the JSON."
+            )
+            review_raw = await self.llm_client.get_completion(
+                prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
+                max_tokens=retry_tokens,
+            )
+            review_full, parse_info = parse_teacher_plan_review(review_raw)
+
+        if attempts:
+            logger.info(
+                f"[TG plan_review] teacher review repaired after {attempts} retry(s); "
+                f"valid={parse_info.get('review_valid')}"
+            )
+        return review_full, review_raw, parse_info, attempts
 
     async def _teacher_planner(
         self, context, state, gold, review_guidance, config, teacher_model, teacher_temp, start
