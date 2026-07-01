@@ -144,6 +144,36 @@ def test_multistep_planning_loop_runs_until_accept():
     assert record["rounds"][-1]["accepted"] is True
 
 
+def test_multistep_planning_loop_records_timing():
+    initial = json.dumps({
+        "plan_summary": "v0", "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+        "uncertainties": [], "stop_condition": "done",
+    })
+    revise = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 0.5, "feedback": "revise"},
+                         "private_diagnosis": {}, "teacher_decision": "revise_plan"})
+    accept = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 1.0, "feedback": "good"},
+                         "private_diagnosis": {}, "teacher_decision": "accept_plan"})
+    revised = json.dumps({"revision_summary": "r", "plan_summary": "v1",
+                          "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+                          "teacher_feedback_used": [], "stop_condition": "done"})
+
+    ctx = _context({"enabled": True, "review_guidance_level": 3, "planning_steps": 3})
+    stub = SequencedStub(initial, [revise, accept], revised)
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    record = ctx.metadata["plan_review"]
+    assert isinstance(record["initial_plan_call_ms"], float) and record["initial_plan_call_ms"] >= 0
+    assert isinstance(record["plan_review_elapsed_ms"], float) and record["plan_review_elapsed_ms"] >= 0
+    round1, round2 = record["rounds"]
+    assert isinstance(round1["review_call_ms"], float) and round1["review_call_ms"] >= 0
+    assert isinstance(round1["revision_call_ms"], float) and round1["revision_call_ms"] >= 0
+    assert isinstance(round2["review_call_ms"], float) and round2["review_call_ms"] >= 0
+    assert "revision_call_ms" not in round2  # accepted -> no revision call made
+
+
 def test_planning_loop_respects_max_rounds():
     initial = json.dumps({"plan_summary": "v0", "steps": [], "uncertainties": [], "stop_condition": "x"})
     revise = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
@@ -194,6 +224,8 @@ def test_teacher_planner_authors_and_sanitizes_plan():
     assert "Delhi" not in plan_text
     assert record["leakage_check"]["gold_answer_leaked"] is True
     assert ctx.metadata["revised_plan"]["steps"][1]["intended_tool"] == "verify"
+    assert isinstance(record["plan_call_ms"], float) and record["plan_call_ms"] >= 0
+    assert isinstance(record["plan_review_elapsed_ms"], float) and record["plan_review_elapsed_ms"] >= 0
 
 
 class TruncatedReviewStub:

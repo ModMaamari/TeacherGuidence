@@ -203,6 +203,29 @@ def test_teacher_eval_falls_back_when_repair_exhausted(tmp_path):
     assert step["leakage_check"]["feedback_fallback_used"] is True
 
 
+def test_step_record_has_call_and_elapsed_timing(tmp_path):
+    student = json.dumps({
+        "thought": "search",
+        "decision": {"category": "need_retrieval", "parametric_knowledge_used": False},
+        "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
+        "new_facts_extracted": [],
+    })
+    teacher = json.dumps({
+        "guidance_level": 3,
+        "student_visible": {"score_binary": 1, "score_continuous": 0.7, "feedback": "Good retrieval."},
+        "private_diagnosis": {"retrieved_gold_doc": True},
+        "teacher_decision": "continue",
+    })
+    ctx = _context(tmp_path)
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=StubLLM(student, teacher))
+    asyncio.run(comp.execute(ctx))
+
+    step = ctx.metadata["teacher_guided_steps"][0]
+    for key in ("student_call_ms", "teacher_call_ms", "step_elapsed_ms"):
+        assert isinstance(step[key], float)
+        assert step[key] >= 0
+
+
 def test_guidance_does_not_leak_gold_answer(tmp_path):
     student = json.dumps({
         "thought": "finish", "decision": {"category": "finish", "parametric_knowledge_used": False},

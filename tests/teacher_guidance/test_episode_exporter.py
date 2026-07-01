@@ -33,15 +33,18 @@ def _context():
                     "t": 1,
                     "student_prompt": "STUDENT PROMPT (no gold here)",
                     "student_raw": '{"action": {"tool": "search"}}',
+                    "student_call_ms": 123.4,
                     "student_action": {"action": {"tool": "search"}},
                     "tool_observation": {"tool": "search", "status": "ok"},
                     "teacher_prompt": "TEACHER PROMPT with gold Delhi",
                     "teacher_raw": '{"teacher_decision": "continue"}',
+                    "teacher_call_ms": 567.8,
                     "teacher_full": {"private_diagnosis": {"main_error": "none"}, "teacher_decision": "continue"},
                     "student_visible_guidance": {"score": 0.7, "feedback": "Good."},
                     "leakage_check": {"gold_answer_leaked": False},
                     "metrics": {"json_valid": True},
                     "stop_condition": "CONTINUE",
+                    "step_elapsed_ms": 999.9,
                 }
             ],
         },
@@ -85,6 +88,27 @@ def test_student_sft_input_has_no_gold_or_diagnosis(tmp_path):
     row = json.loads(student_rows[0])
     assert "Delhi" not in row["input"]
     assert row["metadata"]["gold_answer_hidden"] is True
+
+
+def test_exported_step_keeps_raw_prompts_and_timing(tmp_path):
+    # student_prompt/student_raw/teacher_prompt/teacher_raw and the *_ms timing fields
+    # exist on the in-memory step record but were previously dropped when building the
+    # exported episode row (the file the Trajectory Explorer viewer actually reads).
+    episode = TeacherGuidanceEpisodeExporter().export_episode(_context(), str(tmp_path))
+    step = episode["steps"][0]
+    assert step["student_prompt"] == "STUDENT PROMPT (no gold here)"
+    assert step["student_raw"] == '{"action": {"tool": "search"}}'
+    assert step["student_call_ms"] == 123.4
+    assert step["teacher_prompt"] == "TEACHER PROMPT with gold Delhi"
+    assert step["teacher_raw"] == '{"teacher_decision": "continue"}'
+    assert step["teacher_call_ms"] == 567.8
+    assert step["step_elapsed_ms"] == 999.9
+
+    # And the whole row round-trips through JSON, matching what the viewer's /api/episode
+    # endpoint would actually serve.
+    written = (tmp_path / "teacher_guidance_episodes.jsonl").read_text(encoding="utf-8").strip()
+    row = json.loads(written)
+    assert row["steps"][0]["teacher_prompt"] == "TEACHER PROMPT with gold Delhi"
 
 
 def test_final_metrics_computed_without_retriever(tmp_path):
