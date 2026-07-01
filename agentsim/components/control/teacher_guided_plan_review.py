@@ -118,10 +118,12 @@ class TeacherGuidedPlanReview(ControlComponent):
 
         # 1. Initial plan (student).
         initial_prompt = build_initial_plan_prompt(state, config)
+        call_start = time.time()
         initial_raw = await self.llm_client.get_completion(
             prompt=initial_prompt, model=student_model, temperature=student_temp,
             max_tokens=context.metadata.get("student_plan_max_tokens", 900),
         )
+        initial_plan_call_ms = (time.time() - call_start) * 1000
         initial_plan, _ = parse_student_plan(initial_raw)
 
         # 2. Planning loop: teacher review -> student revision, up to planning_steps
@@ -138,7 +140,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             review_prompt = build_plan_review_prompt(
                 state, gold, current_plan, review_guidance, config
             )
-            review_full, review_raw, _, review_repair_attempts = await self._teacher_review_with_repair(
+            review_full, review_raw, _, review_repair_attempts, review_call_ms = await self._teacher_review_with_repair(
                 context, review_prompt, teacher_model, teacher_temp
             )
             rendered_feedback, leakage = render_student_guidance(
@@ -151,6 +153,7 @@ class TeacherGuidedPlanReview(ControlComponent):
                 "teacher_plan_review_raw": review_raw,
                 "teacher_plan_review_full": review_full,
                 "teacher_plan_review_repair_attempts": review_repair_attempts,
+                "review_call_ms": review_call_ms,
                 "student_visible_plan_feedback": rendered_feedback,
                 "leakage_check": leakage,
                 "accepted": accepted,
@@ -161,10 +164,12 @@ class TeacherGuidedPlanReview(ControlComponent):
                 break
 
             revision_prompt = build_revised_plan_prompt(state, current_plan, rendered_feedback, config)
+            call_start = time.time()
             revision_raw = await self.llm_client.get_completion(
                 prompt=revision_prompt, model=student_model, temperature=student_temp,
                 max_tokens=context.metadata.get("student_plan_max_tokens", 900),
             )
+            round_rec["revision_call_ms"] = (time.time() - call_start) * 1000
             revised_plan, _ = parse_revised_plan(revision_raw)
             round_rec["revised_student_plan_prompt"] = revision_prompt
             round_rec["revised_student_plan_raw"] = revision_raw
@@ -189,6 +194,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             "revision_skipped": revision_skipped,
             "initial_student_plan_prompt": initial_prompt,
             "initial_student_plan_raw": initial_raw,
+            "initial_plan_call_ms": initial_plan_call_ms,
             "initial_student_plan": initial_plan,
             "rounds": rounds,
             # Top-level fields reflect the final round (kept for backward compatibility).
@@ -202,6 +208,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             "revised_student_plan": revised_plan,
             "leakage_check": leakage,
             "metrics": metrics,
+            "plan_review_elapsed_ms": (time.time() - start) * 1000,
         }
         context.metadata["plan_review"] = record
         context.metadata["revised_plan"] = revised_plan
@@ -230,7 +237,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         reasoning before emitting JSON, leaving the response truncated), retry up to
         teacher_max_repair_attempts with a corrective note and a larger token budget.
 
-        Returns (review_full, final_raw, parse_info, repair_attempts).
+        Returns (review_full, final_raw, parse_info, repair_attempts, call_ms).
         """
         max_repairs = int(context.metadata.get("teacher_max_repair_attempts", 1))
         base_tokens = context.metadata.get("teacher_plan_review_max_tokens", 1000)
@@ -238,9 +245,12 @@ class TeacherGuidedPlanReview(ControlComponent):
 
         prompt = review_prompt
         attempts = 0
+        call_ms = 0.0
+        call_start = time.time()
         review_raw = await self.llm_client.get_completion(
             prompt=prompt, model=teacher_model, temperature=teacher_temp, max_tokens=base_tokens,
         )
+        call_ms += (time.time() - call_start) * 1000
         review_full, parse_info = parse_teacher_plan_review(review_raw)
 
         while (not parse_info.get("json_valid") or not parse_info.get("review_valid")) and attempts < max_repairs:
@@ -252,10 +262,12 @@ class TeacherGuidedPlanReview(ControlComponent):
                 "complete, corrected JSON object matching the schema exactly, with no text "
                 "outside the JSON."
             )
+            call_start = time.time()
             review_raw = await self.llm_client.get_completion(
                 prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
                 max_tokens=retry_tokens,
             )
+            call_ms += (time.time() - call_start) * 1000
             review_full, parse_info = parse_teacher_plan_review(review_raw)
 
         if attempts:
@@ -263,16 +275,18 @@ class TeacherGuidedPlanReview(ControlComponent):
                 f"[TG plan_review] teacher review repaired after {attempts} retry(s); "
                 f"valid={parse_info.get('review_valid')}"
             )
-        return review_full, review_raw, parse_info, attempts
+        return review_full, review_raw, parse_info, attempts, call_ms
 
     async def _teacher_planner(
         self, context, state, gold, review_guidance, config, teacher_model, teacher_temp, start
     ) -> ComponentResult:
         plan_prompt = build_teacher_plan_prompt(state, gold, review_guidance, config)
+        call_start = time.time()
         plan_raw = await self.llm_client.get_completion(
             prompt=plan_prompt, model=teacher_model, temperature=teacher_temp,
             max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
         )
+        plan_call_ms = (time.time() - call_start) * 1000
         teacher_plan, _ = parse_student_plan(plan_raw)
 
         # The teacher-authored plan is student-visible, so sanitize any leaked gold.
@@ -290,6 +304,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             "initial_student_plan": None,
             "teacher_plan_prompt": plan_prompt,
             "teacher_plan_raw": plan_raw,
+            "plan_call_ms": plan_call_ms,
             "teacher_authored_plan": teacher_plan,
             "revised_student_plan": clean_plan,
             "student_visible_plan_feedback": None,
@@ -301,6 +316,7 @@ class TeacherGuidedPlanReview(ControlComponent):
                 "revisions_done": 0,
                 "revision_skipped": True,
             },
+            "plan_review_elapsed_ms": (time.time() - start) * 1000,
         }
         context.metadata["plan_review"] = record
         context.metadata["revised_plan"] = clean_plan
