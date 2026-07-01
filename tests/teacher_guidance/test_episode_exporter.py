@@ -33,17 +33,25 @@ def _context():
                     "t": 1,
                     "student_prompt": "STUDENT PROMPT (no gold here)",
                     "student_raw": '{"action": {"tool": "search"}}',
+                    "student_calls": [{"attempt": 1, "started_at": "t0", "ended_at": "t1",
+                                        "elapsed_ms": 123.4, "prompt": "STUDENT PROMPT (no gold here)",
+                                        "response_text": '{"action": {"tool": "search"}}', "raw_response": {"id": "s1"}}],
                     "student_call_ms": 123.4,
                     "student_action": {"action": {"tool": "search"}},
                     "tool_observation": {"tool": "search", "status": "ok"},
                     "teacher_prompt": "TEACHER PROMPT with gold Delhi",
                     "teacher_raw": '{"teacher_decision": "continue"}',
+                    "teacher_calls": [{"attempt": 1, "started_at": "t0", "ended_at": "t1",
+                                        "elapsed_ms": 567.8, "prompt": "TEACHER PROMPT with gold Delhi",
+                                        "response_text": '{"teacher_decision": "continue"}', "raw_response": {"id": "t1"}}],
                     "teacher_call_ms": 567.8,
                     "teacher_full": {"private_diagnosis": {"main_error": "none"}, "teacher_decision": "continue"},
                     "student_visible_guidance": {"score": 0.7, "feedback": "Good."},
                     "leakage_check": {"gold_answer_leaked": False},
                     "metrics": {"json_valid": True},
                     "stop_condition": "CONTINUE",
+                    "step_started_at": "2026-07-01T09:00:00+00:00",
+                    "step_ended_at": "2026-07-01T09:00:01+00:00",
                     "step_elapsed_ms": 999.9,
                 }
             ],
@@ -102,13 +110,18 @@ def test_exported_step_keeps_raw_prompts_and_timing(tmp_path):
     assert step["teacher_prompt"] == "TEACHER PROMPT with gold Delhi"
     assert step["teacher_raw"] == '{"teacher_decision": "continue"}'
     assert step["teacher_call_ms"] == 567.8
+    assert step["step_started_at"] == "2026-07-01T09:00:00+00:00"
+    assert step["step_ended_at"] == "2026-07-01T09:00:01+00:00"
     assert step["step_elapsed_ms"] == 999.9
+    assert step["student_calls"][0]["raw_response"] == {"id": "s1"}
+    assert step["teacher_calls"][0]["raw_response"] == {"id": "t1"}
 
     # And the whole row round-trips through JSON, matching what the viewer's /api/episode
     # endpoint would actually serve.
     written = (tmp_path / "teacher_guidance_episodes.jsonl").read_text(encoding="utf-8").strip()
     row = json.loads(written)
     assert row["steps"][0]["teacher_prompt"] == "TEACHER PROMPT with gold Delhi"
+    assert row["steps"][0]["teacher_calls"][0]["raw_response"] == {"id": "t1"}
 
 
 def test_final_metrics_computed_without_retriever(tmp_path):
