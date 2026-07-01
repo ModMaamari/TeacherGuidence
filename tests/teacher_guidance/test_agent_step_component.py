@@ -172,6 +172,20 @@ def test_teacher_eval_repairs_truncated_response(tmp_path):
     assert stub.teacher_calls == 2
     assert result.data["student_visible_guidance"]["feedback"] == "Good retrieval."
 
+    # The failed first attempt's raw (truncated) text is preserved in teacher_calls,
+    # not just the winning retry -- this is exactly the truncation evidence that would
+    # be needed to debug why a repair was triggered.
+    calls = step["teacher_calls"]
+    assert len(calls) == 2
+    assert calls[0]["attempt"] == 1
+    assert calls[0]["response_text"] == bad_teacher
+    assert calls[1]["attempt"] == 2
+    assert calls[1]["response_text"] == good_teacher
+    for c in calls:
+        assert c["started_at"] <= c["ended_at"]
+        assert c["elapsed_ms"] >= 0
+    assert step["teacher_call_ms"] == sum(c["elapsed_ms"] for c in calls)
+
 
 def test_teacher_eval_falls_back_when_repair_exhausted(tmp_path):
     student = json.dumps({
@@ -224,6 +238,15 @@ def test_step_record_has_call_and_elapsed_timing(tmp_path):
     for key in ("student_call_ms", "teacher_call_ms", "step_elapsed_ms"):
         assert isinstance(step[key], float)
         assert step[key] >= 0
+    assert step["step_started_at"] <= step["step_ended_at"]
+    for calls_key in ("student_calls", "teacher_calls"):
+        calls = step[calls_key]
+        assert len(calls) == 1
+        assert calls[0]["attempt"] == 1
+        assert calls[0]["started_at"] <= calls[0]["ended_at"]
+        # StubLLM (test double) doesn't honor return_raw, so raw_response is None --
+        # confirms the helper degrades gracefully rather than erroring.
+        assert calls[0]["raw_response"] is None
 
 
 def test_guidance_does_not_leak_gold_answer(tmp_path):

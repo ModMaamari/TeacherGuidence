@@ -12,6 +12,7 @@ Pipeline per execution:
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -32,6 +33,7 @@ from agentsim.teacher_guidance.prompts import (
 from agentsim.teacher_guidance.tool_executor import execute_student_tool
 from agentsim.teacher_guidance.guidance_policy import render_student_guidance
 from agentsim.teacher_guidance.metrics import compute_step_metrics
+from agentsim.teacher_guidance.llm_call_log import timed_completion
 
 
 def _guidance_config(context: WorkflowContext) -> GuidanceConfig:
@@ -135,6 +137,7 @@ class TeacherGuidedAgentStep(ControlComponent):
 
     async def execute(self, context: WorkflowContext) -> ComponentResult:
         start = time.time()
+        step_started_at = datetime.now(timezone.utc).isoformat()
 
         if context.metadata.get("done"):
             return ComponentResult(
@@ -164,7 +167,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         if plan_tracker is not None:
             state["expected_plan_step"] = plan_tracker.expected_step()
         student_prompt = build_student_prompt(state, guidance_config, force_finish)
-        student_action, student_raw, parse_info, repair_attempts, student_call_ms = await self._student_action_with_repair(
+        student_action, student_raw, parse_info, repair_attempts, student_calls = await self._student_action_with_repair(
             context, student_prompt, student_model, student_temp
         )
 
@@ -184,7 +187,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         teacher_prompt = build_teacher_prompt(
             state, gold, student_action.to_dict(), tool_observation, guidance_config
         )
-        teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts, teacher_call_ms = await self._teacher_eval_with_repair(
+        teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts, teacher_calls = await self._teacher_eval_with_repair(
             context, teacher_prompt, teacher_model, teacher_temp
         )
         teacher_full = {
@@ -216,18 +219,22 @@ class TeacherGuidedAgentStep(ControlComponent):
             "student_prompt": student_prompt,
             "student_raw": student_raw,
             "student_repair_attempts": repair_attempts,
-            "student_call_ms": student_call_ms,
+            "student_calls": student_calls,
+            "student_call_ms": sum(c["elapsed_ms"] for c in student_calls),
             "student_action": student_action.to_dict(),
             "tool_observation": tool_observation,
             "teacher_prompt": teacher_prompt,
             "teacher_raw": teacher_raw,
             "teacher_repair_attempts": teacher_repair_attempts,
-            "teacher_call_ms": teacher_call_ms,
+            "teacher_calls": teacher_calls,
+            "teacher_call_ms": sum(c["elapsed_ms"] for c in teacher_calls),
             "teacher_full": teacher_full,
             "student_visible_guidance": rendered_guidance,
             "leakage_check": leakage,
             "metrics": step_metrics,
             "stop_condition": "FINISH" if done else "CONTINUE",
+            "step_started_at": step_started_at,
+            "step_ended_at": datetime.now(timezone.utc).isoformat(),
             "step_elapsed_ms": (time.time() - start) * 1000,
         }
         context.metadata.setdefault("teacher_guided_steps", []).append(step_record)
@@ -270,18 +277,21 @@ class TeacherGuidedAgentStep(ControlComponent):
         """Call the student; if the action is unparseable or has an invalid tool, re-ask
         it (up to student_max_repair_attempts) with a generic, gold-free correction note.
 
-        Returns ``(student_action, final_raw, parse_info, repair_attempts, call_ms)``.
+        Returns ``(student_action, final_raw, parse_info, repair_attempts, calls)``, where
+        ``calls`` is a list with one call-log entry per HTTP request made (see
+        ``llm_call_log.timed_completion``) -- including failed attempts, so a truncated
+        first attempt's raw text/response isn't lost.
         """
         max_repairs = int(context.metadata.get("student_max_repair_attempts", 1))
         max_tokens = context.metadata.get("student_max_tokens", 1200)
         prompt = student_prompt
         attempts = 0
-        call_ms = 0.0
-        call_start = time.time()
-        student_raw = await self.llm_client.get_completion(
-            prompt=prompt, model=student_model, temperature=student_temp, max_tokens=max_tokens,
+        calls = []
+        call_entry, student_raw = await timed_completion(
+            self.llm_client, prompt=prompt, model=student_model, temperature=student_temp,
+            max_tokens=max_tokens, attempt=1,
         )
-        call_ms += (time.time() - call_start) * 1000
+        calls.append(call_entry)
         student_action, parse_info = parse_student_action(student_raw)
 
         while (not parse_info.get("json_valid") or not parse_info.get("action_valid")) and attempts < max_repairs:
@@ -292,16 +302,16 @@ class TeacherGuidedAgentStep(ControlComponent):
                 "Return ONLY one corrected JSON object that matches the action schema exactly: "
                 "a valid action.tool from the allowed list, with no text outside the JSON."
             )
-            call_start = time.time()
-            student_raw = await self.llm_client.get_completion(
-                prompt=prompt + correction, model=student_model, temperature=student_temp, max_tokens=max_tokens,
+            call_entry, student_raw = await timed_completion(
+                self.llm_client, prompt=prompt + correction, model=student_model, temperature=student_temp,
+                max_tokens=max_tokens, attempt=attempts + 1,
             )
-            call_ms += (time.time() - call_start) * 1000
+            calls.append(call_entry)
             student_action, parse_info = parse_student_action(student_raw)
 
         if attempts:
             logger.info(f"[TG step] student action repaired after {attempts} retry(s); valid={parse_info.get('action_valid')}")
-        return student_action, student_raw, parse_info, attempts, call_ms
+        return student_action, student_raw, parse_info, attempts, calls
 
     async def _teacher_eval_with_repair(self, context, teacher_prompt, teacher_model, teacher_temp):
         """Call the teacher for a per-step evaluation; if the response fails to parse
@@ -309,7 +319,9 @@ class TeacherGuidedAgentStep(ControlComponent):
         hidden reasoning before emitting JSON, leaving the response truncated), retry up
         to teacher_max_repair_attempts with a corrective note and a larger token budget.
 
-        Returns ``(teacher_eval, final_raw, parse_info, repair_attempts, call_ms)``.
+        Returns ``(teacher_eval, final_raw, parse_info, repair_attempts, calls)``, where
+        ``calls`` is a list with one call-log entry per HTTP request made (including
+        failed attempts).
         """
         max_repairs = int(context.metadata.get("teacher_max_repair_attempts", 1))
         base_tokens = context.metadata.get("teacher_max_tokens", 1000)
@@ -317,12 +329,12 @@ class TeacherGuidedAgentStep(ControlComponent):
 
         prompt = teacher_prompt
         attempts = 0
-        call_ms = 0.0
-        call_start = time.time()
-        teacher_raw = await self.llm_client.get_completion(
-            prompt=prompt, model=teacher_model, temperature=teacher_temp, max_tokens=base_tokens,
+        calls = []
+        call_entry, teacher_raw = await timed_completion(
+            self.llm_client, prompt=prompt, model=teacher_model, temperature=teacher_temp,
+            max_tokens=base_tokens, attempt=1,
         )
-        call_ms += (time.time() - call_start) * 1000
+        calls.append(call_entry)
         teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)
 
         while (not parse_info.get("json_valid") or not parse_info.get("eval_valid")) and attempts < max_repairs:
@@ -334,12 +346,11 @@ class TeacherGuidedAgentStep(ControlComponent):
                 "complete, corrected JSON object matching the schema exactly, with no text "
                 "outside the JSON."
             )
-            call_start = time.time()
-            teacher_raw = await self.llm_client.get_completion(
-                prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
-                max_tokens=retry_tokens,
+            call_entry, teacher_raw = await timed_completion(
+                self.llm_client, prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
+                max_tokens=retry_tokens, attempt=attempts + 1,
             )
-            call_ms += (time.time() - call_start) * 1000
+            calls.append(call_entry)
             teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)
 
         if attempts:
@@ -347,7 +358,7 @@ class TeacherGuidedAgentStep(ControlComponent):
                 f"[TG step] teacher evaluation repaired after {attempts} retry(s); "
                 f"valid={parse_info.get('eval_valid')}"
             )
-        return teacher_eval, teacher_raw, parse_info, attempts, call_ms
+        return teacher_eval, teacher_raw, parse_info, attempts, calls
 
     def _update_done(self, context, student_action, teacher_decision, force_finish) -> bool:
         if force_finish:
