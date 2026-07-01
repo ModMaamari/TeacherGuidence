@@ -33,22 +33,50 @@ function formatElapsed(ms) {
   const rem = total % 1000;
   return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}:${pad(rem, 3)}`;
 }
-function timingBadge(ms, label) {
+function timingBadge(ms, label, startedAt, endedAt) {
   const f = formatElapsed(ms);
   if (!f) return "";
-  return badge(`⏱ ${label ? label + " " : ""}${f}`, "timing");
+  const tip = startedAt && endedAt ? `${startedAt} → ${endedAt}` : undefined;
+  return badge(`⏱ ${label ? label + " " : ""}${f}`, "timing", tip);
 }
-// Collapsed-by-default raw model input/output. Older runs (recorded before this
-// feature existed) never captured this, so say so explicitly rather than rendering a
-// silently empty block that reads as broken.
-function rawBlock(role, prompt, raw) {
-  if (!prompt && !raw) {
-    return `<div class="raw-missing">${esc(role)} raw input/output not recorded for this run</div>`;
-  }
+
+// One HTTP call's raw input/output, and the raw provider response body when present
+// (e.g. OpenRouter/Ollama's full JSON -- finish_reason, usage, eval_count, etc.).
+function callAttempt(role, call) {
+  const label = call.attempt > 1 ? `${role} · attempt ${call.attempt} (repair)` : `${role} · attempt ${call.attempt}`;
+  const tsTip = call.started_at && call.ended_at ? `${call.started_at} → ${call.ended_at}` : "";
+  const rawResponse = call.raw_response != null
+    ? `<details><summary>${esc(role)} · Show raw provider response</summary><pre class="code">${json(call.raw_response)}</pre></details>`
+    : "";
   return `<div class="raw-blocks">
-    <details><summary>${esc(role)} · Show raw input</summary><pre class="code">${esc(prompt || "(empty)")}</pre></details>
-    <details><summary>${esc(role)} · Show raw output</summary><pre class="code">${esc(raw || "(empty)")}</pre></details>
+    <div class="chips" style="margin-bottom:4px"><span class="muted"${tsTip ? ` title="${esc(tsTip)}"` : ""}>${esc(label)}</span>${timingBadge(call.elapsed_ms)}</div>
+    <details><summary>${esc(role)} · Show raw input</summary><pre class="code">${esc(call.prompt || "(empty)")}</pre></details>
+    <details><summary>${esc(role)} · Show raw output</summary><pre class="code">${esc(call.response_text || "(empty)")}</pre></details>
+    ${rawResponse}
   </div>`;
+}
+
+// Renders raw model I/O for one logical turn (student action, teacher evaluation, plan
+// draft, plan review, ...). Prefers the native per-call log (one entry per HTTP
+// request, including failed repair attempts, with the raw provider response) when
+// present; falls back to a single prompt/raw pair (covers runs recorded after the
+// raw-I/O fix but before per-call logging existed, and backfilled legacy runs); shows
+// an explicit "not recorded" note rather than silently rendering nothing when there's
+// truly no data for this run.
+function rawSection(role, calls, prompt, raw, backfilled) {
+  if (Array.isArray(calls) && calls.length) {
+    return calls.map((c) => callAttempt(role, c)).join("");
+  }
+  if (prompt || raw) {
+    const note = backfilled
+      ? `<div class="raw-missing">recovered from ${esc(role.toLowerCase())}_sft.jsonl — per-call timing and raw provider response not available for this run</div>`
+      : "";
+    return `<div class="raw-blocks">
+      <details><summary>${esc(role)} · Show raw input</summary><pre class="code">${esc(prompt || "(empty)")}</pre></details>
+      <details><summary>${esc(role)} · Show raw output</summary><pre class="code">${esc(raw || "(empty)")}</pre></details>
+    </div>${note}`;
+  }
+  return `<div class="raw-missing">${esc(role)} raw input/output not recorded for this run</div>`;
 }
 
 // Hover explanations for UI elements (shown as native tooltips).
@@ -241,7 +269,7 @@ function renderPlanReview(pr) {
 
   return `
   <div class="section">
-    <h3 title="${esc(TIP.plan_review)}">Plan review ${leakBadge}${skipBadge}${timingBadge(pr.plan_review_elapsed_ms, "total")}</h3>
+    <h3 title="${esc(TIP.plan_review)}">Plan review ${leakBadge}${skipBadge}${timingBadge(pr.plan_review_elapsed_ms, "total", pr.plan_review_started_at, pr.plan_review_ended_at)}</h3>
     <div class="panel">
       <div class="plan-grid">
         <div class="plan-col">
@@ -249,7 +277,7 @@ function renderPlanReview(pr) {
           <div class="plan-summary">${esc(initial.plan_summary || "")}</div>
           ${planStepsList(initial.steps)}
           <div class="chips" style="margin-top:8px">${timingBadge(pr.initial_plan_call_ms, "call")}</div>
-          ${rawBlock("Initial plan", pr.initial_student_plan_prompt, pr.initial_student_plan_raw)}
+          ${rawSection("Initial plan", pr.initial_plan_calls, pr.initial_student_plan_prompt, pr.initial_student_plan_raw)}
         </div>
         <div class="plan-col">
           <h4>2 · Teacher feedback (student-visible)</h4>
@@ -288,8 +316,8 @@ function renderPlanReviewRounds(rounds) {
           ${timingBadge(r.review_call_ms, "teacher review")}
           ${r.revision_call_ms != null ? timingBadge(r.revision_call_ms, "student revision") : ""}
         </div>
-        ${rawBlock("Teacher review", r.teacher_plan_review_prompt, r.teacher_plan_review_raw)}
-        ${r.accepted ? "" : rawBlock("Student revision", r.revised_student_plan_prompt, r.revised_student_plan_raw)}
+        ${rawSection("Teacher review", r.review_calls, r.teacher_plan_review_prompt, r.teacher_plan_review_raw)}
+        ${r.accepted ? "" : rawSection("Student revision", r.revision_calls, r.revised_student_plan_prompt, r.revised_student_plan_raw)}
       </div>
     `).join("")}
   </div>`;
@@ -357,7 +385,7 @@ function renderStep(s) {
       ${decision.category ? badge(decision.category) : ""}
       ${s.stop_condition === "FINISH" ? badge("FINISH", "accent") : ""}
       ${leakBadge}
-      ${timingBadge(s.step_elapsed_ms)}
+      ${timingBadge(s.step_elapsed_ms, undefined, s.step_started_at, s.step_ended_at)}
     </div>
     <div class="step-body">
       <div class="block">
@@ -380,8 +408,8 @@ function renderStep(s) {
       <div class="block">
         <div class="blk-label">Raw model I/O</div>
         <div class="chips" style="margin-bottom:6px">${timingBadge(s.student_call_ms, "student call")}${timingBadge(s.teacher_call_ms, "teacher call")}</div>
-        ${rawBlock("Student", s.student_prompt, s.student_raw)}
-        ${rawBlock("Teacher", s.teacher_prompt, s.teacher_raw)}
+        ${rawSection("Student", s.student_calls, s.student_prompt, s.student_raw, s.student_io_backfilled)}
+        ${rawSection("Teacher", s.teacher_calls, s.teacher_prompt, s.teacher_raw, s.teacher_io_backfilled)}
       </div>
       <div class="block">
         <div class="blk-label">Step labels</div>
