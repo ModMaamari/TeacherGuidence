@@ -27,26 +27,34 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         return_usage: bool = False,
+        return_raw: bool = False,
         **kwargs
     ) -> str | Dict[str, Any]:
         """Get completion from any LLM provider
-        
+
         Args:
             prompt: The prompt text
             model: Model ID (uses default if not specified)
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
             return_usage: If True, returns dict with 'text' and 'usage' keys
-            
+            return_raw: If True, also includes the full, unparsed provider response
+                body under 'raw_response' (currently only 'custom' and 'ollama'
+                support this -- the only two providers this project configures).
+
         Returns:
-            str if return_usage=False (default), else dict with {'text': str, 'usage': dict}
+            str if return_usage=False and return_raw=False (default), else dict with
+            {'text': str, 'usage': dict, ['raw_response': dict]}
         """
-        
+
         # Use default model if not specified
         model = model or self.default_model
-        
+
         provider = config.get_provider_from_model_id(model)
-        
+
+        if return_raw and provider not in ("custom", "ollama"):
+            raise ValueError(f"return_raw is not supported for provider '{provider}'")
+
         if provider == "openai":
             result = await self._openai_completion(prompt, model, temperature, max_tokens, return_usage)
         elif provider == "anthropic":
@@ -56,12 +64,16 @@ class LLMClient:
         elif provider == "mistral":
             result = await self._mistral_completion(prompt, model, temperature, max_tokens, return_usage)
         elif provider == "custom":
-            result = await self._custom_completion(prompt, model, temperature, max_tokens, return_usage)
+            result = await self._custom_completion(
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw
+            )
         elif provider == "ollama":
-            result = await self._ollama_completion(prompt, model, temperature, max_tokens, return_usage)
+            result = await self._ollama_completion(
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw
+            )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
-        
+
         return result
     
     async def _openai_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False) -> str | Dict[str, Any]:
@@ -211,7 +223,7 @@ class LLMClient:
                 }
             return text
     
-    async def _custom_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False) -> str | Dict[str, Any]:
+    async def _custom_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False) -> str | Dict[str, Any]:
         """Custom endpoint completion (OpenAI-compatible)"""
         endpoint = config.CUSTOM_LLM_ENDPOINT
         api_key = config.CUSTOM_LLM_API_KEY
@@ -240,10 +252,10 @@ class LLMClient:
             response.raise_for_status()
             data = response.json()
             text = data["choices"][0]["message"]["content"]
-            
+
             if return_usage:
                 usage = data.get("usage", {})
-                return {
+                result = {
                     "text": text,
                     "usage": {
                         "prompt_tokens": usage.get("prompt_tokens", 0),
@@ -251,9 +263,12 @@ class LLMClient:
                         "total_tokens": usage.get("total_tokens", 0)
                     }
                 }
+                if return_raw:
+                    result["raw_response"] = data
+                return result
             return text
-    
-    async def _ollama_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False) -> str | Dict[str, Any]:
+
+    async def _ollama_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False) -> str | Dict[str, Any]:
         """Ollama local completion"""
         endpoint = config.OLLAMA_ENDPOINT
         if not endpoint:
@@ -283,10 +298,10 @@ class LLMClient:
             response.raise_for_status()
             data = response.json()
             text = data["response"]
-            
+
             if return_usage:
                 # Ollama doesn't provide token counts in standard API, return 0
-                return {
+                result = {
                     "text": text,
                     "usage": {
                         "prompt_tokens": 0,
@@ -294,6 +309,9 @@ class LLMClient:
                         "total_tokens": 0
                     }
                 }
+                if return_raw:
+                    result["raw_response"] = data
+                return result
             return text
     
     async def get_embedding(
