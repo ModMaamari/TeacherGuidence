@@ -22,6 +22,32 @@ function badge(text, cls, tip) {
 }
 function cleanModel(m) { return String(m == null ? "" : m).replace(/^custom\//, ""); }
 
+// hh:mm:ss:mmm, or null if ms is missing (older runs recorded before this feature existed).
+function formatElapsed(ms) {
+  if (ms == null || Number.isNaN(Number(ms))) return null;
+  const total = Math.max(0, Math.round(Number(ms)));
+  const pad = (n, len) => String(n).padStart(len, "0");
+  const h = Math.floor(total / 3600000);
+  const m = Math.floor((total % 3600000) / 60000);
+  const s = Math.floor((total % 60000) / 1000);
+  const rem = total % 1000;
+  return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}:${pad(rem, 3)}`;
+}
+function timingBadge(ms, label) {
+  const f = formatElapsed(ms);
+  if (!f) return "";
+  return badge(`⏱ ${label ? label + " " : ""}${f}`, "timing");
+}
+// Collapsed-by-default raw model input/output. Renders nothing when both are absent
+// (older runs recorded before this feature existed).
+function rawBlock(role, prompt, raw) {
+  if (!prompt && !raw) return "";
+  return `<div class="raw-blocks">
+    <details><summary>${esc(role)} · Show raw input</summary><pre class="code">${esc(prompt || "(empty)")}</pre></details>
+    <details><summary>${esc(role)} · Show raw output</summary><pre class="code">${esc(raw || "(empty)")}</pre></details>
+  </div>`;
+}
+
 // Hover explanations for UI elements (shown as native tooltips).
 const TIP = {
   episodes: "Number of question trajectories collected in this run.",
@@ -208,16 +234,19 @@ function renderPlanReview(pr) {
     ? badge("guard fired · sanitized", "warn", TIP.leakage)
     : badge("no leakage", "good", TIP.leakage);
   const skipBadge = pr.revision_skipped ? badge("revision skipped · plan accepted", "accent", TIP.plan_review) : "";
+  const rounds = pr.rounds || [];
 
   return `
   <div class="section">
-    <h3 title="${esc(TIP.plan_review)}">Plan review ${leakBadge}${skipBadge}</h3>
+    <h3 title="${esc(TIP.plan_review)}">Plan review ${leakBadge}${skipBadge}${timingBadge(pr.plan_review_elapsed_ms, "total")}</h3>
     <div class="panel">
       <div class="plan-grid">
         <div class="plan-col">
           <h4>1 · Initial plan (student)</h4>
           <div class="plan-summary">${esc(initial.plan_summary || "")}</div>
           ${planStepsList(initial.steps)}
+          <div class="chips" style="margin-top:8px">${timingBadge(pr.initial_plan_call_ms, "call")}</div>
+          ${rawBlock("Initial plan", pr.initial_student_plan_prompt, pr.initial_student_plan_raw)}
         </div>
         <div class="plan-col">
           <h4>2 · Teacher feedback (student-visible)</h4>
@@ -232,6 +261,7 @@ function renderPlanReview(pr) {
           ${planStepsList(revised.steps)}
         </div>
       </div>
+      ${renderPlanReviewRounds(rounds)}
       <div class="private-only" style="margin-top:12px">
         <div class="private-card">
           <div class="blk-label">${badge("teacher-private", "private")} plan diagnosis</div>
@@ -239,6 +269,26 @@ function renderPlanReview(pr) {
         </div>
       </div>
     </div>
+  </div>`;
+}
+
+function renderPlanReviewRounds(rounds) {
+  if (!rounds || !rounds.length) return "";
+  return `
+  <div class="panel" style="margin-top:12px">
+    <div class="blk-label">Rounds · raw teacher review / student revision</div>
+    ${rounds.map((r) => `
+      <div style="${r.round > 1 ? "margin-top:12px;padding-top:12px;border-top:1px solid var(--border)" : ""}">
+        <div class="chips" style="margin-bottom:6px">
+          ${badge("round " + esc(r.round))}
+          ${r.accepted ? badge("plan accepted", "good") : badge("plan revised")}
+          ${timingBadge(r.review_call_ms, "teacher review")}
+          ${r.revision_call_ms != null ? timingBadge(r.revision_call_ms, "student revision") : ""}
+        </div>
+        ${rawBlock("Teacher review", r.teacher_plan_review_prompt, r.teacher_plan_review_raw)}
+        ${rawBlock("Student revision", r.revised_student_plan_prompt, r.revised_student_plan_raw)}
+      </div>
+    `).join("")}
   </div>`;
 }
 
@@ -304,6 +354,7 @@ function renderStep(s) {
       ${decision.category ? badge(decision.category) : ""}
       ${s.stop_condition === "FINISH" ? badge("FINISH", "accent") : ""}
       ${leakBadge}
+      ${timingBadge(s.step_elapsed_ms)}
     </div>
     <div class="step-body">
       <div class="block">
@@ -322,6 +373,12 @@ function renderStep(s) {
       <div class="block">
         <div class="blk-label" title="${esc(TIP.guidance_box)}">Student-visible guidance</div>
         ${guidanceHtml}
+      </div>
+      <div class="block">
+        <div class="blk-label">Raw model I/O</div>
+        <div class="chips" style="margin-bottom:6px">${timingBadge(s.student_call_ms, "student call")}${timingBadge(s.teacher_call_ms, "teacher call")}</div>
+        ${rawBlock("Student", s.student_prompt, s.student_raw)}
+        ${rawBlock("Teacher", s.teacher_prompt, s.teacher_raw)}
       </div>
       <div class="block">
         <div class="blk-label">Step labels</div>

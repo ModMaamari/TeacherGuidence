@@ -204,6 +204,17 @@ body:not(.hide-private) .when-hidden { display: none; }
 .private-card .blk-label { color: var(--private); }
 .redacted { color: var(--muted); font-style: italic; }
 
+/* Raw model I/O (collapsed by default) */
+.raw-blocks { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.raw-blocks details { border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.raw-blocks summary { padding: 7px 10px; font-size: 12px; color: var(--text-soft); cursor: pointer; user-select: none; list-style: none; }
+.raw-blocks summary::-webkit-details-marker { display: none; }
+.raw-blocks summary::before { content: "▸ "; color: var(--muted); }
+.raw-blocks details[open] summary::before { content: "▾ "; }
+.raw-blocks details[open] summary { border-bottom: 1px solid var(--border); }
+.raw-blocks pre.code { border-radius: 0 0 8px 8px; }
+.badge.timing { font-family: var(--mono); }
+
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; max-height: 320px; }
