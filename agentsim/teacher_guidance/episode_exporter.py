@@ -102,13 +102,20 @@ class TeacherGuidanceEpisodeExporter:
             "steps": [
                 {
                     "t": s.get("t"),
+                    "student_prompt": s.get("student_prompt", ""),
+                    "student_raw": s.get("student_raw", ""),
+                    "student_call_ms": s.get("student_call_ms"),
                     "student_action": s.get("student_action"),
                     "tool_observation": s.get("tool_observation"),
+                    "teacher_prompt": s.get("teacher_prompt", ""),
+                    "teacher_raw": s.get("teacher_raw", ""),
+                    "teacher_call_ms": s.get("teacher_call_ms"),
                     "teacher_private_diagnosis": (s.get("teacher_full", {}) or {}).get("private_diagnosis", {}),
                     "student_visible_guidance": s.get("student_visible_guidance"),
                     "metrics": s.get("metrics"),
                     "leakage_check": s.get("leakage_check"),
                     "stop_condition": s.get("stop_condition", "CONTINUE"),
+                    "step_elapsed_ms": s.get("step_elapsed_ms"),
                 }
                 for s in steps
             ],

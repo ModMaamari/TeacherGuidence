@@ -207,6 +207,7 @@ class PlanReviewRecord:
     enabled: bool = False
     initial_student_plan_prompt: Optional[str] = None
     initial_student_plan_raw: Optional[str] = None
+    initial_plan_call_ms: Optional[float] = None
     initial_student_plan: Optional[Dict[str, Any]] = None
     teacher_plan_review_prompt: Optional[str] = None
     teacher_plan_review_raw: Optional[str] = None
@@ -217,6 +218,7 @@ class PlanReviewRecord:
     revised_student_plan: Optional[Dict[str, Any]] = None
     leakage_check: Optional[Dict[str, Any]] = None
     metrics: Optional[Dict[str, Any]] = None
+    plan_review_elapsed_ms: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------
@@ -227,15 +229,18 @@ class StepRecord:
     t: int = 0
     student_prompt: str = ""
     student_raw: str = ""
+    student_call_ms: Optional[float] = None
     student_action: Dict[str, Any] = field(default_factory=dict)
     tool_observation: Dict[str, Any] = field(default_factory=dict)
     teacher_prompt: str = ""
     teacher_raw: str = ""
+    teacher_call_ms: Optional[float] = None
     teacher_full: Dict[str, Any] = field(default_factory=dict)
     student_visible_guidance: Dict[str, Any] = field(default_factory=dict)
     leakage_check: Dict[str, Any] = field(default_factory=dict)
     metrics: Dict[str, Any] = field(default_factory=dict)
     stop_condition: str = "CONTINUE"
+    step_elapsed_ms: Optional[float] = None
 
 
 @dataclass
