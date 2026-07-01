@@ -154,6 +154,44 @@ def get_run_episodes(output_root: str | Path, run_id: str) -> List[Dict[str, Any
     return summaries
 
 
+def _load_sft_index(path: Path) -> Dict[int, Dict[str, str]]:
+    """step -> {"input", "output"} from a student_sft.jsonl/teacher_sft.jsonl file."""
+    idx: Dict[int, Dict[str, str]] = {}
+    if not path.exists():
+        return idx
+    for row in _read_jsonl(path):
+        step = (row.get("metadata") or {}).get("step")
+        if step is not None:
+            idx[step] = {"input": row.get("input", ""), "output": row.get("output", "")}
+    return idx
+
+
+def _backfill_raw_io(ep: Dict[str, Any], episode_dir: Path) -> None:
+    """Older runs never wrote student_prompt/teacher_prompt into the episode row (fixed
+    in a later exporter version), but the sibling student_sft.jsonl/teacher_sft.jsonl
+    files have always carried the same input/output per step. Recover it from there so
+    the viewer can show raw I/O without requiring the run to be regenerated. Flags each
+    backfilled step since per-call timing and the raw provider response can't be
+    recovered this way — only the prompt/response text."""
+    steps = ep.get("steps") or []
+    if any(not s.get("student_prompt") for s in steps):
+        idx = _load_sft_index(episode_dir / "student_sft.jsonl")
+        for s in steps:
+            hit = idx.get(s.get("t"))
+            if not s.get("student_prompt") and hit:
+                s["student_prompt"] = hit["input"]
+                s["student_raw"] = hit["output"]
+                s["student_io_backfilled"] = True
+    if any(not s.get("teacher_prompt") for s in steps):
+        idx = _load_sft_index(episode_dir / "teacher_sft.jsonl")
+        for s in steps:
+            hit = idx.get(s.get("t"))
+            if not s.get("teacher_prompt") and hit:
+                s["teacher_prompt"] = hit["input"]
+                s["teacher_raw"] = hit["output"]
+                s["teacher_io_backfilled"] = True
+
+
 def get_episode(output_root: str | Path, run_id: str, qid: str) -> Optional[Dict[str, Any]]:
     """Return the full episode for a qid within a run, or None."""
     output_root = Path(output_root)
@@ -163,5 +201,6 @@ def get_episode(output_root: str | Path, run_id: str, qid: str) -> Optional[Dict
                 fm = ep.setdefault("final_metrics", {})
                 if "answer_correct" not in fm:
                     fm["answer_correct"] = _answer_correct(ep)
+                _backfill_raw_io(ep, episode_file.parent)
                 return ep
     return None
