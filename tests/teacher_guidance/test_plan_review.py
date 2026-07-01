@@ -173,6 +173,11 @@ def test_multistep_planning_loop_records_timing():
     assert isinstance(round2["review_call_ms"], float) and round2["review_call_ms"] >= 0
     assert "revision_call_ms" not in round2  # accepted -> no revision call made
 
+    assert len(record["initial_plan_calls"]) == 1
+    assert len(round1["review_calls"]) == 1 and len(round1["revision_calls"]) == 1
+    assert len(round2["review_calls"]) == 1 and "revision_calls" not in round2
+    assert record["plan_review_started_at"] <= record["plan_review_ended_at"]
+
 
 def test_planning_loop_respects_max_rounds():
     initial = json.dumps({"plan_summary": "v0", "steps": [], "uncertainties": [], "stop_condition": "x"})
@@ -226,6 +231,8 @@ def test_teacher_planner_authors_and_sanitizes_plan():
     assert ctx.metadata["revised_plan"]["steps"][1]["intended_tool"] == "verify"
     assert isinstance(record["plan_call_ms"], float) and record["plan_call_ms"] >= 0
     assert isinstance(record["plan_review_elapsed_ms"], float) and record["plan_review_elapsed_ms"] >= 0
+    assert len(record["plan_calls"]) == 1
+    assert record["plan_review_started_at"] <= record["plan_review_ended_at"]
 
 
 class TruncatedReviewStub:
@@ -268,6 +275,16 @@ def test_teacher_plan_review_repairs_truncated_response():
     assert "verification" in record["student_visible_plan_feedback"]["feedback"]
     assert stub.review_calls == 2
     assert result.data["verdict"] == "PROCEED"
+
+    # The failed first attempt's truncated raw text is preserved, not just the
+    # winning retry.
+    review_calls = record["rounds"][0]["review_calls"]
+    assert len(review_calls) == 2
+    assert review_calls[0]["response_text"] == bad_review
+    assert review_calls[1]["response_text"] == good_review
+    assert record["rounds"][0]["review_call_ms"] == sum(c["elapsed_ms"] for c in review_calls)
+    assert record["plan_review_started_at"] <= record["plan_review_ended_at"]
+    assert len(record["initial_plan_calls"]) == 1
 
 
 class AlwaysTruncatedReviewStub:
