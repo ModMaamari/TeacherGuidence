@@ -213,6 +213,7 @@ body:not(.hide-private) .when-hidden { display: none; }
 .raw-blocks details[open] summary::before { content: "▾ "; }
 .raw-blocks details[open] summary { border-bottom: 1px solid var(--border); }
 .raw-blocks pre.code { border-radius: 0 0 8px 8px; }
+.raw-missing { margin-top: 8px; font-size: 12px; color: var(--muted); font-style: italic; }
 .badge.timing { font-family: var(--mono); }
 
 @media (max-width: 900px) {

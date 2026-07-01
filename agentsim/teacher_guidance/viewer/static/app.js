@@ -38,10 +38,13 @@ function timingBadge(ms, label) {
   if (!f) return "";
   return badge(`⏱ ${label ? label + " " : ""}${f}`, "timing");
 }
-// Collapsed-by-default raw model input/output. Renders nothing when both are absent
-// (older runs recorded before this feature existed).
+// Collapsed-by-default raw model input/output. Older runs (recorded before this
+// feature existed) never captured this, so say so explicitly rather than rendering a
+// silently empty block that reads as broken.
 function rawBlock(role, prompt, raw) {
-  if (!prompt && !raw) return "";
+  if (!prompt && !raw) {
+    return `<div class="raw-missing">${esc(role)} raw input/output not recorded for this run</div>`;
+  }
   return `<div class="raw-blocks">
     <details><summary>${esc(role)} · Show raw input</summary><pre class="code">${esc(prompt || "(empty)")}</pre></details>
     <details><summary>${esc(role)} · Show raw output</summary><pre class="code">${esc(raw || "(empty)")}</pre></details>
@@ -286,7 +289,7 @@ function renderPlanReviewRounds(rounds) {
           ${r.revision_call_ms != null ? timingBadge(r.revision_call_ms, "student revision") : ""}
         </div>
         ${rawBlock("Teacher review", r.teacher_plan_review_prompt, r.teacher_plan_review_raw)}
-        ${rawBlock("Student revision", r.revised_student_plan_prompt, r.revised_student_plan_raw)}
+        ${r.accepted ? "" : rawBlock("Student revision", r.revised_student_plan_prompt, r.revised_student_plan_raw)}
       </div>
     `).join("")}
   </div>`;
