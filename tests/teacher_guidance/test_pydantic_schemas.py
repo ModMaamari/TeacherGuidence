@@ -192,3 +192,96 @@ def test_revised_student_plan_generation_model_accepts_well_formed_plan():
         "stop_condition": "verified",
     })
     assert m.steps[0].intended_tool == "search"
+
+
+# ---------------------------------------------------------------------------
+# Per-tool params (discriminated union, generation-only): a freeform params dict let
+# the model get away with an empty {} for tools that need real content (e.g. a
+# "decompose" with no sub_questions is a silent no-op). Only StudentActionGenerationModel
+# enforces this; the base ToolCallModel (freeform params) stays lenient for validation.
+# ---------------------------------------------------------------------------
+def test_generation_model_rejects_decompose_with_empty_params():
+    with pytest.raises(ValidationError):
+        StudentActionGenerationModel.model_validate({
+            "thought": "I need to break this question into sub-questions to search separately.",
+            "action": {"tool": "decompose", "params": {}},
+        })
+
+
+def test_generation_model_accepts_decompose_with_sub_questions():
+    m = StudentActionGenerationModel.model_validate({
+        "thought": "I need to break this question into sub-questions to search separately.",
+        "action": {"tool": "decompose", "params": {"sub_questions": ["who is X?", "what year?"]}},
+    })
+    assert m.action.params.sub_questions == ["who is X?", "what year?"]
+
+
+def test_generation_model_rejects_search_with_empty_params():
+    with pytest.raises(ValidationError):
+        StudentActionGenerationModel.model_validate({
+            "thought": "I should search for the company's headquarters location.",
+            "action": {"tool": "search", "params": {}},
+        })
+
+
+def test_generation_model_accepts_search_with_query():
+    m = StudentActionGenerationModel.model_validate({
+        "thought": "I should search for the company's headquarters location.",
+        "action": {"tool": "search", "params": {"query": "Oberoi Group HQ"}},
+    })
+    assert m.action.params.query == "Oberoi Group HQ"
+    assert m.action.params.k == 5  # default
+
+
+def test_generation_model_rejects_extract_missing_doc_ids():
+    with pytest.raises(ValidationError):
+        StudentActionGenerationModel.model_validate({
+            "thought": "I found a relevant document and should extract the key fact from it.",
+            "action": {"tool": "extract", "params": {"target_facts": ["some fact"]}},
+        })
+
+
+def test_generation_model_accepts_extract_with_doc_ids_and_facts():
+    m = StudentActionGenerationModel.model_validate({
+        "thought": "I found a relevant document and should extract the key fact from it.",
+        "action": {"tool": "extract", "params": {"doc_ids": ["q1::doc0"], "target_facts": ["HQ is in Delhi"]}},
+    })
+    assert m.action.params.doc_ids == ["q1::doc0"]
+
+
+def test_generation_model_synthesize_needs_no_params():
+    m = StudentActionGenerationModel.model_validate({
+        "thought": "I have enough extracted facts now, time to synthesize a draft answer.",
+        "action": {"tool": "synthesize", "params": {}},
+    })
+    assert m.action.tool == "synthesize"
+
+
+def test_generation_model_finish_requires_answer_via_discriminated_union():
+    with pytest.raises(ValidationError):
+        StudentActionGenerationModel.model_validate({
+            "thought": "I believe I have found the final answer to this question.",
+            "action": {"tool": "finish", "params": {}},
+        })
+    m = StudentActionGenerationModel.model_validate({
+        "thought": "I believe I have found the final answer to this question.",
+        "action": {"tool": "finish", "params": {"answer": "Delhi", "citations": []}},
+    })
+    assert m.action.params.answer == "Delhi"
+
+
+def test_base_tool_call_model_still_allows_empty_params_for_any_tool():
+    # Legacy/older data or the lenient post-hoc validation path must not reject an
+    # empty params dict just because a stricter generation-only schema now exists.
+    from agentsim.teacher_guidance.json_utils import validate_student_action
+    ok, errors = validate_student_action({"action": {"tool": "decompose", "params": {}}})
+    assert ok, errors
+
+
+def test_generation_schema_includes_discriminated_action_union():
+    schema = StudentActionGenerationModel.model_json_schema()
+    action_schema = schema["properties"]["action"]
+    assert action_schema["discriminator"]["propertyName"] == "tool"
+    assert set(action_schema["discriminator"]["mapping"].keys()) == {
+        "decompose", "reformulate", "search", "extract", "verify", "synthesize", "finish",
+    }

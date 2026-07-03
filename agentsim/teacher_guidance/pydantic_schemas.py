@@ -34,7 +34,7 @@ routed teacher calls (whose provider never receives the schema payload, only a l
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -83,17 +83,108 @@ class StudentActionModel(_Strict):
     @model_validator(mode="after")
     def _finish_requires_answer(self) -> "StudentActionModel":
         if self.action.tool == "finish":
-            answer = self.action.params.get("answer")
+            params = self.action.params
+            answer = params.get("answer") if isinstance(params, dict) else getattr(params, "answer", None)
             if not (isinstance(answer, str) and answer.strip()):
                 raise ValueError("finish_missing_answer")
         return self
 
 
+# ---------------------------------------------------------------------------
+# Per-tool params, generation-only: mirrors what tool_executor.py actually reads
+# per tool (see execute_student_tool). A freeform params dict let the model get away
+# with an empty {} for tools that need real content -- e.g. a "decompose" with no
+# sub_questions or a "search" with no query is a silent no-op that burns a step for
+# nothing. A discriminated union on `tool` requires the right keys for the right
+# tool. This is used only by StudentActionGenerationModel; the lenient base
+# ToolCallModel above (freeform params) is what validate_student_action still checks
+# post-hoc, so it accepts any already-produced JSON regardless of tool.
+# ---------------------------------------------------------------------------
+class DecomposeParams(_Strict):
+    sub_questions: List[str] = Field(..., min_length=1)
+
+
+class ReformulateParams(_Strict):
+    queries: List[str] = Field(..., min_length=1)
+    reformulation_type: Optional[str] = None
+
+
+class SearchParams(_Strict):
+    query: str = Field(..., min_length=1)
+    k: int = 5
+
+
+class ExtractParams(_Strict):
+    doc_ids: List[str] = Field(..., min_length=1)
+    target_facts: List[str] = Field(..., min_length=1)
+
+
+class VerifyParams(_Strict):
+    claim: str = Field(..., min_length=1)
+    query: Optional[str] = None
+    k: int = 5
+
+
+class SynthesizeParams(_Strict):
+    pass
+
+
+class FinishParams(_Strict):
+    answer: str = Field(..., min_length=1)
+    citations: List[Dict[str, Any]] = []
+
+
+class DecomposeCall(_Strict):
+    tool: Literal["decompose"]
+    params: DecomposeParams
+
+
+class ReformulateCall(_Strict):
+    tool: Literal["reformulate"]
+    params: ReformulateParams
+
+
+class SearchCall(_Strict):
+    tool: Literal["search"]
+    params: SearchParams
+
+
+class ExtractCall(_Strict):
+    tool: Literal["extract"]
+    params: ExtractParams
+
+
+class VerifyCall(_Strict):
+    tool: Literal["verify"]
+    params: VerifyParams
+
+
+class SynthesizeCall(_Strict):
+    tool: Literal["synthesize"]
+    params: SynthesizeParams = SynthesizeParams()
+
+
+class FinishCall(_Strict):
+    tool: Literal["finish"]
+    params: FinishParams
+
+
+ToolCallUnion = Annotated[
+    Union[
+        DecomposeCall, ReformulateCall, SearchCall, ExtractCall,
+        VerifyCall, SynthesizeCall, FinishCall,
+    ],
+    Field(discriminator="tool"),
+]
+
+
 class StudentActionGenerationModel(StudentActionModel):
     """Stricter variant used only for Ollama's response_schema: thought must be a
-    real, substantive reasoning trace, not skippable."""
+    real, substantive reasoning trace (not skippable), and action.params must match
+    the shape the chosen tool actually needs (not an empty no-op {})."""
 
     thought: str = Field(..., min_length=15)
+    action: ToolCallUnion
 
 
 # ---------------------------------------------------------------------------
