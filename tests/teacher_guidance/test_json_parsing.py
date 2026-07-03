@@ -69,11 +69,20 @@ def test_parse_teacher_evaluation_valid():
 
 
 def test_parse_teacher_plan_review_sets_review_valid_on_failure():
-    # Truncated JSON (no closing brace) must not be marked review_valid, even though
-    # review_valid was previously only ever set inside the json_valid branch.
-    obj, info = parse_teacher_plan_review('{"student_visible": {"feedback": "cut off mid')
+    # Totally unparseable input (no JSON object at all) must never be marked
+    # review_valid -- that invariant must hold regardless of which repair tier ran.
+    obj, info = parse_teacher_plan_review("the model just wrote prose, no JSON here")
     assert info["json_valid"] is False
     assert info["review_valid"] is False
+
+
+def test_parse_teacher_plan_review_recovers_truncated_json_via_json_repair():
+    # Truncated JSON (no closing brace, e.g. cut off mid-generation) is now recovered
+    # by the json_repair fallback tier rather than being discarded outright.
+    obj, info = parse_teacher_plan_review('{"student_visible": {"feedback": "cut off mid"}, "teacher_decision": "continue"')
+    assert info["json_valid"] is True
+    assert info["repaired"] is True
+    assert obj["student_visible"]["feedback"] == "cut off mid"
 
 
 def test_parse_teacher_plan_review_valid():
@@ -123,6 +132,40 @@ def test_repair_curly_quotes():
 def test_valid_json_not_marked_repaired():
     obj, info = parse_json_object('{"a": 1}')
     assert info["json_valid"] and info["repaired"] is False
+
+
+def test_repair_invalid_apostrophe_escape():
+    # The exact failure mode reported in production: a small model escapes an
+    # apostrophe with a backslash, which is not a valid JSON escape and makes
+    # json.loads reject the whole object.
+    raw = r'{"plan_summary": "Search for \'Girls\' Life\' editor location."}'
+    obj, info = parse_json_object(raw)
+    assert info["json_valid"] and info["repaired"]
+    assert obj["plan_summary"] == "Search for 'Girls' Life' editor location."
+
+
+def test_repair_invalid_apostrophe_escape_nested_in_plan_steps():
+    raw = (
+        '{"plan_summary": "x", "steps": [{"step_id": 1, "goal": "find Girls\\\' Life", '
+        '"intended_tool": "search", "rationale": "y", "depends_on": []}]}'
+    )
+    obj, info = parse_json_object(raw)
+    assert info["json_valid"] and info["repaired"]
+    assert obj["steps"][0]["goal"] == "find Girls' Life"
+
+
+def test_json_repair_fallback_handles_truncated_json():
+    # Reasoning models sometimes get cut off mid-object; json_repair can often close
+    # out the structure where our conservative regex repairs cannot.
+    obj, info = parse_json_object('{"action": {"tool": "search", "params": {"query": "x"')
+    assert info["json_valid"] and info["repaired"]
+    assert obj["action"]["tool"] == "search"
+
+
+def test_json_repair_fallback_still_fails_on_total_garbage():
+    obj, info = parse_json_object("no json object here at all")
+    assert obj == {}
+    assert info["json_valid"] is False
 
 
 def test_student_prompt_has_format_example_without_gold():

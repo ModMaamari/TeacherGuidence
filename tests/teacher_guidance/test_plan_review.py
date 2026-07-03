@@ -282,8 +282,9 @@ def test_teacher_plan_review_repairs_truncated_response():
         "plan_summary": "v0", "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search",
         "rationale": "x", "depends_on": []}], "uncertainties": [], "stop_condition": "done",
     })
-    # Unterminated JSON, mirroring the real truncation observed in production.
-    bad_review = '{"plan_review_enabled": true, "student_visible": {"score_continuous": 0.5, "feedback": "this gets cu'
+    # Genuinely unparseable (no JSON object at all -- unterminated JSON gets recovered
+    # by the json_repair fallback tier now, so it no longer exercises the repair path).
+    bad_review = "The plan looks reasonable but I didn't return JSON here."
     good_review = json.dumps({
         "plan_review_enabled": True, "review_guidance_level": 3,
         "student_visible": {"score_continuous": 0.8, "feedback": "Solid plan, add a verification step."},
@@ -331,7 +332,7 @@ def test_teacher_plan_review_falls_back_when_repair_exhausted():
     initial = json.dumps({
         "plan_summary": "v0", "steps": [], "uncertainties": [], "stop_condition": "done",
     })
-    bad_review = '{"student_visible": {"feedback": "always cut off h'
+    bad_review = "Sorry, I can't format this as JSON right now."
     ctx = _context({"enabled": True, "review_guidance_level": 3})
     stub = AlwaysTruncatedReviewStub(initial, bad_review)
     comp = TeacherGuidedPlanReview(config={}, llm_client=stub)

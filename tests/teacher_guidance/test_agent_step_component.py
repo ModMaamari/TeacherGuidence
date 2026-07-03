@@ -143,8 +143,9 @@ def test_teacher_eval_repairs_truncated_response(tmp_path):
         "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
         "new_facts_extracted": [],
     })
-    # Unterminated JSON, mirroring the real truncation observed in production.
-    bad_teacher = '{"guidance_level": 3, "student_visible": {"score_continuous": 0.7, "feedback": "cut off h'
+    # Genuinely unparseable (no JSON object at all -- unterminated JSON gets recovered
+    # by the json_repair fallback tier now, so it no longer exercises the repair path).
+    bad_teacher = "I think the student did fine but I forgot to write JSON, sorry about that."
     good_teacher = json.dumps({
         "guidance_level": 3,
         "student_visible": {"score_binary": 1, "score_continuous": 0.7, "feedback": "Good retrieval."},
@@ -193,7 +194,7 @@ def test_teacher_eval_falls_back_when_repair_exhausted(tmp_path):
         "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
         "new_facts_extracted": [],
     })
-    bad_teacher = '{"student_visible": {"feedback": "always cut off h'
+    bad_teacher = "Sorry, I can't format this as JSON right now."
 
     class AlwaysBadTeacherStub:
         def __init__(self):
