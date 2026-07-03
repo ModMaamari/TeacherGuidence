@@ -103,3 +103,64 @@ def test_return_raw_unsupported_provider_raises():
         asyncio.run(
             LLMClient().get_completion(prompt="hi", model="gpt-4o", return_raw=True)
         )
+
+
+def test_ollama_completion_sends_response_schema_as_format(monkeypatch):
+    monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
+    body = {"response": '{"tool": "search"}'}
+    mock_client = _mock_async_client(_fake_response(body))
+    schema = {"type": "object", "properties": {"tool": {"enum": ["search", "finish"]}}}
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(
+            LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b", response_schema=schema)
+        )
+
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert sent_json["format"] == schema
+
+
+def test_ollama_completion_omits_format_when_no_schema_given(monkeypatch):
+    monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
+    body = {"response": "hello"}
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b"))
+
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert "format" not in sent_json
+
+
+def test_custom_completion_sends_json_object_mode_when_schema_given(monkeypatch):
+    # Full JSON-Schema enforcement isn't reliably supported across OpenRouter models,
+    # so only the looser "valid JSON syntax" mode is requested, not the schema itself.
+    monkeypatch.setattr(config, "CUSTOM_LLM_ENDPOINT", "https://example.invalid")
+    monkeypatch.setattr(config, "CUSTOM_LLM_API_KEY", "key")
+    body = {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+    mock_client = _mock_async_client(_fake_response(body))
+    schema = {"type": "object", "properties": {"teacher_decision": {"enum": ["continue"]}}}
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(
+            LLMClient().get_completion(prompt="hi", model="custom/z-ai/glm-5.2", response_schema=schema)
+        )
+
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert sent_json["response_format"] == {"type": "json_object"}
+
+
+def test_custom_completion_omits_response_format_when_no_schema_given(monkeypatch):
+    monkeypatch.setattr(config, "CUSTOM_LLM_ENDPOINT", "https://example.invalid")
+    monkeypatch.setattr(config, "CUSTOM_LLM_API_KEY", "key")
+    body = {"choices": [{"message": {"content": "hello"}}], "usage": {}}
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(LLMClient().get_completion(prompt="hi", model="custom/z-ai/glm-5.2"))
+
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert "response_format" not in sent_json
+
+
+def test_response_schema_unsupported_provider_raises():
+    with pytest.raises(ValueError, match="response_schema"):
+        asyncio.run(
+            LLMClient().get_completion(prompt="hi", model="gpt-4o", response_schema={"type": "object"})
+        )

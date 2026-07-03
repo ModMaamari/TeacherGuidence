@@ -28,6 +28,7 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         return_usage: bool = False,
         return_raw: bool = False,
+        response_schema: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> str | Dict[str, Any]:
         """Get completion from any LLM provider
@@ -41,6 +42,15 @@ class LLMClient:
             return_raw: If True, also includes the full, unparsed provider response
                 body under 'raw_response' (currently only 'custom' and 'ollama'
                 support this -- the only two providers this project configures).
+            response_schema: A JSON Schema dict (e.g. from a Pydantic model's
+                ``.model_json_schema()``) requesting constrained/structured output.
+                Ollama grammar-constrains generation to the schema (physically
+                prevents invalid JSON or an out-of-vocabulary enum value). OpenRouter/
+                custom support for full schema enforcement varies by model, so this
+                only requests the broadly-supported looser "valid JSON syntax"
+                (response_format: json_object) mode there, not schema conformance.
+                Only 'custom' and 'ollama' support this (same two providers as
+                return_raw).
 
         Returns:
             str if return_usage=False and return_raw=False (default), else dict with
@@ -54,6 +64,8 @@ class LLMClient:
 
         if return_raw and provider not in ("custom", "ollama"):
             raise ValueError(f"return_raw is not supported for provider '{provider}'")
+        if response_schema and provider not in ("custom", "ollama"):
+            raise ValueError(f"response_schema is not supported for provider '{provider}'")
 
         if provider == "openai":
             result = await self._openai_completion(prompt, model, temperature, max_tokens, return_usage)
@@ -65,11 +77,11 @@ class LLMClient:
             result = await self._mistral_completion(prompt, model, temperature, max_tokens, return_usage)
         elif provider == "custom":
             result = await self._custom_completion(
-                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw, response_schema
             )
         elif provider == "ollama":
             result = await self._ollama_completion(
-                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw, response_schema
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
@@ -223,35 +235,42 @@ class LLMClient:
                 }
             return text
     
-    async def _custom_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False) -> str | Dict[str, Any]:
+    async def _custom_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
         """Custom endpoint completion (OpenAI-compatible)"""
         endpoint = config.CUSTOM_LLM_ENDPOINT
         api_key = config.CUSTOM_LLM_API_KEY
-        
+
         if not endpoint:
             raise ValueError("CUSTOM_LLM_ENDPOINT not configured")
-        
+
         # Remove custom/ prefix
         model_name = model.replace("custom/", "")
-        
+
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
-        
+
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
+            # OpenRouter-specific extension: asks the response to include real
+            # per-call USD cost in 'usage.cost'. This project's CUSTOM_LLM_ENDPOINT
+            # is always OpenRouter, so this is safe to send unconditionally.
+            "usage": {"include": True},
+        }
+        if response_schema:
+            # Full JSON-Schema enforcement support varies by model on OpenRouter, so
+            # we only request the broadly-supported looser "valid JSON syntax"
+            # guarantee here rather than relying on schema conformance being honored.
+            payload["response_format"] = {"type": "json_object"}
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{endpoint.rstrip('/')}/v1/chat/completions",
                 headers=headers,
-                json={
-                    "model": model_name,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": temperature,
-                    "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
-                    # OpenRouter-specific extension: asks the response to include real
-                    # per-call USD cost in 'usage.cost'. This project's CUSTOM_LLM_ENDPOINT
-                    # is always OpenRouter, so this is safe to send unconditionally.
-                    "usage": {"include": True},
-                }
+                json=payload,
             )
             response.raise_for_status()
             data = response.json()
@@ -273,32 +292,38 @@ class LLMClient:
                 return result
             return text
 
-    async def _ollama_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False) -> str | Dict[str, Any]:
+    async def _ollama_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
         """Ollama local completion"""
         endpoint = config.OLLAMA_ENDPOINT
         if not endpoint:
             raise ValueError("OLLAMA_ENDPOINT not configured")
-        
+
         # Remove ollama/ prefix
         model_name = model.replace("ollama/", "")
-        
+
+        payload = {
+            "model": model_name,
+            "prompt": prompt,
+            "stream": False,
+            # Disable hybrid "thinking" mode (e.g. Qwen3): this framework asks
+            # for JSON-only outputs, so reasoning preambles waste tokens and can
+            # leave the response empty if num_predict is exhausted while thinking.
+            # Ignored by non-thinking models.
+            "think": config.OLLAMA_THINK,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens or config.LLM_MAX_TOKENS
+            }
+        }
+        if response_schema:
+            # Grammar-constrains generation to the schema -- the model is physically
+            # unable to emit invalid JSON or an out-of-vocabulary enum value.
+            payload["format"] = response_schema
+
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
                 f"{endpoint.rstrip('/')}/api/generate",
-                json={
-                    "model": model_name,
-                    "prompt": prompt,
-                    "stream": False,
-                    # Disable hybrid "thinking" mode (e.g. Qwen3): this framework asks
-                    # for JSON-only outputs, so reasoning preambles waste tokens and can
-                    # leave the response empty if num_predict is exhausted while thinking.
-                    # Ignored by non-thinking models.
-                    "think": config.OLLAMA_THINK,
-                    "options": {
-                        "temperature": temperature,
-                        "num_predict": max_tokens or config.LLM_MAX_TOKENS
-                    }
-                }
+                json=payload,
             )
             response.raise_for_status()
             data = response.json()
