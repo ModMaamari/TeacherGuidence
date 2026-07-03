@@ -96,6 +96,18 @@ def test_parse_teacher_plan_review_valid():
     assert obj["teacher_decision"] == "accept_plan"
 
 
+def test_validate_student_action_reports_missing_action():
+    ok, errors = validate_student_action({})
+    assert not ok
+    assert any("missing_action" in e for e in errors)
+
+
+def test_validate_student_action_reports_params_not_object():
+    ok, errors = validate_student_action({"action": {"tool": "search", "params": "not a dict"}})
+    assert not ok
+    assert any("params_not_object" in e for e in errors)
+
+
 def test_validate_teacher_evaluation_rejects_bad_decision():
     ok, errors = validate_teacher_evaluation(
         {"student_visible": {}, "private_diagnosis": {}, "teacher_decision": "explode"}

@@ -15,14 +15,13 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 import json_repair
+from pydantic import ValidationError
 
-from agentsim.teacher_guidance.schemas import (
-    StudentAction,
-    TeacherEvaluation,
-    TOOLS,
-    DECISION_CATEGORIES,
-    TEACHER_DECISIONS,
-    PLAN_TEACHER_DECISIONS,
+from agentsim.teacher_guidance.schemas import StudentAction, TeacherEvaluation
+from agentsim.teacher_guidance.pydantic_schemas import (
+    StudentActionModel,
+    TeacherEvaluationModel,
+    TeacherPlanReviewModel,
 )
 
 
@@ -148,70 +147,77 @@ def parse_json_object(raw: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
-# Validation
+# Validation (delegates to the Pydantic models in pydantic_schemas.py, translating
+# ValidationError.errors() into the same short error-code strings callers already
+# depend on, e.g. "invalid_tool:<value>", "finish_missing_answer".)
 # ---------------------------------------------------------------------------
+def _pydantic_errors_to_strings(exc: ValidationError, code_map: Dict[str, str]) -> List[str]:
+    """Convert pydantic errors into short, greppable error-code strings.
+
+    ``code_map`` maps a dotted field path (e.g. ``"action.tool"``) to a code prefix
+    (e.g. ``"invalid_tool"``); the offending input value is appended. A custom
+    ``model_validator`` that raises ``ValueError("some_code")`` (e.g.
+    ``finish_missing_answer``) is passed through as-is -- the message *is* the code.
+    Anything unmapped still gets a readable, if generic, code.
+    """
+    out: List[str] = []
+    for err in exc.errors():
+        loc = ".".join(str(p) for p in err["loc"])
+        if err["type"] == "value_error":
+            out.append(str(err["ctx"]["error"]))
+            continue
+        if err["type"] == "missing":
+            out.append(f"missing_{loc.replace('.', '_')}")
+            continue
+        prefix = code_map.get(loc, f"invalid_{loc.replace('.', '_')}")
+        out.append(f"{prefix}:{err.get('input')}")
+    return out
+
+
 def validate_student_action(obj: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    errors: List[str] = []
     if not isinstance(obj, dict):
         return False, ["not_an_object"]
-
-    action = obj.get("action")
-    if not isinstance(action, dict):
-        errors.append("missing_action")
-    else:
-        tool = action.get("tool")
-        if tool not in TOOLS:
-            errors.append(f"invalid_tool:{tool}")
-        params = action.get("params")
-        if "params" in action and not isinstance(params, dict):
-            errors.append("params_not_object")
-        # A finish action must carry a non-empty answer.
-        if tool == "finish":
-            answer = (params or {}).get("answer") if isinstance(params, dict) else None
-            if not (isinstance(answer, str) and answer.strip()):
-                errors.append("finish_missing_answer")
-
-    decision = obj.get("decision")
-    if isinstance(decision, dict):
-        category = decision.get("category")
-        if category is not None and category not in DECISION_CATEGORIES:
-            errors.append(f"invalid_category:{category}")
-    # decision is optional-but-recommended; absence is not fatal.
-
-    facts = obj.get("new_facts_extracted", [])
-    if facts is not None and not isinstance(facts, list):
-        errors.append("new_facts_extracted_not_list")
-
-    return len(errors) == 0, errors
+    try:
+        StudentActionModel.model_validate(obj)
+        return True, []
+    except ValidationError as exc:
+        errors = _pydantic_errors_to_strings(exc, {
+            "action": "missing_action",
+            "action.tool": "invalid_tool",
+            "action.params": "params_not_object",
+            "decision.category": "invalid_category",
+            "new_facts_extracted": "new_facts_extracted_not_list",
+        })
+        return False, errors
 
 
 def validate_teacher_evaluation(obj: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    errors: List[str] = []
     if not isinstance(obj, dict):
         return False, ["not_an_object"]
-
-    if not isinstance(obj.get("student_visible", {}), dict):
-        errors.append("student_visible_not_object")
-    if not isinstance(obj.get("private_diagnosis", {}), dict):
-        errors.append("private_diagnosis_not_object")
-
-    decision = obj.get("teacher_decision")
-    if decision is not None and decision not in TEACHER_DECISIONS:
-        errors.append(f"invalid_teacher_decision:{decision}")
-
-    return len(errors) == 0, errors
+    try:
+        TeacherEvaluationModel.model_validate(obj)
+        return True, []
+    except ValidationError as exc:
+        errors = _pydantic_errors_to_strings(exc, {
+            "student_visible": "student_visible_not_object",
+            "private_diagnosis": "private_diagnosis_not_object",
+            "teacher_decision": "invalid_teacher_decision",
+        })
+        return False, errors
 
 
 def validate_teacher_plan_review(obj: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    errors: List[str] = []
     if not isinstance(obj, dict):
         return False, ["not_an_object"]
-    if not isinstance(obj.get("student_visible", {}), dict):
-        errors.append("student_visible_not_object")
-    decision = obj.get("teacher_decision")
-    if decision is not None and decision not in PLAN_TEACHER_DECISIONS:
-        errors.append(f"invalid_plan_decision:{decision}")
-    return len(errors) == 0, errors
+    try:
+        TeacherPlanReviewModel.model_validate(obj)
+        return True, []
+    except ValidationError as exc:
+        errors = _pydantic_errors_to_strings(exc, {
+            "student_visible": "student_visible_not_object",
+            "teacher_decision": "invalid_plan_decision",
+        })
+        return False, errors
 
 
 # ---------------------------------------------------------------------------
