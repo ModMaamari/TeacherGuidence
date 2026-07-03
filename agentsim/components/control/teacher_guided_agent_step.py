@@ -34,9 +34,12 @@ from agentsim.teacher_guidance.tool_executor import execute_student_tool
 from agentsim.teacher_guidance.guidance_policy import render_student_guidance
 from agentsim.teacher_guidance.metrics import compute_step_metrics
 from agentsim.teacher_guidance.llm_call_log import timed_completion
-from agentsim.teacher_guidance.pydantic_schemas import StudentActionModel, TeacherEvaluationModel
+from agentsim.teacher_guidance.pydantic_schemas import StudentActionGenerationModel, TeacherEvaluationModel
 
-STUDENT_ACTION_SCHEMA = StudentActionModel.model_json_schema()
+# StudentActionGenerationModel (not the lenient StudentActionModel used for post-hoc
+# validation) requires substantive 'thought' content -- see pydantic_schemas.py for why
+# an all-optional schema backfires under Ollama's grammar-constrained decoding.
+STUDENT_ACTION_SCHEMA = StudentActionGenerationModel.model_json_schema()
 TEACHER_EVALUATION_SCHEMA = TeacherEvaluationModel.model_json_schema()
 
 

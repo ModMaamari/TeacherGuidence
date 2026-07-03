@@ -5,8 +5,11 @@ from pydantic import ValidationError
 
 from agentsim.teacher_guidance.pydantic_schemas import (
     StudentActionModel,
+    StudentActionGenerationModel,
     StudentPlanModel,
+    StudentPlanGenerationModel,
     RevisedStudentPlanModel,
+    RevisedStudentPlanGenerationModel,
     TeacherEvaluationModel,
     TeacherPlanReviewModel,
 )
@@ -112,3 +115,80 @@ def test_teacher_plan_review_accepts_valid_payload():
 def test_teacher_plan_review_rejects_invalid_decision():
     with pytest.raises(ValidationError):
         TeacherPlanReviewModel.model_validate({"teacher_decision": "explode"})
+
+
+# ---------------------------------------------------------------------------
+# *GenerationModel variants: stricter schemas used only to constrain Ollama's
+# generation (see pydantic_schemas.py docstring for why an all-optional schema
+# backfires under grammar-constrained decoding). The base *Model classes above stay
+# lenient for post-hoc validation of already-produced JSON.
+# ---------------------------------------------------------------------------
+def test_student_action_generation_model_requires_substantive_thought():
+    with pytest.raises(ValidationError) as exc_info:
+        StudentActionGenerationModel.model_validate({"action": {"tool": "search", "params": {"query": "x"}}})
+    assert any(e["loc"] == ("thought",) for e in exc_info.value.errors())
+
+
+def test_student_action_generation_model_accepts_real_thought():
+    m = StudentActionGenerationModel.model_validate({
+        "thought": "I should search for the company headquarters first.",
+        "action": {"tool": "search", "params": {"query": "x"}},
+    })
+    assert m.action.tool == "search"
+
+
+def test_student_action_base_model_still_allows_missing_thought():
+    # The lenient validation model (used by json_utils.validate_student_action) must
+    # not reject old/legacy data or non-Ollama-generated JSON just because it lacks
+    # a thought field -- that would be a validation-time behavior change, which is
+    # not what this fix is about.
+    m = StudentActionModel.model_validate({"action": {"tool": "search", "params": {}}})
+    assert m.thought == ""
+
+
+def test_student_plan_generation_model_requires_at_least_one_step():
+    with pytest.raises(ValidationError) as exc_info:
+        StudentPlanGenerationModel.model_validate({
+            "plan_summary": "a reasonably long plan summary", "steps": [], "stop_condition": "done",
+        })
+    assert any(e["loc"] == ("steps",) for e in exc_info.value.errors())
+
+
+def test_student_plan_generation_model_requires_step_goal_and_rationale():
+    with pytest.raises(ValidationError):
+        StudentPlanGenerationModel.model_validate({
+            "plan_summary": "a reasonably long plan summary",
+            "steps": [{"step_id": 1, "intended_tool": "search", "depends_on": []}],
+            "stop_condition": "done",
+        })
+
+
+def test_student_plan_generation_model_accepts_well_formed_plan():
+    m = StudentPlanGenerationModel.model_validate({
+        "plan_summary": "Search for the company then verify the answer.",
+        "steps": [{"step_id": 1, "goal": "find HQ", "intended_tool": "search",
+                   "rationale": "need the source doc first", "depends_on": []}],
+        "stop_condition": "have a verified answer",
+    })
+    assert len(m.steps) == 1
+
+
+def test_student_plan_base_model_still_allows_empty_steps():
+    m = StudentPlanModel.model_validate({"plan_summary": "", "steps": [], "stop_condition": ""})
+    assert m.steps == []
+
+
+def test_revised_student_plan_generation_model_requires_content():
+    with pytest.raises(ValidationError):
+        RevisedStudentPlanGenerationModel.model_validate({"steps": []})
+
+
+def test_revised_student_plan_generation_model_accepts_well_formed_plan():
+    m = RevisedStudentPlanGenerationModel.model_validate({
+        "revision_summary": "added a verification step",
+        "plan_summary": "Search then verify then answer.",
+        "steps": [{"step_id": 1, "goal": "find HQ", "intended_tool": "search",
+                   "rationale": "need the source doc", "depends_on": []}],
+        "stop_condition": "verified",
+    })
+    assert m.steps[0].intended_tool == "search"

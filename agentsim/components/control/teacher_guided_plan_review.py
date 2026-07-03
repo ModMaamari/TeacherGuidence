@@ -40,13 +40,17 @@ from agentsim.teacher_guidance.leakage import sanitize_rendered_guidance
 from agentsim.teacher_guidance.plan_review import compute_plan_review_metrics
 from agentsim.teacher_guidance.llm_call_log import timed_completion
 from agentsim.teacher_guidance.pydantic_schemas import (
-    StudentPlanModel,
-    RevisedStudentPlanModel,
+    StudentPlanGenerationModel,
+    RevisedStudentPlanGenerationModel,
     TeacherPlanReviewModel,
 )
 
-STUDENT_PLAN_SCHEMA = StudentPlanModel.model_json_schema()
-REVISED_STUDENT_PLAN_SCHEMA = RevisedStudentPlanModel.model_json_schema()
+# The *GenerationModel variants (not the lenient base models used for post-hoc
+# validation) require substantive plan_summary/goal/rationale/stop_condition content
+# and at least one step -- an all-optional schema let Ollama's grammar-constrained
+# decoding skip straight to a near-empty plan. See pydantic_schemas.py for details.
+STUDENT_PLAN_SCHEMA = StudentPlanGenerationModel.model_json_schema()
+REVISED_STUDENT_PLAN_SCHEMA = RevisedStudentPlanGenerationModel.model_json_schema()
 TEACHER_PLAN_REVIEW_SCHEMA = TeacherPlanReviewModel.model_json_schema()
 
 

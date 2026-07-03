@@ -15,13 +15,28 @@ These serve two purposes:
 The ``TOOLS``/``DECISION_CATEGORIES``/``TEACHER_DECISIONS``/``PLAN_TEACHER_DECISIONS``
 vocabularies are imported from ``schemas.py`` (single source of truth) rather than
 duplicated here.
+
+Generation vs. validation strictness: making every free-text field optional (to stay
+lenient for post-hoc validation of already-produced JSON, including older data) turned
+out to actively hurt quality once fed to Ollama as a *generation* schema -- grammar-
+constrained decoding takes the shortest grammatically-valid path once all *required*
+fields are satisfied, so an optional "thought" field gets skipped entirely and the
+model jumps straight to a bare, under-reasoned action (observed in production: empty
+`thought`, empty `action.params`, and a degenerate first `decompose` call with no
+`sub_questions` -- a no-op that burns a step for nothing). The ``*GenerationModel``
+subclasses below tighten exactly the free-text fields that carry the model's reasoning
+(non-empty, with a minimum length) and are used *only* to build the schema handed to
+Ollama for student-routed calls -- the base models stay lenient and are what
+``validate_*`` continues to check post-hoc, so existing/older data and OpenRouter-
+routed teacher calls (whose provider never receives the schema payload, only a loose
+"valid JSON" flag -- see ``LLMClient._custom_completion``) are unaffected.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from agentsim.teacher_guidance.schemas import (
     TOOLS,
@@ -74,6 +89,13 @@ class StudentActionModel(_Strict):
         return self
 
 
+class StudentActionGenerationModel(StudentActionModel):
+    """Stricter variant used only for Ollama's response_schema: thought must be a
+    real, substantive reasoning trace, not skippable."""
+
+    thought: str = Field(..., min_length=15)
+
+
 # ---------------------------------------------------------------------------
 # Student plan (preflight plan-review phase)
 # ---------------------------------------------------------------------------
@@ -85,11 +107,22 @@ class PlanStepModel(_Strict):
     depends_on: List[int] = []
 
 
+class PlanStepGenerationModel(PlanStepModel):
+    goal: str = Field(..., min_length=5)
+    rationale: str = Field(..., min_length=5)
+
+
 class StudentPlanModel(_Strict):
     plan_summary: str = ""
     steps: List[PlanStepModel] = []
     uncertainties: List[str] = []
     stop_condition: str = ""
+
+
+class StudentPlanGenerationModel(StudentPlanModel):
+    plan_summary: str = Field(..., min_length=10)
+    steps: List[PlanStepGenerationModel] = Field(..., min_length=1)
+    stop_condition: str = Field(..., min_length=3)
 
 
 class RevisedStudentPlanModel(_Strict):
@@ -98,6 +131,13 @@ class RevisedStudentPlanModel(_Strict):
     steps: List[PlanStepModel] = []
     teacher_feedback_used: List[str] = []
     stop_condition: str = ""
+
+
+class RevisedStudentPlanGenerationModel(RevisedStudentPlanModel):
+    revision_summary: str = Field(..., min_length=5)
+    plan_summary: str = Field(..., min_length=10)
+    steps: List[PlanStepGenerationModel] = Field(..., min_length=1)
+    stop_condition: str = Field(..., min_length=3)
 
 
 # ---------------------------------------------------------------------------
