@@ -87,6 +87,7 @@ class StandardRunner:
                 "plan_review_config": mode_config.get("plan_review", {}),
                 "corpus_path": mode_config.get("corpus_path"),
                 "retrieval_backend": mode_config.get("retrieval_backend", "hotpot_local"),
+                "skip_teacher": mode_config.get("skip_teacher", False),
             })
 
         # Use the workflow executor provided (with trace exporter) or create new one

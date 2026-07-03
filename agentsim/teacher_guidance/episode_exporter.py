@@ -112,6 +112,7 @@ class TeacherGuidanceEpisodeExporter:
                     "teacher_raw": s.get("teacher_raw", ""),
                     "teacher_calls": s.get("teacher_calls"),
                     "teacher_call_ms": s.get("teacher_call_ms"),
+                    "teacher_skipped": s.get("teacher_skipped", False),
                     "teacher_private_diagnosis": (s.get("teacher_full", {}) or {}).get("private_diagnosis", {}),
                     "student_visible_guidance": s.get("student_visible_guidance"),
                     "metrics": s.get("metrics"),

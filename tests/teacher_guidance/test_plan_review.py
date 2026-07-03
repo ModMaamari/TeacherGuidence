@@ -93,6 +93,32 @@ def test_enabled_flow_records_and_sanitizes():
     assert record["metrics"]["revised_covers_verification"] is True
 
 
+def test_skip_teacher_uses_initial_plan_with_zero_teacher_calls():
+    initial = json.dumps({
+        "plan_summary": "search then answer",
+        "steps": [{"step_id": 1, "goal": "find HQ", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+        "uncertainties": [], "stop_condition": "have HQ",
+    })
+
+    class NoTeacherCallStub:
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher reviewing" in prompt:
+                raise AssertionError("teacher should never be called when skip_teacher is set")
+            return initial
+
+    ctx = _context({"enabled": True, "review_guidance_level": 3})
+    ctx.metadata["skip_teacher"] = True
+    comp = TeacherGuidedPlanReview(config={}, llm_client=NoTeacherCallStub())
+    result = asyncio.run(comp.execute(ctx))
+
+    assert result.data["verdict"] == "PROCEED"
+    record = ctx.metadata["plan_review"]
+    assert record["skip_teacher_review"] is True
+    assert record["rounds"] == []
+    assert record["initial_plan_calls"][0]["response_text"] == initial
+    assert ctx.metadata["revised_plan"] == json.loads(initial)
+
+
 class SequencedStub:
     """Returns the initial plan, then a sequence of teacher reviews, with revisions."""
 

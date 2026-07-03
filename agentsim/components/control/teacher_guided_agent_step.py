@@ -21,7 +21,7 @@ from agentsim.components.base import ComponentSpec, ComponentResult, ComponentRe
 from agentsim.components.control.base import ControlComponent
 from agentsim.workflow.context import WorkflowContext
 
-from agentsim.teacher_guidance.schemas import GuidanceConfig, PlanReviewConfig, StudentAction
+from agentsim.teacher_guidance.schemas import GuidanceConfig, PlanReviewConfig, StudentAction, TeacherEvaluation
 from agentsim.teacher_guidance.local_retrieval import HotpotLocalRetriever
 from agentsim.teacher_guidance.plan_execution import PlanTracker
 from agentsim.teacher_guidance.json_utils import parse_student_action, parse_teacher_evaluation
@@ -183,23 +183,42 @@ class TeacherGuidedAgentStep(ControlComponent):
         tool_observation = execute_student_tool(context, student_action, retriever)
 
         # --- Teacher turn ---
+        skip_teacher = bool(context.metadata.get("skip_teacher", False))
         gold = context.metadata.get("gold", {}) or {}
-        teacher_prompt = build_teacher_prompt(
-            state, gold, student_action.to_dict(), tool_observation, guidance_config
-        )
-        teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts, teacher_calls = await self._teacher_eval_with_repair(
-            context, teacher_prompt, teacher_model, teacher_temp
-        )
+        if skip_teacher:
+            # No-teacher-guidance ablation: the student's own 'finish' choice is the only
+            # stop signal (never "reject_finish"), and there's nothing to show or leak.
+            teacher_prompt = ""
+            teacher_raw = ""
+            teacher_repair_attempts = 0
+            teacher_calls: List[Dict[str, Any]] = []
+            teacher_eval = TeacherEvaluation(
+                guidance_level=0, student_visible={}, private_diagnosis={}, teacher_decision="continue"
+            )
+            rendered_guidance, leakage = {}, {}
+        else:
+            teacher_prompt = build_teacher_prompt(
+                state, gold, student_action.to_dict(), tool_observation, guidance_config
+            )
+            teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts, teacher_calls = await self._teacher_eval_with_repair(
+                context, teacher_prompt, teacher_model, teacher_temp
+            )
+            rendered_guidance, leakage = render_student_guidance(
+                {
+                    "guidance_level": teacher_eval.guidance_level,
+                    "student_visible": teacher_eval.student_visible,
+                    "private_diagnosis": teacher_eval.private_diagnosis,
+                    "teacher_decision": teacher_eval.teacher_decision,
+                },
+                guidance_config, _visibility(context, retriever)
+            )
+
         teacher_full = {
             "guidance_level": teacher_eval.guidance_level,
             "student_visible": teacher_eval.student_visible,
             "private_diagnosis": teacher_eval.private_diagnosis,
             "teacher_decision": teacher_eval.teacher_decision,
         }
-
-        rendered_guidance, leakage = render_student_guidance(
-            teacher_full, guidance_config, _visibility(context, retriever)
-        )
 
         gold_doc_ids = set(gold.get("gold_doc_ids", []) or [])
         step_metrics = compute_step_metrics(
@@ -228,6 +247,7 @@ class TeacherGuidedAgentStep(ControlComponent):
             "teacher_repair_attempts": teacher_repair_attempts,
             "teacher_calls": teacher_calls,
             "teacher_call_ms": sum(c["elapsed_ms"] for c in teacher_calls),
+            "teacher_skipped": skip_teacher,
             "teacher_full": teacher_full,
             "student_visible_guidance": rendered_guidance,
             "leakage_check": leakage,

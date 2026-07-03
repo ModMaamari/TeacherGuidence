@@ -110,6 +110,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         teacher_temp = context.metadata.get("teacher_temperature", 0.1)
         budget = int(context.metadata.get("budget") or 0)
         state = build_student_visible_state(context, step_index=0, budget=budget)
+        skip_teacher = bool(context.metadata.get("skip_teacher", False))
 
         # Teacher-planner mode: the teacher authors the whole plan; the student just
         # follows it. No student drafting/revision.
@@ -138,7 +139,10 @@ class TeacherGuidedPlanReview(ControlComponent):
         review_prompt = review_raw = revision_prompt = revision_raw = None
         revisions_done = 0
 
-        for round_idx in range(1, config.planning_steps + 1):
+        # No-teacher-guidance ablation: the student's initial plan is used as-is, with
+        # zero teacher review/revision calls.
+        planning_rounds = 0 if skip_teacher else config.planning_steps
+        for round_idx in range(1, planning_rounds + 1):
             review_prompt = build_plan_review_prompt(
                 state, gold, current_plan, review_guidance, config
             )
@@ -192,6 +196,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         record = {
             "enabled": True,
             "planner": "student",
+            "skip_teacher_review": skip_teacher,
             "planning_steps": config.planning_steps,
             "num_planning_rounds": len(rounds),
             "revision_skipped": revision_skipped,

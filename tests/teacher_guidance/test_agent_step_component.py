@@ -249,6 +249,36 @@ def test_step_record_has_call_and_elapsed_timing(tmp_path):
         assert calls[0]["raw_response"] is None
 
 
+def test_skip_teacher_makes_zero_teacher_calls_and_stops_on_own_finish(tmp_path):
+    # No-teacher-guidance ablation: student decides everything, no teacher LLM call at all.
+    student_finish = json.dumps({
+        "thought": "done", "decision": {"category": "finish", "parametric_knowledge_used": False},
+        "action": {"tool": "finish", "params": {"answer": "Delhi", "citations": []}},
+        "new_facts_extracted": [],
+    })
+
+    class NoTeacherCallStub:
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                raise AssertionError("teacher should never be called when skip_teacher is set")
+            return student_finish
+
+    ctx = _context(tmp_path)
+    ctx.metadata["skip_teacher"] = True
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=NoTeacherCallStub())
+    result = asyncio.run(comp.execute(ctx))
+
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["teacher_calls"] == []
+    assert step["teacher_call_ms"] == 0
+    assert step["teacher_skipped"] is True
+    assert step["student_visible_guidance"] == {}
+    assert step["leakage_check"] == {}
+    assert result.data["verdict"] == "FINISH"
+    assert ctx.metadata["done"] is True
+    assert ctx.metadata["stop_reason"] == "teacher_accept"
+
+
 def test_guidance_does_not_leak_gold_answer(tmp_path):
     student = json.dumps({
         "thought": "finish", "decision": {"category": "finish", "parametric_knowledge_used": False},
