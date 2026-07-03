@@ -60,3 +60,29 @@ def test_timed_completion_captures_usage_and_cost():
         timed_completion(UsageStub(), prompt="hi", model="m", temperature=0.1, max_tokens=100)
     )
     assert entry["usage"] == {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15, "cost": 0.001}
+
+
+class SchemaCapturingStub:
+    """Records whatever response_schema it was called with."""
+
+    def __init__(self):
+        self.received_schema = "not_called"
+
+    async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, return_raw=False, response_schema=None, **kw):
+        self.received_schema = response_schema
+        return f"echo:{prompt}"
+
+
+def test_timed_completion_forwards_response_schema():
+    stub = SchemaCapturingStub()
+    schema = {"type": "object", "properties": {"tool": {"enum": ["search", "finish"]}}}
+    asyncio.run(
+        timed_completion(stub, prompt="hi", model="m", temperature=0.1, max_tokens=100, response_schema=schema)
+    )
+    assert stub.received_schema == schema
+
+
+def test_timed_completion_defaults_response_schema_to_none():
+    stub = SchemaCapturingStub()
+    asyncio.run(timed_completion(stub, prompt="hi", model="m", temperature=0.1, max_tokens=100))
+    assert stub.received_schema is None

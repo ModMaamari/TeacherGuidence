@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 
 def _utcnow_iso() -> str:
@@ -24,18 +24,24 @@ async def timed_completion(
     temperature: float,
     max_tokens: int,
     attempt: int = 1,
+    response_schema: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], str]:
     """Call ``llm_client.get_completion(..., return_raw=True)`` and return
     ``(call_log_entry, response_text)``.
 
-    Tolerates clients (e.g. test stubs) that ignore ``return_raw`` and return a bare
-    string instead of ``{"text": ..., "raw_response": ...}`` -- ``raw_response`` is
-    ``None`` in that case.
+    ``response_schema`` (typically a Pydantic model's ``.model_json_schema()``) is
+    forwarded to request constrained/structured output -- see
+    ``LLMClient.get_completion``.
+
+    Tolerates clients (e.g. test stubs) that ignore ``return_raw``/``response_schema``
+    and return a bare string instead of ``{"text": ..., "raw_response": ...}`` --
+    ``raw_response`` is ``None`` in that case.
     """
     started_at = _utcnow_iso()
     t0 = time.time()
     result = await llm_client.get_completion(
-        prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens, return_raw=True,
+        prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens,
+        return_raw=True, response_schema=response_schema,
     )
     elapsed_ms = (time.time() - t0) * 1000
     ended_at = _utcnow_iso()
