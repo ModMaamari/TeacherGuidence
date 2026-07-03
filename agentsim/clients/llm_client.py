@@ -246,7 +246,11 @@ class LLMClient:
                     "model": model_name,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": temperature,
-                    "max_tokens": max_tokens or config.LLM_MAX_TOKENS
+                    "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
+                    # OpenRouter-specific extension: asks the response to include real
+                    # per-call USD cost in 'usage.cost'. This project's CUSTOM_LLM_ENDPOINT
+                    # is always OpenRouter, so this is safe to send unconditionally.
+                    "usage": {"include": True},
                 }
             )
             response.raise_for_status()
@@ -260,7 +264,8 @@ class LLMClient:
                     "usage": {
                         "prompt_tokens": usage.get("prompt_tokens", 0),
                         "completion_tokens": usage.get("completion_tokens", 0),
-                        "total_tokens": usage.get("total_tokens", 0)
+                        "total_tokens": usage.get("total_tokens", 0),
+                        "cost": usage.get("cost"),
                     }
                 }
                 if return_raw:

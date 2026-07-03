@@ -30,7 +30,7 @@ def test_custom_completion_return_raw_includes_full_body(monkeypatch):
     body = {
         "id": "gen-abc123",
         "choices": [{"message": {"content": "hello"}, "finish_reason": "stop"}],
-        "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
+        "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3, "cost": 0.00042},
     }
     mock_client = _mock_async_client(_fake_response(body))
     with patch("httpx.AsyncClient", return_value=mock_client):
@@ -41,6 +41,20 @@ def test_custom_completion_return_raw_includes_full_body(monkeypatch):
     assert result["text"] == "hello"
     assert result["raw_response"] == body
     assert result["usage"]["total_tokens"] == 3
+    assert result["usage"]["cost"] == 0.00042
+
+
+def test_custom_completion_requests_openrouter_usage_include(monkeypatch):
+    # OpenRouter only returns per-call cost when the request explicitly opts in.
+    monkeypatch.setattr(config, "CUSTOM_LLM_ENDPOINT", "https://example.invalid")
+    monkeypatch.setattr(config, "CUSTOM_LLM_API_KEY", "key")
+    body = {"choices": [{"message": {"content": "hello"}}], "usage": {}}
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(LLMClient().get_completion(prompt="hi", model="custom/z-ai/glm-5.2"))
+
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert sent_json["usage"] == {"include": True}
 
 
 def test_ollama_completion_return_raw_includes_full_body(monkeypatch):
