@@ -34,6 +34,10 @@ from agentsim.teacher_guidance.tool_executor import execute_student_tool
 from agentsim.teacher_guidance.guidance_policy import render_student_guidance
 from agentsim.teacher_guidance.metrics import compute_step_metrics
 from agentsim.teacher_guidance.llm_call_log import timed_completion
+from agentsim.teacher_guidance.pydantic_schemas import StudentActionModel, TeacherEvaluationModel
+
+STUDENT_ACTION_SCHEMA = StudentActionModel.model_json_schema()
+TEACHER_EVALUATION_SCHEMA = TeacherEvaluationModel.model_json_schema()
 
 
 def _guidance_config(context: WorkflowContext) -> GuidanceConfig:
@@ -198,7 +202,8 @@ class TeacherGuidedAgentStep(ControlComponent):
             rendered_guidance, leakage = {}, {}
         else:
             teacher_prompt = build_teacher_prompt(
-                state, gold, student_action.to_dict(), tool_observation, guidance_config
+                state, gold, student_action.to_dict(), tool_observation, guidance_config,
+                student_raw=student_raw, student_action_valid=bool(parse_info.get("action_valid")),
             )
             teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts, teacher_calls = await self._teacher_eval_with_repair(
                 context, teacher_prompt, teacher_model, teacher_temp
@@ -309,7 +314,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         calls = []
         call_entry, student_raw = await timed_completion(
             self.llm_client, prompt=prompt, model=student_model, temperature=student_temp,
-            max_tokens=max_tokens, attempt=1,
+            max_tokens=max_tokens, attempt=1, response_schema=STUDENT_ACTION_SCHEMA,
         )
         calls.append(call_entry)
         student_action, parse_info = parse_student_action(student_raw)
@@ -320,11 +325,13 @@ class TeacherGuidedAgentStep(ControlComponent):
             correction = (
                 f"\n\nYour previous response was not a valid action ({problems}). "
                 "Return ONLY one corrected JSON object that matches the action schema exactly: "
-                "a valid action.tool from the allowed list, with no text outside the JSON."
+                "a valid action.tool from the allowed list, with no text outside the JSON. "
+                "Do not escape single quotes/apostrophes (') -- only \\\", \\\\, and control "
+                "characters need escaping in JSON strings; \\' is not valid JSON and will fail."
             )
             call_entry, student_raw = await timed_completion(
                 self.llm_client, prompt=prompt + correction, model=student_model, temperature=student_temp,
-                max_tokens=max_tokens, attempt=attempts + 1,
+                max_tokens=max_tokens, attempt=attempts + 1, response_schema=STUDENT_ACTION_SCHEMA,
             )
             calls.append(call_entry)
             student_action, parse_info = parse_student_action(student_raw)
@@ -352,7 +359,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         calls = []
         call_entry, teacher_raw = await timed_completion(
             self.llm_client, prompt=prompt, model=teacher_model, temperature=teacher_temp,
-            max_tokens=base_tokens, attempt=1,
+            max_tokens=base_tokens, attempt=1, response_schema=TEACHER_EVALUATION_SCHEMA,
         )
         calls.append(call_entry)
         teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)
@@ -364,11 +371,12 @@ class TeacherGuidedAgentStep(ControlComponent):
                 f"\n\nYour previous response was not a valid evaluation ({problems}); it may "
                 "have been cut off before the JSON object was complete. Return ONLY one "
                 "complete, corrected JSON object matching the schema exactly, with no text "
-                "outside the JSON."
+                "outside the JSON. Do not escape single quotes/apostrophes (') -- only \\\", "
+                "\\\\, and control characters need escaping in JSON strings."
             )
             call_entry, teacher_raw = await timed_completion(
                 self.llm_client, prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
-                max_tokens=retry_tokens, attempt=attempts + 1,
+                max_tokens=retry_tokens, attempt=attempts + 1, response_schema=TEACHER_EVALUATION_SCHEMA,
             )
             calls.append(call_entry)
             teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)

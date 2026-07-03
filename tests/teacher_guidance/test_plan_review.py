@@ -5,7 +5,12 @@ import json
 
 from agentsim.components.base import ComponentRegistry
 from agentsim.workflow.context import WorkflowContext
-from agentsim.components.control.teacher_guided_plan_review import TeacherGuidedPlanReview
+from agentsim.components.control.teacher_guided_plan_review import (
+    TeacherGuidedPlanReview,
+    STUDENT_PLAN_SCHEMA,
+    REVISED_STUDENT_PLAN_SCHEMA,
+    TEACHER_PLAN_REVIEW_SCHEMA,
+)
 from agentsim.teacher_guidance.guidance_policy import FALLBACK_FEEDBACK
 
 
@@ -378,3 +383,43 @@ def test_accept_plan_skips_revision():
     # exactly two LLM calls were made (initial plan + teacher review), not three
     assert stub.calls == 2
     assert record["metrics"]["revision_skipped"] is True
+
+
+def test_plan_review_calls_request_constrained_output_schemas():
+    initial = json.dumps({
+        "plan_summary": "v0", "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+        "uncertainties": [], "stop_condition": "done",
+    })
+    revise = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 0.5, "feedback": "revise"},
+                         "private_diagnosis": {}, "teacher_decision": "revise_plan"})
+    accept = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
+                         "student_visible": {"score_continuous": 1.0, "feedback": "good"},
+                         "private_diagnosis": {}, "teacher_decision": "accept_plan"})
+    revised = json.dumps({"revision_summary": "r", "plan_summary": "v1",
+                          "steps": [{"step_id": 1, "goal": "g", "intended_tool": "search", "rationale": "x", "depends_on": []}],
+                          "teacher_feedback_used": [], "stop_condition": "done"})
+
+    class SchemaCapturingStub:
+        def __init__(self):
+            self.calls = []  # (kind, response_schema)
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
+            if "teacher reviewing" in prompt:
+                self.calls.append(("review", response_schema))
+                return revise if len([c for c in self.calls if c[0] == "review"]) == 1 else accept
+            if "Revise your plan" in prompt:
+                self.calls.append(("revision", response_schema))
+                return revised
+            self.calls.append(("initial", response_schema))
+            return initial
+
+    ctx = _context({"enabled": True, "review_guidance_level": 3, "planning_steps": 3})
+    stub = SchemaCapturingStub()
+    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    schemas_by_kind = dict(stub.calls)
+    assert schemas_by_kind["initial"] == STUDENT_PLAN_SCHEMA
+    assert schemas_by_kind["review"] == TEACHER_PLAN_REVIEW_SCHEMA
+    assert schemas_by_kind["revision"] == REVISED_STUDENT_PLAN_SCHEMA

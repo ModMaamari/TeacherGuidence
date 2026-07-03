@@ -6,7 +6,11 @@ import json
 import pytest
 
 from agentsim.workflow.context import WorkflowContext
-from agentsim.components.control.teacher_guided_agent_step import TeacherGuidedAgentStep
+from agentsim.components.control.teacher_guided_agent_step import (
+    TeacherGuidedAgentStep,
+    STUDENT_ACTION_SCHEMA,
+    TEACHER_EVALUATION_SCHEMA,
+)
 from agentsim.teacher_guidance.guidance_policy import FALLBACK_FEEDBACK
 
 
@@ -299,3 +303,60 @@ def test_guidance_does_not_leak_gold_answer(tmp_path):
     feedback = result.data["student_visible_guidance"]["feedback"]
     assert "Delhi" not in feedback
     assert ctx.metadata["teacher_guided_steps"][0]["leakage_check"]["gold_answer_leaked"] is True
+
+
+def test_student_and_teacher_calls_request_constrained_output_schemas(tmp_path):
+    student = json.dumps({
+        "thought": "search", "decision": {"category": "need_retrieval", "parametric_knowledge_used": False},
+        "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
+        "new_facts_extracted": [],
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.6, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "continue",
+    })
+
+    class SchemaCapturingStub:
+        def __init__(self):
+            self.schemas = []
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
+            self.schemas.append(response_schema)
+            return teacher if "teacher evaluating" in prompt else student
+
+    ctx = _context(tmp_path)
+    stub = SchemaCapturingStub()
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    # First call is the student action, second is the teacher evaluation.
+    assert stub.schemas[0] == STUDENT_ACTION_SCHEMA
+    assert stub.schemas[1] == TEACHER_EVALUATION_SCHEMA
+
+
+def test_teacher_sees_raw_text_when_student_totally_unparseable(tmp_path):
+    # The student never returns valid JSON, even after the one repair retry --
+    # confirms the teacher prompt shows the real raw text instead of a blank/default
+    # parsed action (previously the teacher had zero signal about what happened).
+    unparseable = "I looked at the docs but I'm not sure how to format my answer as JSON, sorry."
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.0, "feedback": "Invalid output."},
+        "private_diagnosis": {}, "teacher_decision": "continue",
+    })
+
+    class AlwaysUnparseableStudentStub:
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                return teacher
+            return unparseable
+
+    ctx = _context(tmp_path)
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=AlwaysUnparseableStudentStub())
+    asyncio.run(comp.execute(ctx))
+
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["metrics"]["json_valid"] is False
+    assert unparseable in step["teacher_prompt"]
+    assert "FAILED TO PARSE" in step["teacher_prompt"]
+    # the blank default action's empty tool must not silently stand in for the raw text
+    assert '"tool": ""' not in step["teacher_prompt"]

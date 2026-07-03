@@ -13,7 +13,7 @@ All prompts demand a single JSON object as output and nothing else.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from agentsim.teacher_guidance.schemas import GuidanceConfig, PlanReviewConfig
 
@@ -123,12 +123,17 @@ def build_student_prompt(
     return "\n\n".join(parts)
 
 
+_RAW_TEXT_TRUNCATE = 1500
+
+
 def build_teacher_prompt(
     state: Dict[str, Any],
     gold: Dict[str, Any],
     student_action: Dict[str, Any],
     tool_observation: Dict[str, Any],
     guidance_config: GuidanceConfig,
+    student_raw: Optional[str] = None,
+    student_action_valid: bool = True,
 ) -> str:
     parts: List[str] = []
     parts.append(
@@ -139,7 +144,21 @@ def build_teacher_prompt(
     parts.append("Gold metadata (PRIVATE — never reveal hidden gold values to the student):")
     parts.append(_json(gold))
     parts.append(f"Current step {state.get('step')} of budget {state.get('budget')}.")
-    parts.append("Student action: " + _json(student_action))
+    if student_action_valid or not student_raw:
+        parts.append("Student action: " + _json(student_action))
+    else:
+        # The student's output failed to parse into a valid action even after a
+        # repair retry -- showing the empty/default parsed object here would give the
+        # teacher zero signal about what actually happened. Show the real raw text
+        # instead so the teacher can still give a specific, useful evaluation.
+        truncated = student_raw[:_RAW_TEXT_TRUNCATE]
+        if len(student_raw) > _RAW_TEXT_TRUNCATE:
+            truncated += "... [truncated]"
+        parts.append(
+            "Student action: FAILED TO PARSE as a valid action, even after a correction "
+            "retry. Here is the student's raw output verbatim -- evaluate it as best you "
+            "can and penalize the malformed output in your scoring:\n" + truncated
+        )
     parts.append("Tool observation: " + _json(tool_observation))
     parts.append("Retrieved documents so far: " + _json(state.get("retrieved_docs", [])))
     parts.append("Extracted facts so far: " + _json(state.get("extracted_facts", [])))

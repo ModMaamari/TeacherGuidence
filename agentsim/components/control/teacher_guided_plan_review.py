@@ -39,6 +39,15 @@ from agentsim.teacher_guidance.guidance_policy import (
 from agentsim.teacher_guidance.leakage import sanitize_rendered_guidance
 from agentsim.teacher_guidance.plan_review import compute_plan_review_metrics
 from agentsim.teacher_guidance.llm_call_log import timed_completion
+from agentsim.teacher_guidance.pydantic_schemas import (
+    StudentPlanModel,
+    RevisedStudentPlanModel,
+    TeacherPlanReviewModel,
+)
+
+STUDENT_PLAN_SCHEMA = StudentPlanModel.model_json_schema()
+REVISED_STUDENT_PLAN_SCHEMA = RevisedStudentPlanModel.model_json_schema()
+TEACHER_PLAN_REVIEW_SCHEMA = TeacherPlanReviewModel.model_json_schema()
 
 
 def _guidance_config(context: WorkflowContext) -> GuidanceConfig:
@@ -125,6 +134,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         initial_call, initial_raw = await timed_completion(
             self.llm_client, prompt=initial_prompt, model=student_model, temperature=student_temp,
             max_tokens=context.metadata.get("student_plan_max_tokens", 900),
+            response_schema=STUDENT_PLAN_SCHEMA,
         )
         initial_plan_calls = [initial_call]
         initial_plan, _ = parse_student_plan(initial_raw)
@@ -174,6 +184,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             revision_call, revision_raw = await timed_completion(
                 self.llm_client, prompt=revision_prompt, model=student_model, temperature=student_temp,
                 max_tokens=context.metadata.get("student_plan_max_tokens", 900),
+                response_schema=REVISED_STUDENT_PLAN_SCHEMA,
             )
             round_rec["revision_calls"] = [revision_call]
             round_rec["revision_call_ms"] = revision_call["elapsed_ms"]
@@ -261,7 +272,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         calls = []
         call_entry, review_raw = await timed_completion(
             self.llm_client, prompt=prompt, model=teacher_model, temperature=teacher_temp,
-            max_tokens=base_tokens, attempt=1,
+            max_tokens=base_tokens, attempt=1, response_schema=TEACHER_PLAN_REVIEW_SCHEMA,
         )
         calls.append(call_entry)
         review_full, parse_info = parse_teacher_plan_review(review_raw)
@@ -273,11 +284,12 @@ class TeacherGuidedPlanReview(ControlComponent):
                 f"\n\nYour previous response was not a valid plan review ({problems}); it may "
                 "have been cut off before the JSON object was complete. Return ONLY one "
                 "complete, corrected JSON object matching the schema exactly, with no text "
-                "outside the JSON."
+                "outside the JSON. Do not escape single quotes/apostrophes (') -- only \\\", "
+                "\\\\, and control characters need escaping in JSON strings."
             )
             call_entry, review_raw = await timed_completion(
                 self.llm_client, prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
-                max_tokens=retry_tokens, attempt=attempts + 1,
+                max_tokens=retry_tokens, attempt=attempts + 1, response_schema=TEACHER_PLAN_REVIEW_SCHEMA,
             )
             calls.append(call_entry)
             review_full, parse_info = parse_teacher_plan_review(review_raw)
@@ -297,6 +309,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         plan_call, plan_raw = await timed_completion(
             self.llm_client, prompt=plan_prompt, model=teacher_model, temperature=teacher_temp,
             max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
+            response_schema=STUDENT_PLAN_SCHEMA,
         )
         plan_calls = [plan_call]
         teacher_plan, _ = parse_student_plan(plan_raw)
