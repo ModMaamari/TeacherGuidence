@@ -310,10 +310,20 @@ class LLMClient:
                     }
                 }
                 if return_raw:
-                    result["raw_response"] = data
+                    # 'context' is Ollama's raw re-tokenized conversation state (only
+                    # useful if fed back into a follow-up call for continuation, which
+                    # this project never does): a list of hundreds/thousands of token
+                    # IDs that can't be decoded back to text without loading each
+                    # model's own tokenizer. Drop it and keep a count instead -- the
+                    # decoded text is already in 'response' just above it.
+                    raw_response = dict(data)
+                    context = raw_response.pop("context", None)
+                    if context is not None:
+                        raw_response["context_length"] = len(context)
+                    result["raw_response"] = raw_response
                 return result
             return text
-    
+
     async def get_embedding(
         self,
         text: str,

@@ -56,6 +56,24 @@ def test_ollama_completion_return_raw_includes_full_body(monkeypatch):
     assert result["raw_response"] == body
 
 
+def test_ollama_completion_return_raw_strips_context_token_ids(monkeypatch):
+    # 'context' is a raw undecoded token-ID list -- confusing and useless in the raw
+    # response viewer since Ollama has no detokenize endpoint. It should be dropped
+    # and replaced with a plain length, leaving everything else untouched.
+    monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
+    body = {"response": "hello", "done_reason": "stop", "context": [1, 2, 3, 4, 5]}
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = asyncio.run(
+            LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b", return_raw=True)
+        )
+
+    assert "context" not in result["raw_response"]
+    assert result["raw_response"]["context_length"] == 5
+    assert result["raw_response"]["response"] == "hello"
+    assert result["raw_response"]["done_reason"] == "stop"
+
+
 def test_get_completion_without_return_raw_still_returns_plain_string(monkeypatch):
     monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
     body = {"response": "hello"}
