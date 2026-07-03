@@ -43,9 +43,11 @@ async def timed_completion(
     if isinstance(result, dict):
         text = result.get("text", "")
         raw_response = result.get("raw_response")
+        usage = result.get("usage")
     else:
         text = result
         raw_response = None
+        usage = None
 
     entry = {
         "attempt": attempt,
@@ -55,5 +57,6 @@ async def timed_completion(
         "prompt": prompt,
         "response_text": text,
         "raw_response": raw_response,
+        "usage": usage,
     }
     return entry, text
