@@ -14,6 +14,14 @@ For each model group:
        template as it completes (crash-safe: earlier rows survive a later failure).
     6. Stop the GPU poll and the Ollama server before moving to the next model.
 
+Resuming after a crash: by default, any (model, setting) that already has a successful
+(exit_code == 0) row in an existing manifest at --out-dir is skipped -- this matters
+because `agentsim simulate` itself only resumes a run whose checkpoint status is still
+"running"; a completed run's checkpoint is marked "completed", so re-invoking it starts
+a brand-new run from scratch (re-doing real, costed OpenRouter teacher calls) rather
+than doing nothing. Pass --force-rerun-all to ignore the existing manifest and run
+every config again regardless.
+
 Usage:
     python scripts/run_experiment_matrix.py --out-dir reports/experiment_matrix_2026-07-03
     python scripts/run_experiment_matrix.py --dry-run   # print the plan, run nothing
@@ -46,6 +54,27 @@ def plan_runs(models: Dict[str, str] = MODELS, settings: Dict[str, dict] = SETTI
         for setting_key in settings:
             runs.append((model_slug, setting_key, f"exp_matrix_{model_slug}_{setting_key}"))
     return runs
+
+
+def load_completed_configs(manifest_path: Path) -> set:
+    """Return the {(model_slug, setting), ...} pairs with a successful (exit_code == 0)
+    row in an existing manifest.jsonl, so a restarted run can skip them -- re-invoking
+    `agentsim simulate` on an already-completed config starts an entirely new (costed)
+    run rather than a no-op, so these must be skipped explicitly, not just left to the
+    simulator's own checkpoint resume (which only resumes a still-"running" checkpoint).
+    """
+    completed = set()
+    if not manifest_path.exists():
+        return completed
+    with open(manifest_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if row.get("exit_code") == 0:
+                completed.add((row["model_slug"], row["setting"]))
+    return completed
 
 
 def select_free_gpus(nvidia_smi_csv: str, n: int = 4) -> List[str]:
@@ -128,13 +157,21 @@ def _run_template(template_id: str, log_path: Path) -> Tuple[int, float]:
     return result.returncode, time.time() - t0
 
 
-def run_matrix(out_dir: Path, gpu_count: int = 4, gpu_poll_interval: int = 10, dry_run: bool = False) -> None:
+def run_matrix(
+    out_dir: Path, gpu_count: int = 4, gpu_poll_interval: int = 10, dry_run: bool = False,
+    force_rerun_all: bool = False,
+) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = out_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
     manifest_path = out_dir / "manifest.jsonl"
 
-    runs = plan_runs()
+    completed = set() if force_rerun_all else load_completed_configs(manifest_path)
+    if completed:
+        print(f"Skipping {len(completed)} already-completed config(s) found in {manifest_path}: "
+              f"{sorted(completed)}", flush=True)
+
+    runs = [r for r in plan_runs() if (r[0], r[1]) not in completed]
     by_model: Dict[str, List[Tuple[str, str, str]]] = {}
     for model_slug, setting_key, template_id in runs:
         by_model.setdefault(model_slug, []).append((model_slug, setting_key, template_id))
@@ -144,6 +181,10 @@ def run_matrix(out_dir: Path, gpu_count: int = 4, gpu_poll_interval: int = 10, d
             print(f"[dry-run] model={model_slug} ({MODELS[model_slug]})")
             for _, setting_key, template_id in group:
                 print(f"[dry-run]   setting={setting_key} -> {template_id}")
+        return
+
+    if not by_model:
+        print("Nothing to do -- every config already has a successful manifest entry.")
         return
 
     with open(manifest_path, "a", encoding="utf-8") as manifest_f:
@@ -195,11 +236,17 @@ def main() -> None:
     parser.add_argument("--gpu-count", type=int, default=4)
     parser.add_argument("--gpu-poll-interval", type=int, default=10)
     parser.add_argument("--dry-run", action="store_true", help="Print the run plan and exit")
+    parser.add_argument(
+        "--force-rerun-all", action="store_true",
+        help="Ignore any existing manifest and run every config again, even ones already "
+             "marked successful (by default those are skipped -- see module docstring)",
+    )
     args = parser.parse_args()
 
     run_matrix(
         Path(args.out_dir), gpu_count=args.gpu_count,
         gpu_poll_interval=args.gpu_poll_interval, dry_run=args.dry_run,
+        force_rerun_all=args.force_rerun_all,
     )
 
 

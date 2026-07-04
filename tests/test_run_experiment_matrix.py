@@ -5,8 +5,10 @@ The orchestrator itself drives real subprocesses (ollama serve/pull, nvidia-smi,
 parsing logic -- covered here.
 """
 
+import json
+
 from scripts.gen_experiment_matrix_templates import MODELS, SETTINGS
-from scripts.run_experiment_matrix import plan_runs, select_free_gpus
+from scripts.run_experiment_matrix import plan_runs, select_free_gpus, load_completed_configs
 
 
 def test_plan_runs_covers_full_matrix_grouped_by_model():
@@ -32,3 +34,20 @@ def test_select_free_gpus_picks_least_used_ascending():
 def test_select_free_gpus_handles_fewer_rows_than_n():
     csv = "0, 100\n1, 50\n"
     assert select_free_gpus(csv, n=4) == ["1", "0"]
+
+
+def test_load_completed_configs_returns_empty_set_when_manifest_missing(tmp_path):
+    assert load_completed_configs(tmp_path / "no_such_manifest.jsonl") == set()
+
+
+def test_load_completed_configs_only_counts_successful_rows(tmp_path):
+    manifest = tmp_path / "manifest.jsonl"
+    rows = [
+        {"model_slug": "qwen4b", "setting": "A", "exit_code": 0},
+        {"model_slug": "qwen4b", "setting": "B", "exit_code": 1},  # failed -- must not skip
+        {"model_slug": "qwen2b", "setting": "A", "exit_code": 0},
+    ]
+    manifest.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    completed = load_completed_configs(manifest)
+    assert completed == {("qwen4b", "A"), ("qwen2b", "A")}
