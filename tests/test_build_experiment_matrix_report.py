@@ -65,6 +65,28 @@ def test_aggregate_episodes_invalid_json_and_leakage_rates():
     assert m["leakage_rate"] == 0.5  # 1 of 2 episodes leaked
 
 
+def test_leakage_rate_ignores_title_and_doc_only_mentions():
+    # A step that mentions a hidden title/doc but never the gold answer is NOT a leak:
+    # those are fair game and no longer redacted, so they must not count.
+    title_only_step = {
+        "metrics": {"json_valid": True},
+        "leakage_check": {
+            "gold_answer_leaked": False,
+            "hidden_title_leaked": True,
+            "hidden_doc_id_leaked": True,
+            "hidden_span_leaked": True,
+        },
+        "student_calls": [],
+        "teacher_calls": [],
+    }
+    episodes = [
+        _episode(steps=[title_only_step]),
+        _episode(steps=[_step(leaked=True)]),
+    ]
+    m = aggregate_episodes(episodes)
+    assert m["leakage_rate"] == 0.5  # only the gold-answer-leak episode counts
+
+
 def test_aggregate_episodes_sums_teacher_calls_tokens_and_cost():
     call_a = {"usage": {"total_tokens": 100, "cost": 0.01}}
     call_b = {"usage": {"total_tokens": 50, "cost": None}}  # ollama: no cost

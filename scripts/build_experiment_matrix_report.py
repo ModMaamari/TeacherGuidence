@@ -92,8 +92,11 @@ def aggregate_episodes(episodes: List[Dict[str, Any]]) -> Dict[str, Any]:
             total_steps += 1
             if not s.get("metrics", {}).get("json_valid", True):
                 invalid_json_steps += 1
-            lk = s.get("leakage_check", {}) or {}
-            if any(lk.get(k) for k in ("gold_answer_leaked", "hidden_doc_id_leaked", "hidden_title_leaked", "hidden_span_leaked")):
+            # Only a real gold-answer leak counts. Hidden title/doc/span mentions are
+            # detected for telemetry but are fair game (question entities /
+            # already-retrieved docs) and are no longer redacted, so they must not
+            # inflate the leakage rate. See agentsim/teacher_guidance/leakage.py.
+            if (s.get("leakage_check", {}) or {}).get("gold_answer_leaked"):
                 leaked = True
         if leaked:
             leak_episodes += 1
