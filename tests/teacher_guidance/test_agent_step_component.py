@@ -37,6 +37,20 @@ class StubLLM:
         return self.student_json
 
 
+class RouterStubLLM(StubLLM):
+    """Adds a provider-fallback router that always serves the 2nd model (as if FAU was
+    rate-limited)."""
+
+    def __init__(self, student_json, teacher_json):
+        super().__init__(student_json, teacher_json)
+        self.router_calls = []
+
+    async def get_completion_with_fallback(self, models, *, prompt, **kw):
+        self.router_calls.append(list(models))
+        text = self.teacher_json if "teacher evaluating" in prompt else self.student_json
+        return text, models[1]  # pretend the free fallback served it
+
+
 def _context(tmp_path):
     corpus_path = tmp_path / "corpus.jsonl"
     with open(corpus_path, "w", encoding="utf-8") as f:
@@ -113,6 +127,28 @@ def test_finish_step_captures_teacher_final_judgment(tmp_path):
     comp = TeacherGuidedAgentStep(config={"step_index": 3, "budget": 5}, llm_client=StubLLM(student, teacher))
     asyncio.run(comp.execute(ctx))
     assert ctx.metadata["teacher_final_judgment"] == {"correct": 1, "score": 0.95}
+
+
+def test_teacher_call_uses_router_when_configured(tmp_path):
+    student = json.dumps({
+        "thought": "I will search for the headquarters.",
+        "action": {"tool": "search", "params": {"query": "Oberoi HQ", "k": 3}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.6, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "continue",
+    })
+    router = ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"]
+    ctx = _context(tmp_path)
+    ctx.metadata["teacher_router"] = router
+    stub = RouterStubLLM(student, teacher)
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    assert stub.router_calls and stub.router_calls[0] == router
+    # The recorded teacher call notes which model actually served it.
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["teacher_calls"][0]["model"] == "custom/openai/gpt-oss-120b:free"
 
 
 def test_force_finish_overrides_and_stops(tmp_path):

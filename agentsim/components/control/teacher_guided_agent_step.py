@@ -419,6 +419,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         max_repairs = int(context.metadata.get("teacher_max_repair_attempts", 1))
         base_tokens = context.metadata.get("teacher_max_tokens", 1000)
         retry_tokens = context.metadata.get("teacher_max_tokens_retry", 2000)
+        teacher_router = context.metadata.get("teacher_router")
 
         prompt = teacher_prompt
         attempts = 0
@@ -426,6 +427,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         call_entry, teacher_raw = await timed_completion(
             self.llm_client, prompt=prompt, model=teacher_model, temperature=teacher_temp,
             max_tokens=base_tokens, attempt=1, response_schema=TEACHER_EVALUATION_SCHEMA,
+            router_models=teacher_router,
         )
         calls.append(call_entry)
         teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)
@@ -443,6 +445,7 @@ class TeacherGuidedAgentStep(ControlComponent):
             call_entry, teacher_raw = await timed_completion(
                 self.llm_client, prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
                 max_tokens=retry_tokens, attempt=attempts + 1, response_schema=TEACHER_EVALUATION_SCHEMA,
+                router_models=teacher_router,
             )
             calls.append(call_entry)
             teacher_eval, parse_info = parse_teacher_evaluation(teacher_raw)

@@ -271,6 +271,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         max_repairs = int(context.metadata.get("teacher_max_repair_attempts", 1))
         base_tokens = context.metadata.get("teacher_plan_review_max_tokens", 1000)
         retry_tokens = context.metadata.get("teacher_plan_review_max_tokens_retry", 2000)
+        teacher_router = context.metadata.get("teacher_router")
 
         prompt = review_prompt
         attempts = 0
@@ -278,6 +279,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         call_entry, review_raw = await timed_completion(
             self.llm_client, prompt=prompt, model=teacher_model, temperature=teacher_temp,
             max_tokens=base_tokens, attempt=1, response_schema=TEACHER_PLAN_REVIEW_SCHEMA,
+            router_models=teacher_router,
         )
         calls.append(call_entry)
         review_full, parse_info = parse_teacher_plan_review(review_raw)
@@ -295,6 +297,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             call_entry, review_raw = await timed_completion(
                 self.llm_client, prompt=prompt + correction, model=teacher_model, temperature=teacher_temp,
                 max_tokens=retry_tokens, attempt=attempts + 1, response_schema=TEACHER_PLAN_REVIEW_SCHEMA,
+                router_models=teacher_router,
             )
             calls.append(call_entry)
             review_full, parse_info = parse_teacher_plan_review(review_raw)
@@ -314,7 +317,7 @@ class TeacherGuidedPlanReview(ControlComponent):
         plan_call, plan_raw = await timed_completion(
             self.llm_client, prompt=plan_prompt, model=teacher_model, temperature=teacher_temp,
             max_tokens=context.metadata.get("teacher_plan_review_max_tokens", 1000),
-            response_schema=STUDENT_PLAN_SCHEMA,
+            response_schema=STUDENT_PLAN_SCHEMA, router_models=context.metadata.get("teacher_router"),
         )
         plan_calls = [plan_call]
         teacher_plan, _ = parse_student_plan(plan_raw)
