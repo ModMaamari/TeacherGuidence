@@ -84,6 +84,7 @@ const TIP = {
   episodes: "Number of question trajectories collected in this run.",
   guidance: "Guidance level 0–4: how much of the teacher's evaluation the student was shown. G3 = diagnostic feedback (score + explanation, no explicit next action).",
   correct: "Answer correct: the gold answer appears in the student's final answer (handles 'answer + explanation'). Robust alternative to strict exact match.",
+  teacher_correct: "Teacher verdict: the teacher (which can see the gold answer) judged whether the student's final answer is correct — a binary 0/1 and a continuous 0.0–1.0 score, compared to the deterministic cover-match verdict.",
   em: "Exact match: the student's normalized final answer equals the gold answer exactly.",
   f1: "Token-level F1 overlap between the student's final answer and the gold answer.",
   doc_recall: "Supporting-document recall: fraction of the gold supporting documents the student retrieved.",
@@ -199,6 +200,12 @@ function renderEpisodeDetail(ep) {
   const correct = fm.answer_correct != null ? fm.answer_correct : fm.exact_match;
   const matchCls = correct ? "match" : "nomatch";
   const usedSteps = ep.used_steps != null ? ep.used_steps : (ep.steps || []).length;
+  const tCorrect = fm.teacher_answer_correct;
+  const tScore = fm.teacher_answer_score;
+  const teacherChip = tCorrect != null
+    ? metric(`${tCorrect ? "✓" : "✗"}${tScore != null ? " " + Number(tScore).toFixed(2) : ""}`,
+             "teacher verdict", TIP.teacher_correct)
+    : "";
   const header = `
     <div class="ep-header">
       <div class="qid">${esc(ep.qid)}</div>
@@ -215,6 +222,7 @@ function renderEpisodeDetail(ep) {
       </div>
       <div class="chips">
         ${metric(correct ? "✓" : "✗", "correct", TIP.correct)}
+        ${teacherChip}
         ${metric(fm.exact_match ? "1" : "0", "EM", TIP.em)}
         ${metric(num(fm.f1), "F1", TIP.f1)}
         ${metric(pct(fm.supporting_doc_recall), "doc recall", TIP.doc_recall)}
