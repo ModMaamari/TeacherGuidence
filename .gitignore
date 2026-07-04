@@ -55,3 +55,6 @@ ignored-temp/
 .venv/
 # Transient per-worker templates from run_fau_smoke_parallel.py
 templates/simulations/fau_smoke_w*.yaml
+
+# Generated SFT datasets (trace -> training-data pipeline)
+data/sft/
