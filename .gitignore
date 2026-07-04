@@ -51,3 +51,7 @@ data/simulation_output/*
 poetry.lock
 
 ignored-temp/
+
+.venv/
+# Transient per-worker templates from run_fau_smoke_parallel.py
+templates/simulations/fau_smoke_w*.yaml
