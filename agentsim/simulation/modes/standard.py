@@ -89,6 +89,17 @@ class StandardRunner:
                 "retrieval_backend": mode_config.get("retrieval_backend", "hotpot_local"),
                 "skip_teacher": mode_config.get("skip_teacher", False),
             })
+            # Optional per-call tuning (only injected when explicitly set, so existing
+            # templates keep the component defaults). A reasoning-model teacher such as
+            # fau/gpt-oss-120b needs a larger teacher_max_tokens because its
+            # chain-of-thought counts against the completion budget before the JSON.
+            for _k in (
+                "teacher_max_tokens", "teacher_max_tokens_retry",
+                "student_max_tokens", "student_max_repair_attempts",
+                "teacher_max_repair_attempts", "teacher_temperature", "student_temperature",
+            ):
+                if _k in mode_config:
+                    initial_metadata[_k] = mode_config[_k]
 
         # Use the workflow executor provided (with trace exporter) or create new one
         if self.workflow_executor:
