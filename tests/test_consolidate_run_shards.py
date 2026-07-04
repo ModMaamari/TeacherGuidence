@@ -40,6 +40,8 @@ def test_consolidate_merges_shards_and_removes_worker_dirs(tmp_path):
     for w in range(3):
         for s in range(4):
             _make_episode(tmp_path / f"w{w}" / "uuid" / "hotpot_questions" / f"sample_{s:03d}")
+    (tmp_path / "logs").mkdir()  # a non-shard sibling that must be preserved
+    (tmp_path / "logs" / "sim.log").write_text("x", encoding="utf-8")
     moved, removed = consolidate(tmp_path, "run")
     assert moved == 12
     assert set(removed) == {"w0", "w1", "w2"}
@@ -47,6 +49,8 @@ def test_consolidate_merges_shards_and_removes_worker_dirs(tmp_path):
     combined = tmp_path / "run" / "hotpot_questions"
     assert len(list(combined.glob("sample_*"))) == 12
     assert not (tmp_path / "w0").exists()
+    # Non-shard siblings (logs) are never removed.
+    assert (tmp_path / "logs" / "sim.log").exists()
 
 
 def test_consolidate_is_idempotent(tmp_path):

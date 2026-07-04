@@ -16,12 +16,14 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 from pathlib import Path
 from typing import List, Tuple
 
 EPISODE_FILENAME = "teacher_guidance_episodes.jsonl"
+_WORKER_DIR_RE = re.compile(r"^w\d+$")
 
 
 def find_sample_dirs(shard_root: Path, exclude_name: str) -> List[Path]:
@@ -45,9 +47,10 @@ def plan_moves(sample_dirs: List[Path], dest_hotpot: Path) -> List[Tuple[Path, P
 
 
 def _remove_empty_worker_dirs(shard_root: Path, run_name: str) -> List[str]:
+    """Remove only the emptied ``w<N>`` shard dirs -- never other siblings like ``logs``."""
     removed = []
     for child in sorted(shard_root.iterdir()):
-        if not child.is_dir() or child.name == run_name:
+        if not child.is_dir() or child.name == run_name or not _WORKER_DIR_RE.match(child.name):
             continue
         if not list(child.rglob(EPISODE_FILENAME)):
             shutil.rmtree(child)
