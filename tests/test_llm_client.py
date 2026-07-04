@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from agentsim.clients.llm_client import LLMClient
@@ -16,9 +17,34 @@ def _fake_response(body):
     return resp
 
 
+def _status_response(body, status_code=200, headers=None):
+    """A response with a real status_code/headers and a raise_for_status that raises
+    on >= 400, for exercising the retry/backoff path."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    resp.headers = headers or {}
+    resp.json = MagicMock(return_value=body)
+
+    def _raise():
+        if status_code >= 400:
+            raise httpx.HTTPStatusError("err", request=MagicMock(), response=resp)
+
+    resp.raise_for_status = MagicMock(side_effect=_raise)
+    return resp
+
+
 def _mock_async_client(response):
     client = AsyncMock()
     client.post = AsyncMock(return_value=response)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+def _mock_async_client_seq(responses):
+    """Mock client whose .post yields the given responses in order across calls."""
+    client = AsyncMock()
+    client.post = AsyncMock(side_effect=responses)
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=False)
     return client
@@ -239,3 +265,68 @@ def test_fau_completion_missing_api_key_raises(monkeypatch):
     monkeypatch.setattr(config, "FAU_LLM_API_KEY", None)
     with pytest.raises(ValueError, match="FAU_LLM_API_KEY"):
         asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+
+# ---------------------------------------------------------------------------
+# 429/503 retry + backoff on the FAU gateway
+# ---------------------------------------------------------------------------
+def test_fau_retries_on_429_then_succeeds(monkeypatch):
+    _fau_env(monkeypatch)
+    ok_body = {"choices": [{"message": {"content": "ok"}}], "usage": {}}
+    responses = [
+        _status_response({}, status_code=429),
+        _status_response({}, status_code=429),
+        _status_response(ok_body, status_code=200),
+    ]
+    mock_client = _mock_async_client_seq(responses)
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("agentsim.clients.llm_client.asyncio.sleep", new=AsyncMock()) as sleep_mock:
+        text = asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+    assert text == "ok"
+    assert mock_client.post.await_count == 3      # two 429s then success
+    assert sleep_mock.await_count == 2            # backed off before each retry
+
+
+def test_fau_honors_retry_after_header(monkeypatch):
+    _fau_env(monkeypatch)
+    ok_body = {"choices": [{"message": {"content": "ok"}}], "usage": {}}
+    responses = [
+        _status_response({}, status_code=429, headers={"Retry-After": "7"}),
+        _status_response(ok_body, status_code=200),
+    ]
+    mock_client = _mock_async_client_seq(responses)
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("agentsim.clients.llm_client.asyncio.sleep", new=AsyncMock()) as sleep_mock:
+        asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+    # Slept at least the server-requested 7s (plus a little jitter), not the 1s default.
+    slept = sleep_mock.await_args.args[0]
+    assert 7.0 <= slept < 8.0
+
+
+def test_fau_gives_up_after_max_retries_and_raises(monkeypatch):
+    _fau_env(monkeypatch)
+    # Always 429: after self.max_retries retries the final 429 surfaces via raise_for_status.
+    always_429 = [_status_response({}, status_code=429) for _ in range(10)]
+    mock_client = _mock_async_client_seq(always_429)
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("agentsim.clients.llm_client.asyncio.sleep", new=AsyncMock()):
+        client = LLMClient()
+        client.max_retries = 3
+        with pytest.raises(httpx.HTTPStatusError):
+            asyncio.run(client.get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+    assert mock_client.post.await_count == 4       # initial + 3 retries
+
+
+def test_fau_does_not_retry_on_400(monkeypatch):
+    _fau_env(monkeypatch)
+    mock_client = _mock_async_client_seq([_status_response({}, status_code=400)])
+    with patch("httpx.AsyncClient", return_value=mock_client), \
+         patch("agentsim.clients.llm_client.asyncio.sleep", new=AsyncMock()) as sleep_mock:
+        with pytest.raises(httpx.HTTPStatusError):
+            asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+    assert mock_client.post.await_count == 1       # non-retryable, no backoff
+    assert sleep_mock.await_count == 0

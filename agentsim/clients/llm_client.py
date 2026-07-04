@@ -1,6 +1,7 @@
 """Unified LLM client supporting multiple providers"""
 
 import asyncio
+import random
 
 import httpx
 from typing import Optional, Dict, Any
@@ -8,6 +9,14 @@ from loguru import logger
 from sentence_transformers import SentenceTransformer
 
 from agentsim.config import config
+
+# HTTP statuses worth retrying: 429 (rate limited / throttled) and 503 (service
+# temporarily unavailable) -- both transient on a shared academic gateway.
+_RETRYABLE_STATUS = {429, 503}
+_BACKOFF_BASE_S = 1.0      # exponential backoff base: base * 2**attempt
+_BACKOFF_MAX_S = 30.0      # cap for computed exponential backoff
+_BACKOFF_JITTER_S = 0.5    # added uniform(0, jitter) to avoid thundering herd
+_RETRY_AFTER_MAX_S = 120.0  # honor an explicit Retry-After header up to this cap
 
 
 class LLMClient:
@@ -296,6 +305,40 @@ class LLMClient:
                 return result
             return text
 
+    async def _post_json_with_backoff(self, client, url, headers, payload, provider_label="fau"):
+        """POST ``payload`` and retry on transient throttling (HTTP 429) or
+        unavailability (503) with exponential backoff + jitter, honoring a server
+        ``Retry-After`` header when present. Retries up to ``self.max_retries`` times,
+        then returns the final response so the caller can ``raise_for_status()`` (i.e.
+        a persistent 429 still surfaces as a clear error rather than hanging forever).
+
+        This lets larger experiments degrade gracefully when the shared FAU gateway
+        throttles under load instead of erroring out on the first 429.
+        """
+        attempt = 0
+        while True:
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code not in _RETRYABLE_STATUS or attempt >= self.max_retries:
+                return response
+
+            retry_after = response.headers.get("Retry-After") if response.headers else None
+            delay = None
+            if retry_after is not None:
+                try:  # Retry-After is usually an integer number of seconds.
+                    delay = min(float(retry_after), _RETRY_AFTER_MAX_S)
+                except (TypeError, ValueError):
+                    delay = None  # HTTP-date form or garbage -> fall back to backoff
+            if delay is None:
+                delay = min(_BACKOFF_BASE_S * (2 ** attempt), _BACKOFF_MAX_S)
+            delay += random.uniform(0, _BACKOFF_JITTER_S)
+
+            logger.warning(
+                f"[{provider_label}] HTTP {response.status_code} (attempt {attempt + 1}/"
+                f"{self.max_retries}); backing off {delay:.1f}s before retry"
+            )
+            await asyncio.sleep(delay)
+            attempt += 1
+
     async def _fau_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
         """NHR@FAU "LLMs as a Service" gateway completion (OpenAI-compatible).
 
@@ -341,10 +384,9 @@ class LLMClient:
         }
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{endpoint.rstrip('/')}/chat/completions",
-                headers=headers,
-                json=payload,
+            response = await self._post_json_with_backoff(
+                client, f"{endpoint.rstrip('/')}/chat/completions", headers, payload,
+                provider_label="fau",
             )
             response.raise_for_status()
             data = response.json()
