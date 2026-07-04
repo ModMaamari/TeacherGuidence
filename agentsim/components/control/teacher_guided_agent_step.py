@@ -54,6 +54,44 @@ def _guidance_config(context: WorkflowContext) -> GuidanceConfig:
     return GuidanceConfig.from_mode_config({"guidance": context.metadata.get("guidance", {})})
 
 
+def _extract_teacher_final_judgment(private_diagnosis: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Normalize the teacher's final-answer verdict from its private_diagnosis into
+    ``{"correct": 0|1, "score": float}`` (or ``None`` when the teacher didn't return it).
+
+    Tolerant of the shapes a model may emit: bool/int/float/str for the binary flag and
+    any 0-1-ish value for the continuous score. If only one is present the other is
+    derived (score>=0.5 -> correct; correct -> score 1.0/0.0)."""
+    pd = private_diagnosis or {}
+    if "final_answer_correct" not in pd and "final_answer_score" not in pd:
+        return None
+
+    def _to_binary(v: Any) -> Optional[int]:
+        if isinstance(v, bool):
+            return int(v)
+        if isinstance(v, (int, float)):
+            return 1 if v >= 0.5 else 0
+        if isinstance(v, str):
+            return 1 if v.strip().lower() in {"1", "true", "yes", "correct"} else 0
+        return None
+
+    binary = _to_binary(pd.get("final_answer_correct"))
+    score: Optional[float] = None
+    raw_score = pd.get("final_answer_score")
+    if raw_score is not None:
+        try:
+            score = max(0.0, min(1.0, float(raw_score)))
+        except (TypeError, ValueError):
+            score = None
+
+    if binary is None and score is not None:
+        binary = 1 if score >= 0.5 else 0
+    if score is None and binary is not None:
+        score = float(binary)
+    if binary is None and score is None:
+        return None
+    return {"correct": binary, "score": score}
+
+
 def get_plan_tracker(context: WorkflowContext) -> Optional[PlanTracker]:
     """Return a per-episode PlanTracker when formal-plan tracking is enabled and a plan
     exists, creating it on first use."""
@@ -215,13 +253,19 @@ class TeacherGuidedAgentStep(ControlComponent):
             )
             rendered_guidance, leakage = {}, {}
         else:
+            is_final_answer = student_action.action.tool == "finish"
             teacher_prompt = build_teacher_prompt(
                 state, gold, student_action.to_dict(), tool_observation, guidance_config,
                 student_raw=student_raw, student_action_valid=bool(parse_info.get("action_valid")),
+                is_final_answer=is_final_answer,
             )
             teacher_eval, teacher_raw, teacher_parse, teacher_repair_attempts, teacher_calls = await self._teacher_eval_with_repair(
                 context, teacher_prompt, teacher_model, teacher_temp
             )
+            if is_final_answer:
+                judgment = _extract_teacher_final_judgment(teacher_eval.private_diagnosis)
+                if judgment is not None:
+                    context.metadata["teacher_final_judgment"] = judgment
             rendered_guidance, leakage = render_student_guidance(
                 {
                     "guidance_level": teacher_eval.guidance_level,

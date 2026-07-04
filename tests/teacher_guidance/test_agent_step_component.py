@@ -11,6 +11,7 @@ from agentsim.components.control.teacher_guided_agent_step import (
     STUDENT_ACTION_SCHEMA,
     STUDENT_FINISH_ACTION_SCHEMA,
     TEACHER_EVALUATION_SCHEMA,
+    _extract_teacher_final_judgment,
 )
 from agentsim.teacher_guidance.guidance_policy import FALLBACK_FEEDBACK
 
@@ -82,6 +83,36 @@ def test_search_step_records_and_continues(tmp_path):
     assert ctx.metadata["retrieved_doc_ids"] == ["q1::doc0"]
     assert ctx.metadata["last_teacher_guidance_for_student"]["score"] == 0.7
     assert not ctx.metadata.get("done")
+
+
+def test_extract_teacher_final_judgment_shapes():
+    assert _extract_teacher_final_judgment(None) is None
+    assert _extract_teacher_final_judgment({"step_correct": True}) is None
+    assert _extract_teacher_final_judgment({"final_answer_correct": 1, "final_answer_score": 0.9}) == {"correct": 1, "score": 0.9}
+    assert _extract_teacher_final_judgment({"final_answer_correct": True, "final_answer_score": 1.0}) == {"correct": 1, "score": 1.0}
+    assert _extract_teacher_final_judgment({"final_answer_correct": "yes"}) == {"correct": 1, "score": 1.0}
+    # score-only -> derive binary; clamp out-of-range
+    assert _extract_teacher_final_judgment({"final_answer_score": 0.3}) == {"correct": 0, "score": 0.3}
+    assert _extract_teacher_final_judgment({"final_answer_score": 1.7}) == {"correct": 1, "score": 1.0}
+    # garbage score, binary present
+    assert _extract_teacher_final_judgment({"final_answer_correct": 0, "final_answer_score": "n/a"}) == {"correct": 0, "score": 0.0}
+
+
+def test_finish_step_captures_teacher_final_judgment(tmp_path):
+    student = json.dumps({
+        "thought": "I have the answer now.",
+        "action": {"tool": "finish", "params": {"answer": "Delhi", "citations": []}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3,
+        "student_visible": {"score_continuous": 0.9, "feedback": "good"},
+        "private_diagnosis": {"final_answer_correct": 1, "final_answer_score": 0.95},
+        "teacher_decision": "accept_finish",
+    })
+    ctx = _context(tmp_path)
+    comp = TeacherGuidedAgentStep(config={"step_index": 3, "budget": 5}, llm_client=StubLLM(student, teacher))
+    asyncio.run(comp.execute(ctx))
+    assert ctx.metadata["teacher_final_judgment"] == {"correct": 1, "score": 0.95}
 
 
 def test_force_finish_overrides_and_stops(tmp_path):
