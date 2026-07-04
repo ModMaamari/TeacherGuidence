@@ -49,3 +49,5 @@ data/simulation_output/*
 
 # Poetry
 poetry.lock
+
+ignored-temp/

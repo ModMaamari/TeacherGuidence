@@ -90,6 +90,72 @@ def test_cover_match_negative():
     assert cover_match("", "Delhi") is False
 
 
+# ---------------------------------------------------------------------------
+# Real false-positive cases collected from the viewer (student answers marked
+# INCORRECT despite containing the gold answer's actual content) -- see
+# ignored-temp/FalsePositives/fn01..08.png. Each of these was previously rejected by
+# the strict contiguous-span check because the prediction dropped a middle name,
+# inserted a filler word, reordered a generic word, or the gold was a short entity
+# name that didn't lead the prediction.
+# ---------------------------------------------------------------------------
+def test_cover_match_dropped_middle_name():
+    # fn01: gold has a middle name the student's answer omits.
+    pred = "Kelly Osbourne, a British singer-songwriter, hosted the 16th Annual Young Hollywood Awards in July 2014."
+    assert cover_match(pred, "Kelly Lee Osbourne") is True
+
+
+def test_cover_match_inserted_filler_word():
+    # fn02/fn08: gold "born October 25, 1931" vs prediction inserting "on".
+    pred = "The designer of Autopia is Bob Gurr. He was born on October 25, 1931."
+    assert cover_match(pred, "born October 25, 1931") is True
+
+
+def test_cover_match_short_proper_noun_anywhere():
+    # fn03: a short (<=3 char) gold that is a proper noun, not a common word like
+    # "no", may match anywhere in the prediction, not just as the first word.
+    pred = "Tropical Storm Ana has been present in the Central Pacific Ocean but not in the western North Pacific Ocean."
+    assert cover_match(pred, "Ana") is True
+
+
+def test_cover_match_short_acronym_anywhere():
+    # fn04: same as above but for an all-caps acronym.
+    pred = "Mamie Gummer played Nancy Crozier on 'The Good Wife', which aired on CBS."
+    assert cover_match(pred, "CBS") is True
+
+
+def test_cover_match_reordered_generic_word():
+    # fn05: "Club" is reused later in the sentence as a generic noun, and "de" is
+    # dropped -- coverage must still count "club"/"atlético"/"madrid" as matched.
+    pred = "The Amsterdam Tournament 2009 was contested by Atlético Madrid, which is the club that plays its home games at Wanda Metropolitano."
+    assert cover_match(pred, "Club Atlético de Madrid") is True
+
+
+def test_cover_match_pronoun_subject_replaced_by_name():
+    # fn06: gold phrased with a pronoun subject ("He is..."), prediction uses the
+    # actual name instead of the pronoun.
+    pred = "Sulley Muniru is the younger brother of Sulley Muntari, who plays as a central midfielder for the Italian club Pescara."
+    assert cover_match(pred, "He is the younger brother") is True
+
+
+def test_cover_match_extra_patronymic_inserted():
+    # fn07: gold "Alexander Gorsky" vs prediction inserting a patronymic between the
+    # two gold tokens.
+    pred = '"Alexander Alexeyevich Gorsky" restaged the play "Don Quixote", based on the Spanish novel by Miguel de Cervantes Saavedra.'
+    assert cover_match(pred, "Alexander Gorsky") is True
+
+
+def test_cover_match_coverage_fallback_still_requires_majority():
+    # Guard-rail: a 2-token gold with only one token present (50% < 60% threshold)
+    # must NOT count -- coverage must not degrade into "any single word in common".
+    assert cover_match("I think it might be Obama, not sure.", "Barack Obama") is False
+
+
+def test_cover_match_short_common_word_still_must_lead():
+    # Guard-rail: the fix for short proper nouns must not loosen the existing
+    # must-lead rule for ordinary short words like "no".
+    assert cover_match("There is no clear winner", "no") is False
+
+
 def test_supporting_doc_recall():
     assert supporting_doc_recall({"d1", "d2"}, {"d1", "d3"}) == 0.5
     assert supporting_doc_recall(set(), {"d1"}) == 0.0

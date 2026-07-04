@@ -51,6 +51,49 @@ def _has_number(tokens: list) -> bool:
     return any(any(ch.isdigit() for ch in tok) for tok in tokens)
 
 
+def _looks_like_entity(raw_text: str) -> bool:
+    """A short (<=3 char) gold token normally must *lead* the prediction to count
+    (see the ``no`` / ``There is no clear winner`` guard below) -- that avoids
+    incidental matches of common short words deep in an unrelated answer. But a short
+    proper noun or acronym (``Ana``, ``CBS``) is distinctive enough to accept anywhere
+    in the prediction: ordinary English words that short are essentially never
+    capitalized when a gold answer is written as a bare entity name."""
+    word = (raw_text or "").strip()
+    return bool(word) and " " not in word and word[:1].isupper()
+
+
+_FILLER_TOKENS = {
+    # Pronoun + copula lead-ins ("He is the younger brother of X" vs a prediction that
+    # names the actual subject instead of using a pronoun) and short name-linking
+    # words dropped between components of a multi-word proper noun in another
+    # language ("Club Atlético de Madrid" -> "...Atlético Madrid..."). None of these
+    # carry the answer's actual content, so they shouldn't count against coverage.
+    "he", "she", "it", "they", "is", "was", "are", "were", "has", "have", "been", "being", "be",
+    "of", "de", "da", "van", "von", "der", "la", "le", "el", "di",
+}
+
+_COVERAGE_THRESHOLD = 0.6
+
+
+def _content_tokens(tokens: list) -> list:
+    filtered = [t for t in tokens if t not in _FILLER_TOKENS]
+    return filtered if filtered else tokens
+
+
+def _token_coverage(needle: list, hay: list) -> float:
+    """Fraction of `needle`'s tokens found anywhere in `hay` (a bag/multiset match --
+    order-independent, each hay token satisfies at most one needle token)."""
+    if not needle:
+        return 0.0
+    hay_counts = Counter(hay)
+    matched = 0
+    for tok in needle:
+        if hay_counts.get(tok, 0) > 0:
+            hay_counts[tok] -= 1
+            matched += 1
+    return matched / len(needle)
+
+
 def cover_match(pred: str, gold: str) -> bool:
     """Robust-but-cheap correctness, in both directions, without an LLM.
 
@@ -59,7 +102,17 @@ def cover_match(pred: str, gold: str) -> bool:
     * exact normalized equality, or
     * the gold answer appears as a contiguous token span in the prediction
       (the "answer + explanation" pattern: gold ``no`` vs ``No. Roger Donaldson ...``;
-      a short yes/no-style gold must *lead* the prediction), or
+      a short yes/no-style gold must *lead* the prediction, unless it looks like a
+      proper noun/acronym -- see ``_looks_like_entity`` -- in which case it may appear
+      anywhere), or
+    * most (>= 60%) of the gold's content tokens appear anywhere in the prediction,
+      ignoring a small set of pronoun/copula/name-linking filler words (see
+      ``_FILLER_TOKENS``) that often differ between a gold answer phrased as a full
+      sentence or foreign-language name and a prediction that rephrases it -- this
+      catches a dropped middle name (``Kelly Lee Osbourne`` vs ``Kelly Osbourne``), an
+      inserted filler word (``born October 25, 1931`` vs ``born on October 25, 1931``),
+      or a reordered generic word (``Club Atlético de Madrid`` vs ``Atlético
+      Madrid ... the club``), or
     * the prediction is the salient core of a longer gold (gold ``22 episodes`` vs
       prediction ``22``): the prediction is a contiguous token span of the gold and is
       "salient" — it contains a number or covers at least half the gold tokens. This
@@ -78,11 +131,18 @@ def cover_match(pred: str, gold: str) -> bool:
 
     # Direction 1: gold contained in the prediction.
     if len(gt) <= len(pt):
-        if len(gt) == 1 and len(gt[0]) <= 3:
+        if len(gt) == 1 and len(gt[0]) <= 3 and not _looks_like_entity(gold):
             if pt[0] == gt[0]:
                 return True
-        elif _is_contiguous_span(gt, pt):
-            return True
+        elif len(gt) == 1:
+            if _is_contiguous_span(gt, pt):
+                return True
+        else:
+            if _is_contiguous_span(gt, pt):
+                return True
+            gt_content = _content_tokens(gt)
+            if len(gt_content) >= 2 and _token_coverage(gt_content, pt) >= _COVERAGE_THRESHOLD:
+                return True
 
     # Direction 2: prediction is the salient core of a longer gold.
     if len(pt) < len(gt) and _is_contiguous_span(pt, gt):
