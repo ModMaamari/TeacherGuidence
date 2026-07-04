@@ -63,7 +63,10 @@ def plan_workers(num_samples: int, gpu_ids: List[str], base_port: int = 11500) -
     return workers
 
 
-def plan_shards(num_samples: int, gpu_ids: List[str], base_port: int = 11500) -> List[Dict]:
+def plan_shards(
+    num_samples: int, gpu_ids: List[str], base_port: int = 11500,
+    out_root: str = "data/simulation_output/fau_run",
+) -> List[Dict]:
     """A pool of one worker per GPU, each owning a round-robin shard of the samples.
 
     With more samples than GPUs, each GPU's worker processes its shard sequentially, so at
@@ -82,7 +85,7 @@ def plan_shards(num_samples: int, gpu_ids: List[str], base_port: int = 11500) ->
             "port": base_port + w,
             "endpoint": f"http://127.0.0.1:{base_port + w}",
             "template_id": f"fau_run_w{w}",
-            "output_dir": f"./data/simulation_output/fau_run/w{w}",
+            "output_dir": f"./{out_root.rstrip('/')}/w{w}",
         })
     return workers
 
@@ -152,7 +155,7 @@ def main() -> None:
         sys.exit("Set FAU_LLM_API_KEY (or LLMAPI_KEY) in the environment first.")
 
     gpu_ids = _free_gpus(args.num_gpus)
-    workers = plan_shards(args.num_samples, gpu_ids, args.base_port)
+    workers = plan_shards(args.num_samples, gpu_ids, args.base_port, out_root=args.out_root)
     print(f"Planned {len(workers)} GPU workers on {gpu_ids} for {args.num_samples} samples "
           f"(shards: {[len(w['sample_indices']) for w in workers]})", flush=True)
 
