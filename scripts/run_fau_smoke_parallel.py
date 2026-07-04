@@ -35,6 +35,7 @@ sys.path.insert(0, str(REPO_ROOT))
 import yaml  # noqa: E402
 
 from scripts.gen_fau_smoke_template import build_fau_smoke_template  # noqa: E402
+from scripts.consolidate_run_shards import consolidate  # noqa: E402
 
 TEMPLATES_DIR = REPO_ROOT / "templates" / "simulations"
 OLLAMA_READY_TIMEOUT_S = 120
@@ -147,6 +148,9 @@ def main() -> None:
     ap.add_argument("--planning-steps", type=int, default=3, help="plan review/revise rounds")
     ap.add_argument("--max-plan-steps", type=int, default=12)
     ap.add_argument("--out-root", default="data/simulation_output/fau_run")
+    ap.add_argument("--run-name", default="run", help="consolidated run dir name under out-root")
+    ap.add_argument("--no-consolidate", action="store_true",
+                    help="keep per-worker shard dirs instead of merging them into one run")
     ap.add_argument("--questions", default="./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_questions.jsonl")
     ap.add_argument("--corpus", default="./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_corpus.jsonl")
     args = ap.parse_args()
@@ -235,6 +239,12 @@ def main() -> None:
     print(f"\n==== FAU run done in {time.time() - t_start:.0f}s ====", flush=True)
     print(f"episodes: {total} | answer_correct: {correct} ({correct / total:.1%})" if total else "no episodes",
           flush=True)
+
+    # Merge the per-GPU shard dirs into a single run so the explorer shows one run.
+    if not args.no_consolidate and total:
+        moved, removed = consolidate(work_dir, args.run_name)
+        print(f"consolidated {moved} episodes into one run '{work_dir.name}/{args.run_name}' "
+              f"(removed shard dirs: {removed})", flush=True)
     print(f"output root: {work_dir}", flush=True)
 
 
