@@ -152,13 +152,32 @@ def _do_synthesize(context: Any) -> ToolObservation:
     return ToolObservation(tool="synthesize", status="ok", data={"draft_answer": draft})
 
 
+def _substantive(text: Any) -> str:
+    """Return the stripped text if it is a real answer, else "". Treats the
+    "unknown" placeholder as non-substantive so it never gets resurfaced as if it were
+    a genuine answer by a later fallback."""
+    s = str(text or "").strip()
+    return "" if s.lower() == "unknown" else s
+
+
 def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -> str:
-    """Best non-empty final answer: the student's answer, else the draft, else the
-    extracted facts, else a last-resort placeholder. Never empty."""
+    """Best non-empty final answer, in priority order:
+
+    1. the answer in *this* finish call's params,
+    2. a previously-committed finish answer (``candidate_final_answer``) -- e.g. the
+       student answered "the BBC, in London" at an earlier step, the teacher asked it to
+       keep going, and then budget ran out: that committed answer must not be thrown away
+       and replaced with "unknown" on the forced finish,
+    3. the synthesized draft,
+    4. the concatenated extracted facts,
+    5. the "unknown" placeholder (never empty).
+    """
     params = params or {}
-    answer = str(params.get("answer", "") or "").strip()
+    answer = _substantive(params.get("answer"))
     if not answer:
-        answer = str(context.metadata.get("draft_answer", "") or "").strip()
+        answer = _substantive(context.metadata.get("candidate_final_answer"))
+    if not answer:
+        answer = _substantive(context.metadata.get("draft_answer"))
     if not answer:
         facts = context.metadata.get("extracted_facts", []) or []
         answer = " ".join(str(f.get("fact", "")).strip() for f in facts).strip()

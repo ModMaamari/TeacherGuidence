@@ -131,6 +131,38 @@ def test_finish_never_empty_last_resort(context, retriever):
     assert context.metadata["final_answer"]
 
 
+def test_forced_finish_reuses_prior_committed_answer(context, retriever):
+    # The BBC case: the student committed "the BBC, in London" at an earlier finish,
+    # the teacher asked it to keep going, budget ran out -> the forced finish (empty
+    # params) must reuse that committed answer, not fall back to "unknown".
+    execute_student_tool(context, _action("finish", {"answer": "the BBC, in London"}), retriever)
+    assert context.metadata["candidate_final_answer"] == "the BBC, in London"
+    obs = execute_student_tool(context, _action("finish", {}), retriever)
+    assert obs["answer"] == "the BBC, in London"
+    assert context.metadata["final_answer"] == "the BBC, in London"
+
+
+def test_derive_final_answer_priority_and_unknown_not_resurfaced():
+    from agentsim.teacher_guidance.tool_executor import derive_final_answer
+
+    class _Ctx:
+        def __init__(self, md):
+            self.metadata = md
+
+    # explicit params answer wins
+    assert derive_final_answer(_Ctx({"candidate_final_answer": "old"}), {"answer": "new"}) == "new"
+    # a prior committed answer beats draft/facts
+    assert derive_final_answer(
+        _Ctx({"candidate_final_answer": "committed", "draft_answer": "draft"})
+    ) == "committed"
+    # a prior "unknown" is never resurfaced -- fall through to the draft
+    assert derive_final_answer(
+        _Ctx({"candidate_final_answer": "unknown", "draft_answer": "draft"})
+    ) == "draft"
+    # nothing at all -> the placeholder
+    assert derive_final_answer(_Ctx({})) == "unknown"
+
+
 def test_new_facts_validated_against_evidence(context, retriever):
     execute_student_tool(context, _action("search", {"query": "Delhi", "k": 2}), retriever)
     # valid span via new_facts_extracted on a non-extract tool (synthesize)
