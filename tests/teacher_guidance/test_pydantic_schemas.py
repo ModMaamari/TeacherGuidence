@@ -303,6 +303,13 @@ def test_finish_generation_schema_pins_tool_to_finish():
     assert finish_call["properties"]["tool"]["const"] == "finish"
 
 
+def test_finish_generation_schema_emits_action_before_thought():
+    # Ollama generates fields in schema order; the answer must come before the thought
+    # so a long reasoning trace can't truncate the answer away on a small model.
+    props = list(StudentFinishActionGenerationModel.model_json_schema()["properties"].keys())
+    assert props.index("action") < props.index("thought")
+
+
 def test_finish_generation_model_rejects_non_finish_tool():
     with pytest.raises(ValidationError):
         StudentFinishActionGenerationModel.model_validate({
