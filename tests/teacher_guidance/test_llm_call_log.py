@@ -86,3 +86,37 @@ def test_timed_completion_defaults_response_schema_to_none():
     stub = SchemaCapturingStub()
     asyncio.run(timed_completion(stub, prompt="hi", model="m", temperature=0.1, max_tokens=100))
     assert stub.received_schema is None
+
+
+class RouterStub:
+    """Mimics an LLMClient with a provider-fallback router."""
+
+    def __init__(self, serve_model):
+        self.serve_model = serve_model
+        self.tried = []
+
+    async def get_completion_with_fallback(self, models, *, prompt, **kw):
+        self.tried = list(models)
+        return {"text": f"served:{prompt}"}, self.serve_model
+
+    async def get_completion(self, prompt, model=None, **kw):
+        raise AssertionError("router path should not call get_completion directly")
+
+
+def test_timed_completion_routes_and_records_used_model():
+    stub = RouterStub(serve_model="custom/openai/gpt-oss-120b:free")
+    router = ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"]
+    entry, text = asyncio.run(
+        timed_completion(stub, prompt="hi", model="fau/gpt-oss-120b", temperature=0.1,
+                         max_tokens=100, router_models=router)
+    )
+    assert text == "served:hi"
+    assert entry["model"] == "custom/openai/gpt-oss-120b:free"
+    assert stub.tried == router
+
+
+def test_timed_completion_no_router_records_single_model():
+    entry, _ = asyncio.run(
+        timed_completion(DictStub(), prompt="hi", model="fau/gpt-oss-120b", temperature=0.1, max_tokens=100)
+    )
+    assert entry["model"] == "fau/gpt-oss-120b"
