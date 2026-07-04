@@ -38,6 +38,7 @@ class LLMClient:
         return_usage: bool = False,
         return_raw: bool = False,
         response_schema: Optional[Dict[str, Any]] = None,
+        max_retries: Optional[int] = None,
         **kwargs
     ) -> str | Dict[str, Any]:
         """Get completion from any LLM provider
@@ -90,7 +91,8 @@ class LLMClient:
             )
         elif provider == "fau":
             result = await self._fau_completion(
-                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw, response_schema
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw,
+                response_schema, max_retries,
             )
         elif provider == "ollama":
             result = await self._ollama_completion(
@@ -305,20 +307,21 @@ class LLMClient:
                 return result
             return text
 
-    async def _post_json_with_backoff(self, client, url, headers, payload, provider_label="fau"):
+    async def _post_json_with_backoff(self, client, url, headers, payload, provider_label="fau", max_retries=None):
         """POST ``payload`` and retry on transient throttling (HTTP 429) or
         unavailability (503) with exponential backoff + jitter, honoring a server
-        ``Retry-After`` header when present. Retries up to ``self.max_retries`` times,
-        then returns the final response so the caller can ``raise_for_status()`` (i.e.
-        a persistent 429 still surfaces as a clear error rather than hanging forever).
-
-        This lets larger experiments degrade gracefully when the shared FAU gateway
-        throttles under load instead of erroring out on the first 429.
+        ``Retry-After`` header when present. Retries up to ``max_retries`` (default
+        ``self.max_retries``) times, then returns the final response so the caller can
+        ``raise_for_status()`` (i.e. a persistent 429 still surfaces as a clear error
+        rather than hanging forever). Pass ``max_retries=0`` to fail fast -- used by the
+        provider-fallback router so a rate-limited FAU call falls through immediately
+        instead of backing off.
         """
+        retries = self.max_retries if max_retries is None else max_retries
         attempt = 0
         while True:
             response = await client.post(url, headers=headers, json=payload)
-            if response.status_code not in _RETRYABLE_STATUS or attempt >= self.max_retries:
+            if response.status_code not in _RETRYABLE_STATUS or attempt >= retries:
                 return response
 
             retry_after = response.headers.get("Retry-After") if response.headers else None
@@ -334,12 +337,42 @@ class LLMClient:
 
             logger.warning(
                 f"[{provider_label}] HTTP {response.status_code} (attempt {attempt + 1}/"
-                f"{self.max_retries}); backing off {delay:.1f}s before retry"
+                f"{retries}); backing off {delay:.1f}s before retry"
             )
             await asyncio.sleep(delay)
             attempt += 1
 
-    async def _fau_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
+    async def get_completion_with_fallback(self, models, *, prompt: str, **kwargs):
+        """Try each model in ``models`` in order, returning ``(result, used_model)`` from
+        the first that succeeds. A rate-limit (HTTP 429), unavailability, or connection
+        error falls through to the next model; every model but the last one is called
+        fail-fast (``max_retries=0``) so falling through is quick, while the last model
+        keeps normal retry behaviour as the final fallback. Re-raises the last error if
+        all models fail.
+
+        Used to route teacher calls FAU -> OpenRouter-free -> OpenRouter-paid: free
+        options first for cost, paid last for reliability.
+        """
+        if not models:
+            raise ValueError("get_completion_with_fallback requires at least one model")
+        last_exc: Optional[Exception] = None
+        for i, model in enumerate(models):
+            is_last = i == len(models) - 1
+            call_kwargs = dict(kwargs)
+            if not is_last:
+                call_kwargs["max_retries"] = 0  # fail fast, fall through on rate limit
+            try:
+                result = await self.get_completion(prompt=prompt, model=model, **call_kwargs)
+                return result, model
+            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                last_exc = exc
+                logger.warning(
+                    f"[router] teacher model '{model}' failed ({type(exc).__name__}); "
+                    f"{'falling through to next' if not is_last else 'no fallback left'}"
+                )
+        raise last_exc  # type: ignore[misc]
+
+    async def _fau_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None, max_retries: Optional[int] = None) -> str | Dict[str, Any]:
         """NHR@FAU "LLMs as a Service" gateway completion (OpenAI-compatible).
 
         Differs from ``_custom_completion`` (OpenRouter) in three ways:
@@ -386,7 +419,7 @@ class LLMClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await self._post_json_with_backoff(
                 client, f"{endpoint.rstrip('/')}/chat/completions", headers, payload,
-                provider_label="fau",
+                provider_label="fau", max_retries=max_retries,
             )
             response.raise_for_status()
             data = response.json()

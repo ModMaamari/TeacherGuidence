@@ -330,3 +330,72 @@ def test_fau_does_not_retry_on_400(monkeypatch):
 
     assert mock_client.post.await_count == 1       # non-retryable, no backoff
     assert sleep_mock.await_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Provider-fallback router (get_completion_with_fallback)
+# ---------------------------------------------------------------------------
+def _http_error(status=429):
+    return httpx.HTTPStatusError("rate limited", request=MagicMock(),
+                                 response=_status_response({}, status_code=status))
+
+
+def test_router_returns_first_success():
+    client = LLMClient()
+    calls = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        calls.append((model, kw.get("max_retries")))
+        return {"text": "ok from " + model}
+
+    client.get_completion = fake_get_completion
+    result, used = asyncio.run(client.get_completion_with_fallback(
+        ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"],
+        prompt="hi", return_raw=True,
+    ))
+    assert used == "fau/gpt-oss-120b"
+    assert result["text"].endswith("fau/gpt-oss-120b")
+    assert calls == [("fau/gpt-oss-120b", 0)]  # first is fail-fast, and it succeeded
+
+
+def test_router_falls_through_on_rate_limit():
+    client = LLMClient()
+    seen = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        seen.append(model)
+        if model != "custom/openai/gpt-oss-120b:free":
+            raise _http_error(429)
+        return {"text": "free served it"}
+
+    client.get_completion = fake_get_completion
+    result, used = asyncio.run(client.get_completion_with_fallback(
+        ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"],
+        prompt="hi",
+    ))
+    assert used == "custom/openai/gpt-oss-120b:free"
+    assert seen == ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free"]
+
+
+def test_router_uses_paid_last_and_raises_if_all_fail():
+    client = LLMClient()
+    order = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        order.append((model, kw.get("max_retries")))
+        raise _http_error(429)
+
+    client.get_completion = fake_get_completion
+    with pytest.raises(httpx.HTTPStatusError):
+        asyncio.run(client.get_completion_with_fallback(
+            ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"],
+            prompt="hi",
+        ))
+    # last model called with default retries (None = normal), earlier ones fail-fast (0)
+    assert order[0][1] == 0 and order[1][1] == 0
+    assert order[2][1] is None
+
+
+def test_router_requires_models():
+    with pytest.raises(ValueError):
+        asyncio.run(LLMClient().get_completion_with_fallback([], prompt="hi"))
