@@ -2,9 +2,14 @@
 Leakage detection and sanitization for student-visible teacher guidance.
 
 The teacher holds privileged information (gold answer, hidden gold titles/doc ids,
-hidden supporting spans). This module enforces — in code, not by prompt — that none of
-that leaks into the student-visible guidance, except for titles/spans the student has
-already retrieved (which are fair game). It is meant to run *after* the guidance
+hidden supporting spans). The only thing that must never reach the student is the
+**gold answer itself** — and even that is fair game when it already appears in the
+question (a comparison/boolean question whose answer is one of the entities the student
+was handed). Gold titles, doc ids, and supporting spans are *not* redacted: they are
+routinely the very entities named in the question, or docs the student has already
+retrieved, so hiding them mangled legitimate teacher feedback (e.g. restating the
+question turned into ``[title hidden]``). This module still *detects* those mentions for
+telemetry, but only the gold answer is ever removed. It runs *after* the guidance
 renderer.
 """
 
@@ -131,15 +136,12 @@ def sanitize_rendered_guidance(
     if leak_policy != "strict":
         return rendered, report
 
+    # Only the gold answer is ever redacted. Titles, doc ids, and spans are still
+    # reported above for telemetry, but are considered fair game (question entities /
+    # already-retrieved docs) and left in place.
     replacements: List[Tuple[str, str]] = []
     if not getattr(config, "expose_gold_answer_hint", False) and gold_answer:
         replacements.append((gold_answer, "[answer hidden]"))
-    for title in hidden_titles:
-        replacements.append((title, "[title hidden]"))
-    for doc_id in hidden_doc_ids:
-        replacements.append((doc_id, "[doc hidden]"))
-    for span in hidden_spans:
-        replacements.append((span, "[span hidden]"))
 
     applied: List[str] = []
     clean = _sanitize_obj(rendered, replacements, applied)
