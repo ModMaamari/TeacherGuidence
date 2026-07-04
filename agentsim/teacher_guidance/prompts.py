@@ -134,6 +134,7 @@ def build_teacher_prompt(
     guidance_config: GuidanceConfig,
     student_raw: Optional[str] = None,
     student_action_valid: bool = True,
+    is_final_answer: bool = False,
 ) -> str:
     parts: List[str] = []
     parts.append(
@@ -169,6 +170,22 @@ def build_teacher_prompt(
         f"{guidance_config.max_feedback_words} words and do NOT mention any hidden gold "
         f"answer, title, doc id, or span the student has not retrieved."
     )
+
+    final_judgment_field = ""
+    if is_final_answer:
+        parts.append(
+            "This is the student's FINAL answer. You can see the gold answer, so also judge "
+            "whether the student's final answer is correct by comparing it to the gold answer "
+            "(accept a correct answer wrapped in explanation or extra words; judge on meaning, "
+            "not exact string match). Put your verdict in private_diagnosis as "
+            "\"final_answer_correct\" (1 if the final answer is correct, else 0) and "
+            "\"final_answer_score\" (0.0-1.0 continuous correctness). These two fields are "
+            "PRIVATE and must never be shown to the student."
+        )
+        final_judgment_field = (
+            '"final_answer_correct": 0, "final_answer_score": 0.0, '
+        )
+
     parts.append(
         "Return ONLY a JSON object:\n"
         "{\n"
@@ -176,8 +193,8 @@ def build_teacher_prompt(
         '  "student_visible": {"score_binary": 0, "score_continuous": 0.0, "feedback": "...", "hint": null},\n'
         '  "private_diagnosis": {"json_valid": true, "action_valid": true, "tool_valid": true, '
         '"step_correct": false, "retrieved_gold_doc": false, "extracted_gold_fact": false, '
-        '"answer_supported": false, "main_error": "...", "recommended_next_tool": "...", '
-        '"recommended_next_focus": "...", "gold_answer_leaked": false},\n'
+        '"answer_supported": false, ' + final_judgment_field + '"main_error": "...", '
+        '"recommended_next_tool": "...", "recommended_next_focus": "...", "gold_answer_leaked": false},\n'
         '  "teacher_decision": "continue|accept_finish|reject_finish|force_finish"\n'
         "}"
     )
