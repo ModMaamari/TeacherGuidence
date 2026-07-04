@@ -58,3 +58,4 @@ templates/simulations/fau_smoke_w*.yaml
 
 # Generated SFT datasets (trace -> training-data pipeline)
 data/sft/
+templates/simulations/fau_run_w*.yaml

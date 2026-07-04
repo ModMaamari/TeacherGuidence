@@ -63,6 +63,30 @@ def plan_workers(num_samples: int, gpu_ids: List[str], base_port: int = 11500) -
     return workers
 
 
+def plan_shards(num_samples: int, gpu_ids: List[str], base_port: int = 11500) -> List[Dict]:
+    """A pool of one worker per GPU, each owning a round-robin shard of the samples.
+
+    With more samples than GPUs, each GPU's worker processes its shard sequentially, so at
+    any instant there is exactly one sample in flight per GPU (the requested "one sample
+    per GPU, in parallel across GPUs"). Round-robin keeps shard sizes within 1 of each
+    other."""
+    if not gpu_ids:
+        raise ValueError("no gpu_ids provided")
+    num_workers = min(len(gpu_ids), num_samples)
+    workers = []
+    for w in range(num_workers):
+        workers.append({
+            "index": w,
+            "sample_indices": list(range(w, num_samples, num_workers)),
+            "gpu_id": gpu_ids[w],
+            "port": base_port + w,
+            "endpoint": f"http://127.0.0.1:{base_port + w}",
+            "template_id": f"fau_run_w{w}",
+            "output_dir": f"./data/simulation_output/fau_run/w{w}",
+        })
+    return workers
+
+
 def read_question_lines(path: Path, n: int) -> List[str]:
     lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     return lines[:n]
@@ -112,20 +136,27 @@ def _stop(proc: subprocess.Popen) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--num-samples", type=int, default=8)
-    ap.add_argument("--student", default="ollama/qwen3.5:4b")
+    ap.add_argument("--num-gpus", type=int, default=8)
+    ap.add_argument("--student", default="ollama/qwen3.5:2b")
     ap.add_argument("--base-port", type=int, default=11500)
-    ap.add_argument("--questions", default="./data/datasets/hotpot_teacher_guidance_exp30/hotpot_distractor_validation_questions.jsonl")
-    ap.add_argument("--corpus", default="./data/datasets/hotpot_teacher_guidance_exp30/hotpot_distractor_validation_corpus.jsonl")
+    ap.add_argument("--budget", type=int, default=12, help="running (tool-use) step budget")
+    ap.add_argument("--workflow", default="hotpot_teacher_guided_b12_plan_review")
+    ap.add_argument("--planning-steps", type=int, default=3, help="plan review/revise rounds")
+    ap.add_argument("--max-plan-steps", type=int, default=12)
+    ap.add_argument("--out-root", default="data/simulation_output/fau_run")
+    ap.add_argument("--questions", default="./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_questions.jsonl")
+    ap.add_argument("--corpus", default="./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_corpus.jsonl")
     args = ap.parse_args()
 
     if not (os.getenv("FAU_LLM_API_KEY") or os.getenv("LLMAPI_KEY")):
         sys.exit("Set FAU_LLM_API_KEY (or LLMAPI_KEY) in the environment first.")
 
-    gpu_ids = _free_gpus(args.num_samples)
-    workers = plan_workers(args.num_samples, gpu_ids, args.base_port)
-    print(f"Planned {len(workers)} workers on GPUs {gpu_ids}")
+    gpu_ids = _free_gpus(args.num_gpus)
+    workers = plan_shards(args.num_samples, gpu_ids, args.base_port)
+    print(f"Planned {len(workers)} GPU workers on {gpu_ids} for {args.num_samples} samples "
+          f"(shards: {[len(w['sample_indices']) for w in workers]})", flush=True)
 
-    work_dir = REPO_ROOT / "data" / "simulation_output" / "fau_smoke"
+    work_dir = REPO_ROOT / args.out_root
     work_dir.mkdir(parents=True, exist_ok=True)
     logs_dir = work_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
@@ -135,14 +166,18 @@ def main() -> None:
 
     written_templates: List[Path] = []
     servers: List[subprocess.Popen] = []
+    t_start = time.time()
     try:
-        # Materialize per-worker dataset + template.
+        # Materialize per-worker dataset shard + template.
         for w in workers:
+            shard_lines = [q_lines[i] for i in w["sample_indices"]]
             qpath = work_dir / f"w{w['index']}_questions.jsonl"
-            qpath.write_text(q_lines[w["sample_index"]] + "\n", encoding="utf-8")
+            qpath.write_text("\n".join(shard_lines) + "\n", encoding="utf-8")
             template = build_fau_smoke_template(
-                template_id=w["template_id"], student_model=args.student, num_samples=1,
-                questions_path=str(qpath), corpus_path=args.corpus, output_dir=w["output_dir"],
+                template_id=w["template_id"], student_model=args.student,
+                num_samples=len(shard_lines), questions_path=str(qpath), corpus_path=args.corpus,
+                output_dir=w["output_dir"], budget=args.budget, workflow=args.workflow,
+                planning_steps=args.planning_steps, max_plan_steps=args.max_plan_steps,
             )
             tpath = TEMPLATES_DIR / f"{w['template_id']}.yaml"
             tpath.write_text(yaml.dump(template, sort_keys=False), encoding="utf-8")
@@ -152,12 +187,12 @@ def main() -> None:
         # on-disk model store) via the first server.
         for w in workers:
             servers.append(_start_ollama(w["gpu_id"], w["port"], logs_dir / f"ollama_w{w['index']}.log"))
-        print("All Ollama servers ready; pulling student model ...")
+        print("All Ollama servers ready; pulling student model ...", flush=True)
         pull_env = os.environ.copy()
         pull_env["OLLAMA_HOST"] = f"127.0.0.1:{workers[0]['port']}"
         subprocess.run(["ollama", "pull", student_tag], env=pull_env, check=True)
 
-        # Launch all simulate processes in parallel.
+        # Launch all worker simulate processes in parallel (one per GPU).
         procs = []
         for w in workers:
             env = os.environ.copy()
@@ -171,31 +206,33 @@ def main() -> None:
                 cwd=REPO_ROOT, env=env, stdout=log_f, stderr=subprocess.STDOUT,
             )
             procs.append((w, p, time.time()))
-            print(f"  -> worker {w['index']} (GPU {w['gpu_id']}, port {w['port']}) started")
+            print(f"  -> worker {w['index']} (GPU {w['gpu_id']}, {len(w['sample_indices'])} samples) started", flush=True)
 
         results = []
         for w, p, t0 in procs:
             code = p.wait()
             results.append((w, code, time.time() - t0))
-            print(f"  <- worker {w['index']} exit={code} in {time.time() - t0:.0f}s")
+            print(f"  <- worker {w['index']} exit={code} in {time.time() - t0:.0f}s", flush=True)
     finally:
         for s in servers:
             _stop(s)
         for tpath in written_templates:
             tpath.unlink(missing_ok=True)
 
-    # Summarize final answers.
-    print("\n==== FAU smoke results ====")
+    # Summarize correctness across all workers.
+    correct = total = 0
     for w, code, secs in results:
-        ep_files = list((REPO_ROOT / w["output_dir"].lstrip("./")).rglob("teacher_guidance_episodes.jsonl"))
-        for ep_file in ep_files:
+        for ep_file in (REPO_ROOT / w["output_dir"].lstrip("./")).rglob("teacher_guidance_episodes.jsonl"):
             for line in ep_file.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue
-                ep = json.loads(line)
-                fm = ep.get("final_metrics", {})
-                print(f"w{w['index']} exit={code} correct={fm.get('answer_correct')} "
-                      f"gold={ep.get('gold_answer')!r} final={str(ep.get('final_answer'))[:60]!r}")
+                total += 1
+                if (json.loads(line).get("final_metrics", {}) or {}).get("answer_correct"):
+                    correct += 1
+    print(f"\n==== FAU run done in {time.time() - t_start:.0f}s ====", flush=True)
+    print(f"episodes: {total} | answer_correct: {correct} ({correct / total:.1%})" if total else "no episodes",
+          flush=True)
+    print(f"output root: {work_dir}", flush=True)
 
 
 if __name__ == "__main__":

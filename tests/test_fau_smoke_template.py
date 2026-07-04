@@ -29,3 +29,16 @@ def test_per_worker_overrides_are_respected():
     assert t["datasets"][0]["num_samples"] == 1
     assert t["datasets"][0]["path"] == "/tmp/w3.jsonl"
     assert t["output_dir"] == "/tmp/out/w3"
+
+
+def test_budget_workflow_and_plan_params_are_configurable():
+    t = build_fau_smoke_template(
+        budget=12, workflow="hotpot_teacher_guided_b12_plan_review",
+        planning_steps=3, max_plan_steps=12,
+    )
+    mc = t["mode_config"]
+    assert mc["budget"] == 12
+    assert t["workflows"] == ["hotpot_teacher_guided_b12_plan_review"]
+    assert mc["plan_review"]["planning_steps"] == 3
+    assert mc["plan_review"]["max_initial_plan_steps"] == 12
+    assert mc["plan_review"]["max_revised_plan_steps"] == 12

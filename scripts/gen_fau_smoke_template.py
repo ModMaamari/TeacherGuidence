@@ -41,9 +41,13 @@ def build_fau_smoke_template(
     questions_path: str = f"{DATASET_DIR}/hotpot_distractor_validation_questions.jsonl",
     corpus_path: str = f"{DATASET_DIR}/hotpot_distractor_validation_corpus.jsonl",
     output_dir: str = "./data/simulation_output/fau_smoke/fau_smoke_gptoss",
+    budget: int = 5,
+    workflow: str = "hotpot_teacher_guided_b5_plan_review",
+    planning_steps: int = 1,
+    max_plan_steps: int = 6,
 ) -> dict:
     mode_config = {
-        "budget": 5,
+        "budget": budget,
         "student_model": student_model,
         "teacher_model": teacher_model,
         "corpus_path": corpus_path,
@@ -68,11 +72,11 @@ def build_fau_smoke_template(
         "plan_review": {
             "enabled": True,
             "planner": "student",
-            "planning_steps": 1,
+            "planning_steps": planning_steps,
             "formal_plan": False,
             "review_guidance_level": 3,
-            "max_initial_plan_steps": 6,
-            "max_revised_plan_steps": 6,
+            "max_initial_plan_steps": max_plan_steps,
+            "max_revised_plan_steps": max_plan_steps,
             "consume_budget": False,
             "include_revised_plan_in_student_context": True,
             "allow_teacher_to_suggest_tools": True,
@@ -83,13 +87,13 @@ def build_fau_smoke_template(
     }
     return {
         "id": template_id,
-        "name": f"FAU gpt-oss-120b teacher smoke ({student_model} student)",
+        "name": f"FAU gpt-oss-120b teacher ({student_model} student, b={budget})",
         "mode": "standard",
         "teacher_models": [
             {"name": "student", "model_id": student_model, "role": "teacher", "temperature": 0.2}
         ],
         "consultant_models": [],
-        "workflows": ["hotpot_teacher_guided_b5_plan_review"],
+        "workflows": [workflow],
         "datasets": [
             {
                 "name": "hotpot_questions",
