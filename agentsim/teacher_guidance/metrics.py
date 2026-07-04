@@ -220,6 +220,42 @@ def supporting_fact_recall(
     return covered / len(gold_facts)
 
 
+def answer_grounding(
+    final_answer: str,
+    evidence_text: str,
+    *,
+    supporting_doc_recall: float = 0.0,
+    has_extracted_facts: bool = False,
+    threshold: float = 0.5,
+) -> tuple:
+    """Is the final answer supported by evidence the student actually gathered, rather
+    than produced from parametric memory? Returns ``(score, grounded_bool)``.
+
+    For a lexical answer (entities/dates/phrases) the score is the fraction of the
+    answer's *content* tokens (fillers dropped) that appear in ``evidence_text`` (the
+    concatenation of the student's extracted spans and retrieved doc text). A grounded
+    answer is one the retrieved evidence could actually justify -- exactly the behavior
+    we want the fine-tuned student to learn, and a general signal (it keys on token
+    overlap with *whatever* was retrieved, never on the specific gold answer).
+
+    For a non-lexical answer with no substantive content tokens (yes/no and other short
+    verdicts, where token overlap is meaningless) grounding instead requires that the
+    evidence base was genuinely built -- the gold supporting docs were retrieved or at
+    least some facts were extracted -- so such traces are neither auto-passed nor unfairly
+    rejected.
+    """
+    norm = normalize_answer(final_answer)
+    content = [t for t in _content_tokens(norm.split()) if t not in _FILLER_TOKENS]
+    substantive = [t for t in content if len(t) > 1]
+    # Boolean/verdict answers ("yes"/"no") carry no lexical content to match against the
+    # evidence, so token overlap is meaningless -- fall back to the evidence base.
+    if substantive and norm not in {"yes", "no"}:
+        score = _token_coverage(substantive, normalize_answer(evidence_text).split())
+        return round(score, 4), score >= threshold
+    grounded = supporting_doc_recall >= 0.999 or has_extracted_facts
+    return (1.0 if grounded else 0.0), grounded
+
+
 def binary_from_continuous(score_continuous: float, threshold: float = 0.75) -> int:
     return 1 if score_continuous >= threshold else 0
 
@@ -264,14 +300,27 @@ def compute_final_metrics(
     gold_facts: List[Dict[str, Any]],
     corpus: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
+    doc_recall = supporting_doc_recall(set(retrieved_doc_ids), set(gold_doc_ids))
+
+    # Evidence the student actually gathered: its extracted spans plus the text of the
+    # docs it retrieved (never gold docs it failed to retrieve). Used only for grounding.
+    evidence_parts = [str(s.get("span", "") or "") for s in (extracted_spans or [])]
+    for did in retrieved_doc_ids:
+        doc = corpus.get(did, {}) or {}
+        evidence_parts.append(doc.get("text", "") or " ".join(doc.get("sentences", []) or []))
+    grounded_score, grounded = answer_grounding(
+        final_answer, " \n ".join(evidence_parts),
+        supporting_doc_recall=doc_recall, has_extracted_facts=bool(extracted_spans),
+    )
+
     return {
         "exact_match": exact_match(final_answer, gold_answer),
         "answer_correct": cover_match(final_answer, gold_answer),
         "f1": round(f1_score(final_answer, gold_answer), 4),
-        "supporting_doc_recall": round(
-            supporting_doc_recall(set(retrieved_doc_ids), set(gold_doc_ids)), 4
-        ),
+        "supporting_doc_recall": round(doc_recall, 4),
         "supporting_fact_recall": round(
             supporting_fact_recall(extracted_spans, gold_facts, corpus), 4
         ),
+        "answer_grounded": grounded,
+        "answer_grounded_score": grounded_score,
     }

@@ -7,6 +7,7 @@ from agentsim.teacher_guidance.metrics import (
     f1_score,
     supporting_doc_recall,
     supporting_fact_recall,
+    answer_grounding,
     binary_from_continuous,
     compute_final_metrics,
 )
@@ -156,6 +157,44 @@ def test_cover_match_short_common_word_still_must_lead():
     assert cover_match("There is no clear winner", "no") is False
 
 
+def test_answer_grounding_lexical_supported():
+    # The answer's content tokens appear in the retrieved evidence -> grounded.
+    score, grounded = answer_grounding(
+        "Kelly Osbourne", "Kelly Osbourne hosted the Young Hollywood Awards in 2014."
+    )
+    assert grounded is True
+    assert score == 1.0
+
+
+def test_answer_grounding_lexical_unsupported_is_rejected():
+    # An answer whose tokens are absent from the evidence looks parametric/hallucinated.
+    score, grounded = answer_grounding(
+        "Barack Obama", "The document discusses the Oberoi Group and its hotels."
+    )
+    assert grounded is False
+    assert score == 0.0
+
+
+def test_answer_grounding_partial_below_threshold():
+    # Only half the content tokens are supported -> below the 0.5-exclusive threshold?
+    # 1 of 2 tokens = 0.5 which meets the default threshold; 1 of 3 does not.
+    _, grounded_half = answer_grounding("New York", "We only found the word York here.")
+    assert grounded_half is True  # 1/2 = 0.5 >= 0.5
+    _, grounded_third = answer_grounding("New York City", "We only found the word York here.")
+    assert grounded_third is False  # 1/3 < 0.5
+
+
+def test_answer_grounding_yesno_uses_evidence_base():
+    # "yes" has no lexical content to match; grounding falls back to whether evidence
+    # was actually gathered.
+    _, grounded_ok = answer_grounding("yes", "irrelevant text", supporting_doc_recall=1.0)
+    assert grounded_ok is True
+    _, grounded_facts = answer_grounding("no", "irrelevant", has_extracted_facts=True)
+    assert grounded_facts is True
+    _, grounded_none = answer_grounding("yes", "irrelevant", supporting_doc_recall=0.0)
+    assert grounded_none is False
+
+
 def test_supporting_doc_recall():
     assert supporting_doc_recall({"d1", "d2"}, {"d1", "d3"}) == 0.5
     assert supporting_doc_recall(set(), {"d1"}) == 0.0
@@ -179,7 +218,7 @@ def test_binary_from_continuous():
 
 
 def test_compute_final_metrics():
-    corpus = {"d0": {"title": "T", "sentences": ["gold sentence"]}}
+    corpus = {"d0": {"title": "T", "sentences": ["gold sentence"], "text": "Delhi is the answer here"}}
     m = compute_final_metrics(
         final_answer="the Delhi",
         gold_answer="Delhi",
@@ -193,3 +232,22 @@ def test_compute_final_metrics():
     assert m["f1"] == 1.0
     assert m["supporting_doc_recall"] == 1.0
     assert m["supporting_fact_recall"] == 1.0
+    # "Delhi" appears in the retrieved doc text -> grounded.
+    assert m["answer_grounded"] is True
+    assert m["answer_grounded_score"] == 1.0
+
+
+def test_compute_final_metrics_flags_ungrounded_answer():
+    corpus = {"d0": {"title": "T", "text": "This document is about hotels in Mumbai."}}
+    m = compute_final_metrics(
+        final_answer="Delhi",
+        gold_answer="Delhi",
+        retrieved_doc_ids={"d0"},
+        gold_doc_ids={"d0"},
+        extracted_spans=[],
+        gold_facts=[],
+        corpus=corpus,
+    )
+    # Correct answer, but "Delhi" is nowhere in the retrieved evidence -> not grounded.
+    assert m["answer_correct"] is True
+    assert m["answer_grounded"] is False
