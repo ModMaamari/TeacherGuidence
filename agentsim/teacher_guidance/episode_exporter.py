@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from agentsim.teacher_guidance.metrics import compute_final_metrics
+from agentsim.teacher_guidance.optimality import compute_path_optimality
 
 
 def _append_jsonl(path: Path, row: Dict[str, Any]) -> None:
@@ -86,6 +87,32 @@ class TeacherGuidanceEpisodeExporter:
         if budget is None:
             budget = len(steps)
 
+        step_records = [
+            {
+                "t": s.get("t"),
+                "student_prompt": s.get("student_prompt", ""),
+                "student_raw": s.get("student_raw", ""),
+                "student_calls": s.get("student_calls"),
+                "student_call_ms": s.get("student_call_ms"),
+                "student_action": s.get("student_action"),
+                "tool_observation": s.get("tool_observation"),
+                "teacher_prompt": s.get("teacher_prompt", ""),
+                "teacher_raw": s.get("teacher_raw", ""),
+                "teacher_calls": s.get("teacher_calls"),
+                "teacher_call_ms": s.get("teacher_call_ms"),
+                "teacher_skipped": s.get("teacher_skipped", False),
+                "teacher_private_diagnosis": (s.get("teacher_full", {}) or {}).get("private_diagnosis", {}),
+                "student_visible_guidance": s.get("student_visible_guidance"),
+                "metrics": s.get("metrics"),
+                "leakage_check": s.get("leakage_check"),
+                "stop_condition": s.get("stop_condition", "CONTINUE"),
+                "step_started_at": s.get("step_started_at"),
+                "step_ended_at": s.get("step_ended_at"),
+                "step_elapsed_ms": s.get("step_elapsed_ms"),
+            }
+            for s in steps
+        ]
+
         return {
             "episode_id": f"{md.get('sample_id', context.task_id)}",
             "qid": gold.get("qid", md.get("retrieval_scope", {}).get("qid", context.task_id)),
@@ -99,33 +126,10 @@ class TeacherGuidanceEpisodeExporter:
             "student_model": md.get("student_model", ""),
             "teacher_model": md.get("teacher_model", ""),
             "plan_review": plan_review,
-            "steps": [
-                {
-                    "t": s.get("t"),
-                    "student_prompt": s.get("student_prompt", ""),
-                    "student_raw": s.get("student_raw", ""),
-                    "student_calls": s.get("student_calls"),
-                    "student_call_ms": s.get("student_call_ms"),
-                    "student_action": s.get("student_action"),
-                    "tool_observation": s.get("tool_observation"),
-                    "teacher_prompt": s.get("teacher_prompt", ""),
-                    "teacher_raw": s.get("teacher_raw", ""),
-                    "teacher_calls": s.get("teacher_calls"),
-                    "teacher_call_ms": s.get("teacher_call_ms"),
-                    "teacher_skipped": s.get("teacher_skipped", False),
-                    "teacher_private_diagnosis": (s.get("teacher_full", {}) or {}).get("private_diagnosis", {}),
-                    "student_visible_guidance": s.get("student_visible_guidance"),
-                    "metrics": s.get("metrics"),
-                    "leakage_check": s.get("leakage_check"),
-                    "stop_condition": s.get("stop_condition", "CONTINUE"),
-                    "step_started_at": s.get("step_started_at"),
-                    "step_ended_at": s.get("step_ended_at"),
-                    "step_elapsed_ms": s.get("step_elapsed_ms"),
-                }
-                for s in steps
-            ],
+            "steps": step_records,
             "final_answer": final_answer,
             "final_metrics": final_metrics,
+            "path_optimality": compute_path_optimality(step_records),
             "plan_adherence": md.get("plan_adherence"),
             "stop_reason": md.get("stop_reason", "error"),
         }
