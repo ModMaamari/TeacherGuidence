@@ -31,6 +31,18 @@ def test_per_worker_overrides_are_respected():
     assert t["output_dir"] == "/tmp/out/w3"
 
 
+def test_template_sets_cost_saving_teacher_router_by_default():
+    mc = build_fau_smoke_template()["mode_config"]
+    assert mc["teacher_router"] == [
+        "fau/gpt-oss-120b",
+        "custom/openai/gpt-oss-120b:free",
+        "custom/openai/gpt-oss-120b",
+    ]
+    # FAU (free) first, paid OpenRouter last.
+    assert mc["teacher_router"][0].startswith("fau/")
+    assert mc["teacher_router"][-1] == "custom/openai/gpt-oss-120b"
+
+
 def test_budget_workflow_and_plan_params_are_configurable():
     t = build_fau_smoke_template(
         budget=12, workflow="hotpot_teacher_guided_b12_plan_review",

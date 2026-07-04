@@ -31,6 +31,15 @@ TEACHER_MODEL = "fau/gpt-oss-120b"
 STUDENT_MODEL = "ollama/qwen3.5:4b"
 NUM_SAMPLES = 8
 
+# Cost-saving teacher router: try FAU (free academic) first, then OpenRouter's free
+# gpt-oss-120b, then the paid OpenRouter model as the reliable last resort. Each teacher
+# call falls through on rate limit.
+TEACHER_ROUTER = [
+    "fau/gpt-oss-120b",
+    "custom/openai/gpt-oss-120b:free",
+    "custom/openai/gpt-oss-120b",
+]
+
 
 def build_fau_smoke_template(
     *,
@@ -45,11 +54,13 @@ def build_fau_smoke_template(
     workflow: str = "hotpot_teacher_guided_b5_plan_review",
     planning_steps: int = 1,
     max_plan_steps: int = 6,
+    teacher_router: list = None,
 ) -> dict:
     mode_config = {
         "budget": budget,
         "student_model": student_model,
         "teacher_model": teacher_model,
+        "teacher_router": teacher_router if teacher_router is not None else list(TEACHER_ROUTER),
         "corpus_path": corpus_path,
         "retrieval_backend": "hotpot_local",
         "skip_teacher": False,
