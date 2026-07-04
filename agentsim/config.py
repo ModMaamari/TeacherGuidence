@@ -32,7 +32,15 @@ class Config:
     # Custom endpoints
     CUSTOM_LLM_ENDPOINT: Optional[str] = os.getenv("CUSTOM_LLM_ENDPOINT")
     CUSTOM_LLM_API_KEY: Optional[str] = os.getenv("CUSTOM_LLM_API_KEY")
-    
+
+    # NHR@FAU "LLMs as a Service" gateway (OpenAI-compatible). Distinct from the
+    # OpenRouter `custom` provider: its base URL already ends in /v1 (the client appends
+    # only /chat/completions), it needs no OpenRouter-specific usage extension, and it
+    # serves reasoning models (e.g. gpt-oss-120b). Key name mirrors the FAU docs'
+    # LLMAPI_KEY as a fallback so the same .env works. See docs at /root/DeKIS/hpc_fau.
+    FAU_LLM_ENDPOINT: str = os.getenv("FAU_LLM_ENDPOINT", "https://hub.nhr.fau.de/api/llmgw/v1")
+    FAU_LLM_API_KEY: Optional[str] = os.getenv("FAU_LLM_API_KEY") or os.getenv("LLMAPI_KEY")
+
     # Ollama
     OLLAMA_ENDPOINT: str = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
     OLLAMA_ENABLED: bool = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
@@ -95,11 +103,13 @@ class Config:
         """Detect provider from model ID"""
         model_lower = model_id.lower()
         
-        # Check for custom/ollama prefixes first
+        # Check for custom/ollama/fau prefixes first
         if model_id.startswith("custom/"):
             return "custom"
         elif model_id.startswith("ollama/"):
             return "ollama"
+        elif model_id.startswith("fau/"):
+            return "fau"
         elif any(x in model_lower for x in ["gpt", "openai", "o1", "davinci", "turbo"]):
             return "openai"
         elif any(x in model_lower for x in ["claude", "anthropic"]):
@@ -127,6 +137,7 @@ class Config:
             "cohere": cls.COHERE_API_KEY,
             "together": cls.TOGETHER_API_KEY,
             "custom": cls.CUSTOM_LLM_API_KEY,
+            "fau": cls.FAU_LLM_API_KEY,
             "ollama": None,  # Ollama doesn't require API key by default
         }
         return provider_keys.get(provider.lower())
@@ -152,6 +163,10 @@ class Config:
             "custom": {
                 "api_key": cls.CUSTOM_LLM_API_KEY,
                 "endpoint": cls.CUSTOM_LLM_ENDPOINT,
+            },
+            "fau": {
+                "api_key": cls.FAU_LLM_API_KEY,
+                "endpoint": cls.FAU_LLM_ENDPOINT,
             },
             "ollama": {
                 "endpoint": cls.OLLAMA_ENDPOINT,
