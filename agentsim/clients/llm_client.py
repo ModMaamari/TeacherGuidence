@@ -62,9 +62,9 @@ class LLMClient:
 
         provider = config.get_provider_from_model_id(model)
 
-        if return_raw and provider not in ("custom", "ollama"):
+        if return_raw and provider not in ("custom", "ollama", "fau"):
             raise ValueError(f"return_raw is not supported for provider '{provider}'")
-        if response_schema and provider not in ("custom", "ollama"):
+        if response_schema and provider not in ("custom", "ollama", "fau"):
             raise ValueError(f"response_schema is not supported for provider '{provider}'")
 
         if provider == "openai":
@@ -77,6 +77,10 @@ class LLMClient:
             result = await self._mistral_completion(prompt, model, temperature, max_tokens, return_usage)
         elif provider == "custom":
             result = await self._custom_completion(
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw, response_schema
+            )
+        elif provider == "fau":
+            result = await self._fau_completion(
                 prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw, response_schema
             )
         elif provider == "ollama":
@@ -286,6 +290,77 @@ class LLMClient:
                         "total_tokens": usage.get("total_tokens", 0),
                         "cost": usage.get("cost"),
                     }
+                }
+                if return_raw:
+                    result["raw_response"] = data
+                return result
+            return text
+
+    async def _fau_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
+        """NHR@FAU "LLMs as a Service" gateway completion (OpenAI-compatible).
+
+        Differs from ``_custom_completion`` (OpenRouter) in three ways:
+        * the configured base URL already ends in ``/v1``, so we append only
+          ``/chat/completions`` (not ``/v1/chat/completions``);
+        * it sends no OpenRouter-specific ``usage: {include: true}`` extension, and the
+          gateway returns no per-call USD cost (academic service), so ``usage.cost`` is
+          ``None``;
+        * ``response_schema`` is deliberately NOT turned into a ``response_format:
+          json_object`` request. The gateway's JSON mode empirically corrupts the
+          output of the reasoning model gpt-oss-120b (e.g. ``{"score": 0.{ ...``),
+          whereas leaving it off yields clean JSON. Our prompts already demand
+          "Return ONLY a JSON object" and the json_utils repair layer covers the rest,
+          so the schema is accepted for API symmetry but not forwarded.
+
+        gpt-oss-120b is a reasoning model: it emits chain-of-thought in
+        ``message.reasoning_content`` (which counts against ``max_tokens``) and puts the
+        final answer in ``message.content`` -- give it a generous ``max_tokens`` or the
+        answer is truncated. If the answer is truncated to empty, ``content`` may be
+        ``None``; we coerce to "" so the caller's parse/repair path handles it.
+        """
+        endpoint = config.FAU_LLM_ENDPOINT
+        api_key = config.FAU_LLM_API_KEY
+
+        if not endpoint:
+            raise ValueError("FAU_LLM_ENDPOINT not configured")
+        if not api_key:
+            raise ValueError("FAU_LLM_API_KEY not configured")
+
+        # Remove fau/ prefix
+        model_name = model.replace("fau/", "", 1)
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
+        }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{endpoint.rstrip('/')}/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+            text = data["choices"][0]["message"].get("content") or ""
+
+            if return_usage:
+                usage = data.get("usage", {})
+                result = {
+                    "text": text,
+                    "usage": {
+                        "prompt_tokens": usage.get("prompt_tokens", 0),
+                        "completion_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
+                        # Academic gateway: no per-call billing is returned.
+                        "cost": usage.get("cost"),
+                    },
                 }
                 if return_raw:
                     result["raw_response"] = data

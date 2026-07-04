@@ -164,3 +164,78 @@ def test_response_schema_unsupported_provider_raises():
         asyncio.run(
             LLMClient().get_completion(prompt="hi", model="gpt-4o", response_schema={"type": "object"})
         )
+
+
+# ---------------------------------------------------------------------------
+# NHR@FAU gateway (fau/ provider)
+# ---------------------------------------------------------------------------
+def _fau_env(monkeypatch):
+    monkeypatch.setattr(config, "FAU_LLM_ENDPOINT", "https://hub.nhr.fau.de/api/llmgw/v1")
+    monkeypatch.setattr(config, "FAU_LLM_API_KEY", "sk-fau")
+
+
+def test_fau_completion_posts_to_chat_completions_without_double_v1(monkeypatch):
+    _fau_env(monkeypatch)
+    body = {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+    url = mock_client.post.call_args.args[0]
+    assert url == "https://hub.nhr.fau.de/api/llmgw/v1/chat/completions"  # no double /v1
+    headers = mock_client.post.call_args.kwargs["headers"]
+    assert headers["Authorization"] == "Bearer sk-fau"
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert sent_json["model"] == "gpt-oss-120b"  # fau/ prefix stripped
+
+
+def test_fau_completion_never_sends_response_format_even_with_schema(monkeypatch):
+    # The gateway's json_object mode corrupts gpt-oss-120b output, so the schema must
+    # never be turned into a response_format request (unlike the custom provider).
+    _fau_env(monkeypatch)
+    body = {"choices": [{"message": {"content": "{}"}}], "usage": {}}
+    mock_client = _mock_async_client(_fake_response(body))
+    schema = {"type": "object", "properties": {"teacher_decision": {"enum": ["continue"]}}}
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        asyncio.run(
+            LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b", response_schema=schema)
+        )
+
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert "response_format" not in sent_json
+
+
+def test_fau_completion_return_raw_and_usage_without_cost(monkeypatch):
+    _fau_env(monkeypatch)
+    body = {
+        "id": "chatcmpl-xyz",
+        "choices": [{"message": {"content": "hello", "reasoning_content": "thinking"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+    }
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        result = asyncio.run(
+            LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b", return_raw=True)
+        )
+
+    assert result["text"] == "hello"
+    assert result["raw_response"] == body
+    assert result["usage"]["total_tokens"] == 30
+    assert result["usage"]["cost"] is None  # academic gateway, no billing
+
+
+def test_fau_completion_coerces_none_content_to_empty(monkeypatch):
+    # A reasoning model can truncate to empty content when its budget is exhausted.
+    _fau_env(monkeypatch)
+    body = {"choices": [{"message": {"content": None}}], "usage": {}}
+    mock_client = _mock_async_client(_fake_response(body))
+    with patch("httpx.AsyncClient", return_value=mock_client):
+        text = asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+    assert text == ""
+
+
+def test_fau_completion_missing_api_key_raises(monkeypatch):
+    monkeypatch.setattr(config, "FAU_LLM_ENDPOINT", "https://hub.nhr.fau.de/api/llmgw/v1")
+    monkeypatch.setattr(config, "FAU_LLM_API_KEY", None)
+    with pytest.raises(ValueError, match="FAU_LLM_API_KEY"):
+        asyncio.run(LLMClient().get_completion(prompt="hi", model="fau/gpt-oss-120b"))
