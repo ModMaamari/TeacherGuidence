@@ -77,6 +77,12 @@ class TeacherGuidanceEpisodeExporter:
             gold_facts=gold.get("supporting_facts", []) or [],
             corpus=corpus,
         )
+        # The teacher's own verdict on the final answer (it can see the gold answer),
+        # reported alongside the deterministic cover-match metric. Absent when there was
+        # no teacher (skip_teacher runs) or the teacher didn't return the fields.
+        judgment = md.get("teacher_final_judgment") or {}
+        final_metrics["teacher_answer_correct"] = judgment.get("correct")
+        final_metrics["teacher_answer_score"] = judgment.get("score")
 
         guidance = md.get("guidance", {}) or {}
         plan_review = md.get("plan_review", {"enabled": False})

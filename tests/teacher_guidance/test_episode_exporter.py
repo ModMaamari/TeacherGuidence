@@ -129,3 +129,17 @@ def test_final_metrics_computed_without_retriever(tmp_path):
     # EM should be true (final answer "Delhi" vs gold "Delhi"); doc recall 1.0
     assert episode["final_metrics"]["exact_match"] is True
     assert episode["final_metrics"]["supporting_doc_recall"] == 1.0
+
+
+def test_final_metrics_include_teacher_judgment_when_present(tmp_path):
+    ctx = _context()
+    ctx.metadata["teacher_final_judgment"] = {"correct": 1, "score": 0.9}
+    fm = TeacherGuidanceEpisodeExporter().export_episode(ctx, str(tmp_path))["final_metrics"]
+    assert fm["teacher_answer_correct"] == 1
+    assert fm["teacher_answer_score"] == 0.9
+
+
+def test_final_metrics_teacher_judgment_none_when_absent(tmp_path):
+    fm = TeacherGuidanceEpisodeExporter().export_episode(_context(), str(tmp_path))["final_metrics"]
+    assert fm["teacher_answer_correct"] is None
+    assert fm["teacher_answer_score"] is None

@@ -67,6 +67,8 @@ def _episode_summary(ep: Dict[str, Any]) -> Dict[str, Any]:
         "final_answer": ep.get("final_answer", ""),
         "exact_match": bool(fm.get("exact_match", False)),
         "answer_correct": _answer_correct(ep),
+        "teacher_answer_correct": fm.get("teacher_answer_correct"),
+        "teacher_answer_score": fm.get("teacher_answer_score"),
         "f1": float(fm.get("f1", 0.0) or 0.0),
         "supporting_doc_recall": float(fm.get("supporting_doc_recall", 0.0) or 0.0),
         "stop_reason": ep.get("stop_reason", ""),
