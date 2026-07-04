@@ -9,6 +9,7 @@ from agentsim.workflow.context import WorkflowContext
 from agentsim.components.control.teacher_guided_agent_step import (
     TeacherGuidedAgentStep,
     STUDENT_ACTION_SCHEMA,
+    STUDENT_FINISH_ACTION_SCHEMA,
     TEACHER_EVALUATION_SCHEMA,
 )
 from agentsim.teacher_guidance.guidance_policy import FALLBACK_FEEDBACK
@@ -332,6 +333,37 @@ def test_student_and_teacher_calls_request_constrained_output_schemas(tmp_path):
     # First call is the student action, second is the teacher evaluation.
     assert stub.schemas[0] == STUDENT_ACTION_SCHEMA
     assert stub.schemas[1] == TEACHER_EVALUATION_SCHEMA
+
+
+def test_force_finish_step_constrains_student_to_finish_only_schema(tmp_path):
+    # On the final (force_finish) step the student's generation must be constrained to
+    # the finish-only schema so the model commits an answer instead of searching again.
+    student = json.dumps({
+        "thought": "Based on the retrieved evidence the answer is Delhi.",
+        "action": {"tool": "finish", "params": {"answer": "Delhi", "citations": []}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.9, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "accept_finish",
+    })
+
+    class SchemaCapturingStub:
+        def __init__(self):
+            self.schemas = []
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
+            self.schemas.append(response_schema)
+            return teacher if "teacher evaluating" in prompt else student
+
+    ctx = _context(tmp_path)
+    stub = SchemaCapturingStub()
+    comp = TeacherGuidedAgentStep(
+        config={"step_index": 5, "budget": 5, "force_finish": True}, llm_client=stub
+    )
+    asyncio.run(comp.execute(ctx))
+
+    assert stub.schemas[0] == STUDENT_FINISH_ACTION_SCHEMA
+    assert ctx.metadata["final_answer"] == "Delhi"
 
 
 def test_teacher_sees_raw_text_when_student_totally_unparseable(tmp_path):

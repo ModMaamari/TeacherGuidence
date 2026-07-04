@@ -34,12 +34,19 @@ from agentsim.teacher_guidance.tool_executor import execute_student_tool
 from agentsim.teacher_guidance.guidance_policy import render_student_guidance
 from agentsim.teacher_guidance.metrics import compute_step_metrics
 from agentsim.teacher_guidance.llm_call_log import timed_completion
-from agentsim.teacher_guidance.pydantic_schemas import StudentActionGenerationModel, TeacherEvaluationModel
+from agentsim.teacher_guidance.pydantic_schemas import (
+    StudentActionGenerationModel,
+    StudentFinishActionGenerationModel,
+    TeacherEvaluationModel,
+)
 
 # StudentActionGenerationModel (not the lenient StudentActionModel used for post-hoc
 # validation) requires substantive 'thought' content -- see pydantic_schemas.py for why
 # an all-optional schema backfires under Ollama's grammar-constrained decoding.
 STUDENT_ACTION_SCHEMA = StudentActionGenerationModel.model_json_schema()
+# Finish-only schema used on the final force-finish step so the model commits a real
+# answer from its context instead of searching again (which yielded answer "unknown").
+STUDENT_FINISH_ACTION_SCHEMA = StudentFinishActionGenerationModel.model_json_schema()
 TEACHER_EVALUATION_SCHEMA = TeacherEvaluationModel.model_json_schema()
 
 
@@ -175,8 +182,11 @@ class TeacherGuidedAgentStep(ControlComponent):
         if plan_tracker is not None:
             state["expected_plan_step"] = plan_tracker.expected_step()
         student_prompt = build_student_prompt(state, guidance_config, force_finish)
+        # On the final step, constrain generation to a finish-only schema so the model
+        # commits an actual answer from its context rather than searching again.
+        action_schema = STUDENT_FINISH_ACTION_SCHEMA if force_finish else STUDENT_ACTION_SCHEMA
         student_action, student_raw, parse_info, repair_attempts, student_calls = await self._student_action_with_repair(
-            context, student_prompt, student_model, student_temp
+            context, student_prompt, student_model, student_temp, response_schema=action_schema
         )
 
         if force_finish and student_action.action.tool != "finish":
@@ -302,15 +312,23 @@ class TeacherGuidedAgentStep(ControlComponent):
             execution_time_ms=(time.time() - start) * 1000,
         )
 
-    async def _student_action_with_repair(self, context, student_prompt, student_model, student_temp):
+    async def _student_action_with_repair(
+        self, context, student_prompt, student_model, student_temp, response_schema=None
+    ):
         """Call the student; if the action is unparseable or has an invalid tool, re-ask
         it (up to student_max_repair_attempts) with a generic, gold-free correction note.
+
+        ``response_schema`` is the grammar-constraining JSON schema handed to Ollama;
+        defaults to the full all-tools STUDENT_ACTION_SCHEMA, but the final force-finish
+        step passes the finish-only schema so the model must commit an answer.
 
         Returns ``(student_action, final_raw, parse_info, repair_attempts, calls)``, where
         ``calls`` is a list with one call-log entry per HTTP request made (see
         ``llm_call_log.timed_completion``) -- including failed attempts, so a truncated
         first attempt's raw text/response isn't lost.
         """
+        if response_schema is None:
+            response_schema = STUDENT_ACTION_SCHEMA
         max_repairs = int(context.metadata.get("student_max_repair_attempts", 1))
         max_tokens = context.metadata.get("student_max_tokens", 1200)
         prompt = student_prompt
@@ -318,7 +336,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         calls = []
         call_entry, student_raw = await timed_completion(
             self.llm_client, prompt=prompt, model=student_model, temperature=student_temp,
-            max_tokens=max_tokens, attempt=1, response_schema=STUDENT_ACTION_SCHEMA,
+            max_tokens=max_tokens, attempt=1, response_schema=response_schema,
         )
         calls.append(call_entry)
         student_action, parse_info = parse_student_action(student_raw)
@@ -335,7 +353,7 @@ class TeacherGuidedAgentStep(ControlComponent):
             )
             call_entry, student_raw = await timed_completion(
                 self.llm_client, prompt=prompt + correction, model=student_model, temperature=student_temp,
-                max_tokens=max_tokens, attempt=attempts + 1, response_schema=STUDENT_ACTION_SCHEMA,
+                max_tokens=max_tokens, attempt=attempts + 1, response_schema=response_schema,
             )
             calls.append(call_entry)
             student_action, parse_info = parse_student_action(student_raw)
