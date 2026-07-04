@@ -96,6 +96,7 @@ def _visibility(context: WorkflowContext, retriever: HotpotLocalRetriever) -> Di
                     hidden_spans.append(sentences[sid])
     return {
         "gold_answer": gold.get("answer", ""),
+        "question": context.query or "",
         "gold_titles": gold.get("supporting_titles", []),
         "gold_doc_ids": gold.get("gold_doc_ids", []),
         "retrieved_titles": retrieved_titles,

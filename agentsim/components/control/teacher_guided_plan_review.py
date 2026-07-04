@@ -69,6 +69,7 @@ def _preflight_visibility(context: WorkflowContext) -> Dict[str, Any]:
     # Nothing retrieved yet, so all gold values are hidden.
     return {
         "gold_answer": gold.get("answer", ""),
+        "question": context.query or "",
         "gold_titles": gold.get("supporting_titles", []),
         "gold_doc_ids": gold.get("gold_doc_ids", []),
         "retrieved_titles": [],

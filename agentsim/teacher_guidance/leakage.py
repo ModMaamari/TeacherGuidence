@@ -52,8 +52,14 @@ def detect_leakage(
     hidden_titles: List[str],
     hidden_doc_ids: List[str],
     hidden_spans: List[str],
+    question: str = "",
 ) -> Dict[str, Any]:
-    """Return a leakage report for any string/dict/list payload."""
+    """Return a leakage report for any string/dict/list payload.
+
+    ``question`` (when supplied) suppresses a gold-answer "leak": if the answer already
+    appears in the question (a comparison/boolean question whose answer is one of the
+    entities the student was handed), the teacher echoing it reveals nothing new.
+    """
     combined = " \n ".join(_iter_strings(text_or_obj))
 
     matched: List[str] = []
@@ -66,7 +72,8 @@ def detect_leakage(
         "sanitizations_applied": [],
     }
 
-    if _contains(combined, gold_answer):
+    answer_in_question = _contains(question, gold_answer)
+    if _contains(combined, gold_answer) and not answer_in_question:
         report["gold_answer_leaked"] = True
         matched.append(gold_answer)
     for doc_id in hidden_doc_ids or []:
@@ -118,6 +125,7 @@ def sanitize_rendered_guidance(
     titles/doc-ids that are allowed to remain.
     """
     gold_answer = visibility.get("gold_answer", "") or ""
+    question = visibility.get("question", "") or ""
     retrieved_titles = {t.lower() for t in visibility.get("retrieved_titles", [])}
     retrieved_doc_ids = {d.lower() for d in visibility.get("retrieved_doc_ids", [])}
 
@@ -130,17 +138,21 @@ def sanitize_rendered_guidance(
     ]
     hidden_spans = visibility.get("hidden_spans", [])
 
-    report = detect_leakage(rendered, gold_answer, hidden_titles, hidden_doc_ids, hidden_spans)
+    report = detect_leakage(
+        rendered, gold_answer, hidden_titles, hidden_doc_ids, hidden_spans, question=question
+    )
 
     leak_policy = getattr(config, "leak_policy", "strict")
     if leak_policy != "strict":
         return rendered, report
 
-    # Only the gold answer is ever redacted. Titles, doc ids, and spans are still
-    # reported above for telemetry, but are considered fair game (question entities /
-    # already-retrieved docs) and left in place.
+    # Only the gold answer is ever redacted -- and not even that when it already appears
+    # in the question (the teacher echoing a question entity reveals nothing). Titles,
+    # doc ids, and spans are still reported above for telemetry, but are considered fair
+    # game (question entities / already-retrieved docs) and left in place.
+    answer_in_question = _contains(question, gold_answer)
     replacements: List[Tuple[str, str]] = []
-    if not getattr(config, "expose_gold_answer_hint", False) and gold_answer:
+    if not getattr(config, "expose_gold_answer_hint", False) and gold_answer and not answer_in_question:
         replacements.append((gold_answer, "[answer hidden]"))
 
     applied: List[str] = []

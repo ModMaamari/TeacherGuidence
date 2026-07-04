@@ -112,6 +112,50 @@ def test_word_boundary_does_not_mangle_substrings():
     assert clean["feedback"] == "I noted the cannot-do nothing knowledge."
 
 
+def test_gold_answer_in_question_is_not_leaked_or_redacted():
+    # Comparison question whose answer is one of the entities named in the question:
+    # the teacher echoing "Roger Federer" reveals nothing the student wasn't handed.
+    rendered = {"feedback": "You correctly focused on Roger Federer's career."}
+    visibility = {
+        "gold_answer": "Roger Federer",
+        "question": "Who won more Grand Slams, Roger Federer or Andy Murray?",
+        "gold_titles": [],
+        "gold_doc_ids": [],
+        "retrieved_titles": [],
+        "retrieved_doc_ids": [],
+        "hidden_spans": [],
+    }
+    clean, report = sanitize_rendered_guidance(rendered, visibility, _cfg())
+    assert report["gold_answer_leaked"] is False
+    assert "Roger Federer" in clean["feedback"]  # left intact
+    assert report["sanitizations_applied"] == []
+
+
+def test_gold_answer_not_in_question_is_still_redacted():
+    rendered = {"feedback": "The answer is Delhi."}
+    visibility = {
+        "gold_answer": "Delhi",
+        "question": "Where is the Oberoi Group headquartered?",
+        "gold_titles": [],
+        "gold_doc_ids": [],
+        "retrieved_titles": [],
+        "retrieved_doc_ids": [],
+        "hidden_spans": [],
+    }
+    clean, report = sanitize_rendered_guidance(rendered, visibility, _cfg())
+    assert report["gold_answer_leaked"] is True
+    assert "Delhi" not in clean["feedback"]
+    assert "[answer hidden]" in clean["feedback"]
+
+
+def test_detect_leakage_question_suppresses_answer_flag():
+    report = detect_leakage(
+        {"feedback": "It is clearly France."}, "France", [], [], [],
+        question="Which country is larger, France or Monaco?",
+    )
+    assert report["gold_answer_leaked"] is False
+
+
 def test_permissive_policy_does_not_sanitize():
     rendered = {"feedback": "The answer is Delhi."}
     visibility = {
