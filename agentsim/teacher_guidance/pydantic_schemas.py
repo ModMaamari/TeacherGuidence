@@ -187,6 +187,17 @@ class StudentActionGenerationModel(StudentActionModel):
     action: ToolCallUnion
 
 
+class StudentFinishActionGenerationModel(StudentActionModel):
+    """Finish-only variant used as Ollama's response_schema on the *final* (force-finish)
+    step. Grammar-constraining generation to a FinishCall (tool == "finish", non-empty
+    ``params.answer``) makes the model turn its retrieved context into an actual answer
+    instead of burning the last step on yet another search -- which previously left the
+    system fabricating a "Budget exhausted" finish with answer "unknown"."""
+
+    thought: str = Field(..., min_length=15)
+    action: FinishCall
+
+
 # ---------------------------------------------------------------------------
 # Student plan (preflight plan-review phase)
 # ---------------------------------------------------------------------------

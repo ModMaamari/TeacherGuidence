@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from agentsim.teacher_guidance.pydantic_schemas import (
     StudentActionModel,
     StudentActionGenerationModel,
+    StudentFinishActionGenerationModel,
     StudentPlanModel,
     StudentPlanGenerationModel,
     RevisedStudentPlanModel,
@@ -285,3 +286,43 @@ def test_generation_schema_includes_discriminated_action_union():
     assert set(action_schema["discriminator"]["mapping"].keys()) == {
         "decompose", "reformulate", "search", "extract", "verify", "synthesize", "finish",
     }
+
+
+# ---------------------------------------------------------------------------
+# Finish-only generation schema: used on the final force-finish step so the model
+# turns its context into a real answer instead of searching again (which left the
+# system fabricating answer "unknown"). See pydantic_schemas.py.
+# ---------------------------------------------------------------------------
+def test_finish_generation_schema_pins_tool_to_finish():
+    schema = StudentFinishActionGenerationModel.model_json_schema()
+    action_schema = schema["properties"]["action"]
+    # A single FinishCall $ref -- no discriminated union of other tools.
+    assert "discriminator" not in action_schema
+    assert action_schema["$ref"].endswith("/FinishCall")
+    finish_call = schema["$defs"]["FinishCall"]
+    assert finish_call["properties"]["tool"]["const"] == "finish"
+
+
+def test_finish_generation_model_rejects_non_finish_tool():
+    with pytest.raises(ValidationError):
+        StudentFinishActionGenerationModel.model_validate({
+            "thought": "I still want to search for more evidence before answering.",
+            "action": {"tool": "search", "params": {"query": "x"}},
+        })
+
+
+def test_finish_generation_model_requires_non_empty_answer():
+    with pytest.raises(ValidationError):
+        StudentFinishActionGenerationModel.model_validate({
+            "thought": "I am ready to give my final answer to the question now.",
+            "action": {"tool": "finish", "params": {"answer": ""}},
+        })
+
+
+def test_finish_generation_model_accepts_real_answer():
+    m = StudentFinishActionGenerationModel.model_validate({
+        "thought": "Based on the retrieved documents the answer is clearly Broadcasting House.",
+        "action": {"tool": "finish", "params": {"answer": "Broadcasting House in London", "citations": []}},
+    })
+    assert m.action.tool == "finish"
+    assert m.action.params.answer == "Broadcasting House in London"
