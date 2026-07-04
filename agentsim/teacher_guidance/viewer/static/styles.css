@@ -221,3 +221,28 @@ body:not(.hide-private) .when-hidden { display: none; }
   .sidebar { position: static; height: auto; max-height: 320px; }
   .answers, .plan-grid { grid-template-columns: 1fr; }
 }
+
+/* Floating jump-to-top / jump-to-bottom navigation */
+.jump-nav {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+.jump-btn {
+  min-width: 84px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.jump-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }

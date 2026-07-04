@@ -108,6 +108,10 @@ async function init() {
   });
   document.getElementById("run-select").addEventListener("change", (e) => loadRun(e.target.value));
   document.getElementById("episode-search").addEventListener("input", (e) => renderEpisodeList(e.target.value));
+  document.getElementById("jump-top").addEventListener("click", () =>
+    window.scrollTo({ top: 0, behavior: "smooth" }));
+  document.getElementById("jump-bottom").addEventListener("click", () =>
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" }));
 
   try {
     state.runs = await getJSON("/api/runs");
