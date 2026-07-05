@@ -83,40 +83,38 @@ def test_custom_completion_requests_openrouter_usage_include(monkeypatch):
     assert sent_json["usage"] == {"include": True}
 
 
-def test_ollama_completion_return_raw_includes_full_body(monkeypatch):
+def test_ollama_completion_uses_chat_endpoint_and_messages(monkeypatch):
+    # Must post to /api/chat with a messages array (so the model's chat template is
+    # applied) -- /api/generate feeds a raw prompt and breaks ChatML models like MiniCPM5.
     monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
-    body = {"response": "hello", "done_reason": "stop", "eval_count": 12, "eval_duration": 456}
+    body = {"message": {"role": "assistant", "content": "hello"}, "done_reason": "stop"}
     mock_client = _mock_async_client(_fake_response(body))
     with patch("httpx.AsyncClient", return_value=mock_client):
         result = asyncio.run(
             LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b", return_raw=True)
         )
 
+    assert mock_client.post.call_args.args[0].endswith("/api/chat")
+    sent_json = mock_client.post.call_args.kwargs["json"]
+    assert sent_json["messages"] == [{"role": "user", "content": "hi"}]
+    assert "prompt" not in sent_json
     assert result["text"] == "hello"
     assert result["raw_response"] == body
 
 
-def test_ollama_completion_return_raw_strips_context_token_ids(monkeypatch):
-    # 'context' is a raw undecoded token-ID list -- confusing and useless in the raw
-    # response viewer since Ollama has no detokenize endpoint. It should be dropped
-    # and replaced with a plain length, leaving everything else untouched.
+def test_ollama_completion_coerces_missing_content_to_empty(monkeypatch):
+    # A truncated thinking turn can leave message.content null.
     monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
-    body = {"response": "hello", "done_reason": "stop", "context": [1, 2, 3, 4, 5]}
+    body = {"message": {"role": "assistant", "content": None}}
     mock_client = _mock_async_client(_fake_response(body))
     with patch("httpx.AsyncClient", return_value=mock_client):
-        result = asyncio.run(
-            LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b", return_raw=True)
-        )
-
-    assert "context" not in result["raw_response"]
-    assert result["raw_response"]["context_length"] == 5
-    assert result["raw_response"]["response"] == "hello"
-    assert result["raw_response"]["done_reason"] == "stop"
+        text = asyncio.run(LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b"))
+    assert text == ""
 
 
 def test_get_completion_without_return_raw_still_returns_plain_string(monkeypatch):
     monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
-    body = {"response": "hello"}
+    body = {"message": {"content": "hello"}}
     mock_client = _mock_async_client(_fake_response(body))
     with patch("httpx.AsyncClient", return_value=mock_client):
         result = asyncio.run(LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b"))
@@ -133,7 +131,7 @@ def test_return_raw_unsupported_provider_raises():
 
 def test_ollama_completion_sends_response_schema_as_format(monkeypatch):
     monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
-    body = {"response": '{"tool": "search"}'}
+    body = {"message": {"content": '{"tool": "search"}'}}
     mock_client = _mock_async_client(_fake_response(body))
     schema = {"type": "object", "properties": {"tool": {"enum": ["search", "finish"]}}}
     with patch("httpx.AsyncClient", return_value=mock_client):
@@ -147,7 +145,7 @@ def test_ollama_completion_sends_response_schema_as_format(monkeypatch):
 
 def test_ollama_completion_omits_format_when_no_schema_given(monkeypatch):
     monkeypatch.setattr(config, "OLLAMA_ENDPOINT", "http://example.invalid")
-    body = {"response": "hello"}
+    body = {"message": {"content": "hello"}}
     mock_client = _mock_async_client(_fake_response(body))
     with patch("httpx.AsyncClient", return_value=mock_client):
         asyncio.run(LLMClient().get_completion(prompt="hi", model="ollama/qwen3.5:0.8b"))

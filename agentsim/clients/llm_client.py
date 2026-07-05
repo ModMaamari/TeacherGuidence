@@ -451,9 +451,16 @@ class LLMClient:
         # Remove ollama/ prefix
         model_name = model.replace("ollama/", "")
 
+        # Use /api/chat (not /api/generate) so Ollama applies the model's chat template.
+        # /api/generate feeds the raw prompt unwrapped, which produces coherent output
+        # only for models whose Modelfile template happens to no-op; a ChatML/instruct
+        # model such as MiniCPM5 (pulled from hf.co) then sees an unformatted prompt and
+        # emits pure gibberish. /api/chat wraps the message in the model's template, so it
+        # works across models (verified: MiniCPM5-1B produced garbage via /api/generate
+        # but coherent task output via /api/chat, with qwen unaffected).
         payload = {
             "model": model_name,
-            "prompt": prompt,
+            "messages": [{"role": "user", "content": prompt}],
             "stream": False,
             # Disable hybrid "thinking" mode (e.g. Qwen3): this framework asks
             # for JSON-only outputs, so reasoning preambles waste tokens and can
@@ -472,15 +479,16 @@ class LLMClient:
 
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             response = await client.post(
-                f"{endpoint.rstrip('/')}/api/generate",
+                f"{endpoint.rstrip('/')}/api/chat",
                 json=payload,
             )
             response.raise_for_status()
             data = response.json()
-            text = data["response"]
+            # A truncated 'thinking' turn can leave content empty -> coerce to "".
+            text = (data.get("message") or {}).get("content") or ""
 
             if return_usage:
-                # Ollama doesn't provide token counts in standard API, return 0
+                # Ollama doesn't provide OpenAI-style token counts; report 0s.
                 result = {
                     "text": text,
                     "usage": {
@@ -490,17 +498,7 @@ class LLMClient:
                     }
                 }
                 if return_raw:
-                    # 'context' is Ollama's raw re-tokenized conversation state (only
-                    # useful if fed back into a follow-up call for continuation, which
-                    # this project never does): a list of hundreds/thousands of token
-                    # IDs that can't be decoded back to text without loading each
-                    # model's own tokenizer. Drop it and keep a count instead -- the
-                    # decoded text is already in 'response' just above it.
-                    raw_response = dict(data)
-                    context = raw_response.pop("context", None)
-                    if context is not None:
-                        raw_response["context_length"] = len(context)
-                    result["raw_response"] = raw_response
+                    result["raw_response"] = data
                 return result
             return text
 
