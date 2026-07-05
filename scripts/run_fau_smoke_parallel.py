@@ -150,6 +150,9 @@ def main() -> None:
     ap.add_argument("--student-use-schema", action="store_true",
                     help="opt into grammar-constrained decoding for student calls (default is "
                          "OFF -- universal, since it collapses some models e.g. MiniCPM5)")
+    ap.add_argument("--hidden-budget", action="store_true",
+                    help="do not disclose the step budget to the student (efficient-plan / "
+                         "answer-ASAP mode; budget revealed only on the forced last step)")
     ap.add_argument("--out-root", default="data/simulation_output/fau_run")
     ap.add_argument("--run-name", default="run", help="consolidated run dir name under out-root")
     ap.add_argument("--no-consolidate", action="store_true",
@@ -189,6 +192,7 @@ def main() -> None:
                 output_dir=w["output_dir"], budget=args.budget, workflow=args.workflow,
                 planning_steps=args.planning_steps, max_plan_steps=args.max_plan_steps,
                 student_use_response_schema=args.student_use_schema,
+                disclose_budget=not args.hidden_budget,
             )
             tpath = TEMPLATES_DIR / f"{w['template_id']}.yaml"
             tpath.write_text(yaml.dump(template, sort_keys=False), encoding="utf-8")

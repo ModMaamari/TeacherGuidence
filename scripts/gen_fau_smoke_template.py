@@ -56,6 +56,7 @@ def build_fau_smoke_template(
     max_plan_steps: int = 6,
     teacher_router: list = None,
     student_use_response_schema: bool = False,
+    disclose_budget: bool = True,
 ) -> dict:
     mode_config = {
         "budget": budget,
@@ -63,6 +64,7 @@ def build_fau_smoke_template(
         "teacher_model": teacher_model,
         "teacher_router": teacher_router if teacher_router is not None else list(TEACHER_ROUTER),
         "student_use_response_schema": student_use_response_schema,
+        "disclose_budget": disclose_budget,
         "corpus_path": corpus_path,
         "retrieval_backend": "hotpot_local",
         "skip_teacher": False,
