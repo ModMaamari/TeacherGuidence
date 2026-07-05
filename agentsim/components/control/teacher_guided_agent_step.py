@@ -222,12 +222,17 @@ class TeacherGuidedAgentStep(ControlComponent):
         student_prompt = build_student_prompt(state, guidance_config, force_finish)
         # On the final step, constrain generation to a finish-only schema so the model
         # commits an actual answer from its context rather than searching again.
-        # student_use_response_schema=False disables grammar-constrained decoding for the
-        # student entirely: some models (observed: MiniCPM5-1B) collapse to degenerate
-        # shortest-path actions under llama.cpp grammar constraints while producing valid,
+        # student_use_response_schema=False disables the all-tools grammar for normal
+        # steps: some models (observed: MiniCPM5-1B) collapse to degenerate shortest-path
+        # actions under the big discriminated-union grammar while producing valid,
         # sensible JSON unconstrained -- the prompt + parse/repair path handles the rest.
-        if context.metadata.get("student_use_response_schema", True):
-            action_schema = STUDENT_FINISH_ACTION_SCHEMA if force_finish else STUDENT_ACTION_SCHEMA
+        # The force-finish step KEEPS the small finish-only schema either way: without it
+        # the final step can come back malformed/non-finish and degrade to answer
+        # "unknown", and the tiny finish grammar doesn't trigger the collapse.
+        if force_finish:
+            action_schema = STUDENT_FINISH_ACTION_SCHEMA
+        elif context.metadata.get("student_use_response_schema", True):
+            action_schema = STUDENT_ACTION_SCHEMA
         else:
             action_schema = None
         student_action, student_raw, parse_info, repair_attempts, student_calls = await self._student_action_with_repair(

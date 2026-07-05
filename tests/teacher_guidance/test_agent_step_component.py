@@ -490,3 +490,33 @@ def test_student_schema_disabled_by_metadata_flag(tmp_path):
 
     assert stub.schemas[0] is None  # student unconstrained
     assert stub.schemas[1] == TEACHER_EVALUATION_SCHEMA  # teacher unchanged
+
+
+def test_force_finish_keeps_finish_schema_even_when_student_schema_disabled(tmp_path):
+    student = json.dumps({
+        "thought": "Committing my final answer based on the retrieved evidence now.",
+        "action": {"tool": "finish", "params": {"answer": "Delhi", "citations": []}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.9, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "accept_finish",
+    })
+
+    class SchemaCapturingStub:
+        def __init__(self):
+            self.schemas = []
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
+            self.schemas.append(response_schema)
+            return teacher if "teacher evaluating" in prompt else student
+
+    ctx = _context(tmp_path)
+    ctx.metadata["student_use_response_schema"] = False
+    stub = SchemaCapturingStub()
+    comp = TeacherGuidedAgentStep(
+        config={"step_index": 5, "budget": 5, "force_finish": True}, llm_client=stub
+    )
+    asyncio.run(comp.execute(ctx))
+
+    # The final commit step stays grammar-constrained to finish-only.
+    assert stub.schemas[0] == STUDENT_FINISH_ACTION_SCHEMA
