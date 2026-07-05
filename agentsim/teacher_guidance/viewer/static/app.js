@@ -94,6 +94,7 @@ const TIP = {
   stop_reason: "Why the episode ended — teacher_accept (teacher accepted a finish) or budget_forced_finish (ran out of budget).",
   student: "Student model: solves the task with tools and never sees the gold answer.",
   teacher: "Teacher model: sees gold metadata and scores each step; how much it can tell the student is gated by the guidance level.",
+  teacher_source: "Which provider actually served each teacher call, as a percentage — FAU (free), OpenRouter free, OpenRouter paid — reflecting the cost router's fallthrough.",
   plan_review: "Plan review: before acting, the student drafts a plan, the teacher reviews it, and the student revises it (revision is skipped if the teacher accepts the plan).",
   leakage: "Leakage guard: detects and sanitizes any gold answer / title / doc-id that the teacher's student-visible feedback tried to reveal.",
   step_tool: "The tool the student invoked this step (search, extract, verify, synthesize, decompose, reformulate, finish).",
@@ -102,10 +103,14 @@ const TIP = {
 
 // ---------- runs ----------
 async function init() {
-  document.getElementById("private-toggle").addEventListener("change", (e) => {
+  // Default shows teacher-private (checkbox is checked in the HTML); reflect it now.
+  const priv = document.getElementById("private-toggle");
+  document.body.classList.toggle("hide-private", !priv.checked);
+  priv.addEventListener("change", (e) => {
     document.body.classList.toggle("hide-private", !e.target.checked);
     if (state.currentQid) loadEpisode(state.currentQid); // re-render gold gating
   });
+  document.getElementById("back-to-runs").addEventListener("click", showRunsView);
   document.getElementById("run-select").addEventListener("change", (e) => loadRun(e.target.value));
   document.getElementById("episode-search").addEventListener("input", (e) => renderEpisodeList(e.target.value));
   document.getElementById("jump-top").addEventListener("click", () =>
@@ -127,17 +132,69 @@ async function init() {
   }
   sel.innerHTML = state.runs.map((r) =>
     `<option value="${esc(r.run_id)}">${esc(r.run_id)} (${r.num_episodes})</option>`).join("");
-  loadRun(state.runs[0].run_id);
+  renderRunsTable();
+  showRunsView();
+}
+
+function fmtDate(mtime) {
+  if (!mtime) return "—";
+  const d = new Date(mtime * 1000);
+  return d.toISOString().slice(0, 16).replace("T", " ");
+}
+function sourcePctStr(pct) {
+  const e = Object.entries(pct || {});
+  if (!e.length) return "—";
+  return e.map(([k, v]) => `${esc(k)} ${v}%`).join(" · ");
+}
+
+function renderRunsTable() {
+  const meanCorrect = (r) => r.mean_correct != null ? r.mean_correct : r.mean_exact_match;
+  const head = `<thead><tr>
+    <th>Run</th><th>Date</th><th title="${esc(TIP.episodes)}">Episodes</th>
+    <th title="${esc(TIP.correct)}">Correct</th><th title="${esc(TIP.f1)}">F1</th>
+    <th title="${esc(TIP.doc_recall)}">Doc recall</th><th>Student</th>
+    <th title="${esc(TIP.teacher_source)}">Teacher source</th></tr></thead>`;
+  const rows = state.runs.map((r) => `<tr class="run-row" data-run="${esc(r.run_id)}">
+    <td class="run-id">${esc(r.run_id)}</td>
+    <td class="nowrap muted">${esc(fmtDate(r.mtime))}</td>
+    <td>${r.num_episodes}</td>
+    <td><b>${pct(meanCorrect(r))}</b></td>
+    <td>${num(r.mean_f1)}</td>
+    <td>${pct(r.mean_doc_recall)}</td>
+    <td><code>${esc(cleanModel(r.student_model))}</code></td>
+    <td class="src">${sourcePctStr(r.teacher_source_pct)}</td>
+  </tr>`).join("");
+  const table = document.getElementById("runs-table");
+  table.innerHTML = head + `<tbody>${rows}</tbody>`;
+  table.querySelectorAll(".run-row").forEach((tr) =>
+    tr.addEventListener("click", () => loadRun(tr.dataset.run)));
+}
+
+function showRunsView() {
+  document.getElementById("runs-view").hidden = false;
+  document.getElementById("run-view").hidden = true;
+  document.getElementById("run-stats").hidden = true;
+  document.getElementById("back-to-runs").hidden = true;
+  document.querySelector(".run-picker").hidden = true;
+  document.title = "Runs — Trajectory Explorer";
 }
 
 async function loadRun(runId) {
   state.currentRun = state.runs.find((r) => r.run_id === runId) || null;
+  document.getElementById("runs-view").hidden = true;
+  document.getElementById("run-view").hidden = false;
+  document.getElementById("run-stats").hidden = false;
+  document.getElementById("back-to-runs").hidden = false;
+  const picker = document.querySelector(".run-picker");
+  picker.hidden = false;
+  document.getElementById("run-select").value = runId;
   renderRunStats(state.currentRun);
   state.episodes = await getJSON("/api/episodes?run=" + encodeURIComponent(runId));
   state.currentQid = null;
   renderEpisodeList("");
   document.getElementById("detail").innerHTML =
     `<div class="empty-state"><h2>${state.episodes.length} episodes</h2><p>Select a question on the left.</p></div>`;
+  window.scrollTo({ top: 0 });
 }
 
 function renderRunStats(run) {

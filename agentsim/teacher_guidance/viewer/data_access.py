@@ -78,11 +78,60 @@ def _episode_summary(ep: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _teacher_source(model: str) -> str:
+    """Classify a per-call teacher model id into a coarse provider/source bucket."""
+    m = (model or "").lower()
+    if m.startswith("fau/"):
+        return "FAU"
+    if m.startswith("custom/") or "openrouter" in m:
+        return "OpenRouter free" if m.endswith(":free") else "OpenRouter paid"
+    if not m:
+        return "unknown"
+    return model
+
+
+def _iter_teacher_call_models(ep: Dict[str, Any]):
+    pr = ep.get("plan_review") or {}
+    for call in (pr.get("plan_calls") or []):
+        yield call.get("model")
+    for rnd in (pr.get("rounds") or []):
+        for call in (rnd.get("review_calls") or []):
+            yield call.get("model")
+    for step in (ep.get("steps") or []):
+        for call in (step.get("teacher_calls") or []):
+            yield call.get("model")
+
+
+# Cache find_runs by a cheap stat-signature of every episode file, so repeat /api/runs
+# calls don't re-read and re-parse every episode (the source of the explorer's slow load).
+_RUNS_CACHE: Dict[str, Any] = {}
+
+
+def _runs_signature(output_root: Path) -> tuple:
+    sig = []
+    for f in output_root.rglob(EPISODE_FILENAME):
+        try:
+            st = f.stat()
+            sig.append((str(f), st.st_mtime_ns, st.st_size))
+        except OSError:
+            continue
+    sig.sort()
+    return tuple(sig)
+
+
 def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
-    """Group all episode files by run and return one summary per run."""
+    """Group all episode files by run and return one summary per run, newest first.
+
+    Cached on a stat-signature of the episode files so repeated calls are fast.
+    """
     output_root = Path(output_root)
     if not output_root.exists():
         return []
+
+    signature = _runs_signature(output_root)
+    cached = _RUNS_CACHE.get(str(output_root))
+    if cached is not None and cached[0] == signature:
+        return cached[1]
 
     runs: Dict[str, Dict[str, Any]] = {}
     for episode_file in output_root.rglob(EPISODE_FILENAME):
@@ -91,9 +140,13 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
         episodes = _read_jsonl(episode_file)
         bucket = runs.setdefault(
             run_id,
-            {"run_id": run_id, "label": run_id, "episodes": []},
+            {"run_id": run_id, "label": run_id, "episodes": [], "mtime": 0.0},
         )
         bucket["episodes"].extend(episodes)
+        try:
+            bucket["mtime"] = max(bucket["mtime"], episode_file.stat().st_mtime)
+        except OSError:
+            pass
 
     result: List[Dict[str, Any]] = []
     for run_id, bucket in runs.items():
@@ -105,15 +158,25 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
         f1 = [float((e.get("final_metrics", {}) or {}).get("f1", 0.0) or 0.0) for e in episodes]
         doc = [float((e.get("final_metrics", {}) or {}).get("supporting_doc_recall", 0.0) or 0.0) for e in episodes]
         stop_reasons: Dict[str, int] = {}
+        source_counts: Dict[str, int] = {}
         for e in episodes:
             sr = e.get("stop_reason", "?")
             stop_reasons[sr] = stop_reasons.get(sr, 0) + 1
+            for model in _iter_teacher_call_models(e):
+                src = _teacher_source(model)
+                source_counts[src] = source_counts.get(src, 0) + 1
+        total_calls = sum(source_counts.values()) or 1
+        teacher_source_pct = {
+            k: round(100.0 * v / total_calls, 1)
+            for k, v in sorted(source_counts.items(), key=lambda kv: -kv[1])
+        }
         first = episodes[0]
         result.append(
             {
                 "run_id": run_id,
                 "label": run_id,
                 "num_episodes": len(episodes),
+                "mtime": bucket["mtime"],
                 "guidance_level": first.get("guidance_level"),
                 "student_model": first.get("student_model", ""),
                 "teacher_model": first.get("teacher_model", ""),
@@ -122,9 +185,13 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
                 "mean_f1": _mean(f1),
                 "mean_doc_recall": _mean(doc),
                 "stop_reasons": stop_reasons,
+                "teacher_calls": sum(source_counts.values()),
+                "teacher_source_pct": teacher_source_pct,
             }
         )
-    result.sort(key=lambda r: r["run_id"])
+    # Newest run first (by most-recent episode file mtime).
+    result.sort(key=lambda r: r["mtime"], reverse=True)
+    _RUNS_CACHE[str(output_root)] = (signature, result)
     return result
 
 

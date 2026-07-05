@@ -6,9 +6,10 @@
   <title>Teacher Guidance — Trajectory Explorer</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-<body class="hide-private">
+<body>
   <header class="topbar">
     <div class="brand">
+      <button id="back-to-runs" class="back-btn" type="button" title="Back to all runs" hidden>← Runs</button>
       <div class="brand-mark">TG</div>
       <div class="brand-text">
         <h1>Trajectory Explorer</h1>
@@ -17,20 +18,28 @@
     </div>
 
     <div class="topbar-controls">
-      <label class="field">
+      <label class="field run-picker" hidden>
         <span>Run</span>
         <select id="run-select"></select>
       </label>
       <label class="toggle">
-        <input type="checkbox" id="private-toggle" />
+        <input type="checkbox" id="private-toggle" checked />
         <span>Show teacher-private</span>
       </label>
     </div>
   </header>
 
-  <div id="run-stats" class="run-stats"></div>
+  <!-- Main page: table of runs -->
+  <section id="runs-view" class="runs-view">
+    <h2 class="runs-title">Runs</h2>
+    <div class="table-scroll">
+      <table id="runs-table" class="runs-table"></table>
+    </div>
+  </section>
 
-  <main class="layout">
+  <div id="run-stats" class="run-stats" hidden></div>
+
+  <main class="layout" id="run-view" hidden>
     <aside class="sidebar">
       <div class="sidebar-head">
         <input type="search" id="episode-search" placeholder="Filter questions…" />
