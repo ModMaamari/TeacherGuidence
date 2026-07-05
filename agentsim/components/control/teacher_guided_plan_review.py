@@ -134,11 +134,10 @@ class TeacherGuidedPlanReview(ControlComponent):
                 teacher_model, teacher_temp, start, plan_review_started_at,
             )
 
-        # Universal default: grammar-constrained decoding is OFF for student plan calls
-        # (some models collapse under llama.cpp grammar constraints -- see
-        # teacher_guided_agent_step.execute); the parse/repair path covers them. Set the
-        # flag True to force the old constrained behavior.
-        use_student_schema = context.metadata.get("student_use_response_schema", False)
+        # student_use_response_schema=False disables grammar-constrained decoding for
+        # student calls (some models collapse under llama.cpp grammar constraints --
+        # see teacher_guided_agent_step.execute); the parse/repair path covers them.
+        use_student_schema = context.metadata.get("student_use_response_schema", True)
 
         # 1. Initial plan (student).
         initial_prompt = build_initial_plan_prompt(state, config)

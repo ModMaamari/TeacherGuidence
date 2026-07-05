@@ -415,38 +415,11 @@ def test_plan_review_calls_request_constrained_output_schemas():
             return initial
 
     ctx = _context({"enabled": True, "review_guidance_level": 3, "planning_steps": 3})
-    ctx.metadata["student_use_response_schema"] = True  # opt into constrained decoding
     stub = SchemaCapturingStub()
     comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
     asyncio.run(comp.execute(ctx))
 
     schemas_by_kind = dict(stub.calls)
-    # Student plan/revision constrained only when the flag is on; teacher always constrained.
     assert schemas_by_kind["initial"] == STUDENT_PLAN_SCHEMA
     assert schemas_by_kind["review"] == TEACHER_PLAN_REVIEW_SCHEMA
     assert schemas_by_kind["revision"] == REVISED_STUDENT_PLAN_SCHEMA
-
-
-def test_plan_review_student_unconstrained_by_default():
-    initial = json.dumps({"plan_summary": "p", "steps": [{"step_id": 1, "goal": "g",
-              "intended_tool": "search", "rationale": "x", "depends_on": []}],
-              "uncertainties": [], "stop_condition": "done"})
-    accept = json.dumps({"plan_review_enabled": True, "review_guidance_level": 3,
-             "student_visible": {"score_continuous": 1.0, "feedback": "good"},
-             "private_diagnosis": {}, "teacher_decision": "accept_plan"})
-
-    class SchemaCapturingStub:
-        def __init__(self):
-            self.calls = []
-
-        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
-            if "teacher reviewing" in prompt:
-                self.calls.append(("review", response_schema)); return accept
-            self.calls.append(("initial", response_schema)); return initial
-
-    stub = SchemaCapturingStub()
-    comp = TeacherGuidedPlanReview(config={}, llm_client=stub)
-    asyncio.run(comp.execute(_context({"enabled": True, "review_guidance_level": 3, "planning_steps": 1})))
-    by_kind = dict(stub.calls)
-    assert by_kind["initial"] is None                       # student plan unconstrained
-    assert by_kind["review"] == TEACHER_PLAN_REVIEW_SCHEMA   # teacher unchanged

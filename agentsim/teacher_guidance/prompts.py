@@ -27,24 +27,14 @@ _TOOL_REFERENCE = """Available tools (action.tool) and their params:
 - synthesize: {}
 - finish: {"answer": "...", "citations": [{"doc_id": "...", "span": "..."}]}"""
 
-_STUDENT_ACTION_SCHEMA = """Output EXACTLY ONE JSON object and nothing else — no prose, no
-markdown, no code fences before or after it. Shape:
+_STUDENT_ACTION_SCHEMA = """Return ONLY a JSON object with this shape (no prose outside JSON):
 {
-  "thought": "one or two sentences of concrete reasoning about your single best next step",
+  "thought": "brief private reasoning",
   "decision": {"category": "need_decomposition|need_retrieval|need_reformulation|sufficient_evidence|synthesize|verify|finish",
                "parametric_knowledge_used": false},
   "action": {"tool": "decompose|reformulate|search|extract|verify|synthesize|finish", "params": {}},
   "new_facts_extracted": [{"doc_id": "...", "span": "verbatim span", "fact": "grounded fact"}]
-}
-Rules:
-- Choose the SINGLE most useful next tool; do not default to "synthesize" — only synthesize
-  after you have extracted the facts you need.
-- Fill "action.params" with the exact keys that tool needs (see the tool list above); never
-  leave a tool's required params empty.
-- Prefer this progression when evidence is missing: search -> extract the specific
-  supporting sentences -> (verify if needed) -> finish. Follow the teacher's guidance.
-- As soon as you have enough evidence to answer, use "finish" with a concise, well-grounded
-  "answer" — do not keep searching once you can answer."""
+}"""
 
 # A single neutral example, included only to reinforce the JSON FORMAT. Its content is
 # generic and unrelated to any dataset question, so it cannot leak gold information.
