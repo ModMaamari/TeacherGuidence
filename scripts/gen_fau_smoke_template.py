@@ -55,12 +55,14 @@ def build_fau_smoke_template(
     planning_steps: int = 1,
     max_plan_steps: int = 6,
     teacher_router: list = None,
+    student_use_response_schema: bool = True,
 ) -> dict:
     mode_config = {
         "budget": budget,
         "student_model": student_model,
         "teacher_model": teacher_model,
         "teacher_router": teacher_router if teacher_router is not None else list(TEACHER_ROUTER),
+        "student_use_response_schema": student_use_response_schema,
         "corpus_path": corpus_path,
         "retrieval_backend": "hotpot_local",
         "skip_teacher": False,

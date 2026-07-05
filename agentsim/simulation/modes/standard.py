@@ -97,7 +97,7 @@ class StandardRunner:
                 "teacher_max_tokens", "teacher_max_tokens_retry",
                 "student_max_tokens", "student_max_repair_attempts",
                 "teacher_max_repair_attempts", "teacher_temperature", "student_temperature",
-                "teacher_router",
+                "teacher_router", "student_use_response_schema",
             ):
                 if _k in mode_config:
                     initial_metadata[_k] = mode_config[_k]
