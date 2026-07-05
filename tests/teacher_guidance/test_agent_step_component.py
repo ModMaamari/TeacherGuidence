@@ -393,13 +393,40 @@ def test_student_and_teacher_calls_request_constrained_output_schemas(tmp_path):
             return teacher if "teacher evaluating" in prompt else student
 
     ctx = _context(tmp_path)
+    ctx.metadata["student_use_response_schema"] = True  # opt back into constrained decoding
     stub = SchemaCapturingStub()
     comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
     asyncio.run(comp.execute(ctx))
 
-    # First call is the student action, second is the teacher evaluation.
+    # First call is the student action (constrained when the flag is on), second is teacher.
     assert stub.schemas[0] == STUDENT_ACTION_SCHEMA
     assert stub.schemas[1] == TEACHER_EVALUATION_SCHEMA
+
+
+def test_student_unconstrained_by_default(tmp_path):
+    # Universal default: no grammar constraint on the student's normal steps.
+    student = json.dumps({
+        "thought": "I will search for the headquarters location.",
+        "action": {"tool": "search", "params": {"query": "Oberoi HQ", "k": 3}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.6, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "continue",
+    })
+
+    class SchemaCapturingStub:
+        def __init__(self):
+            self.schemas = []
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
+            self.schemas.append(response_schema)
+            return teacher if "teacher evaluating" in prompt else student
+
+    stub = SchemaCapturingStub()
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    asyncio.run(comp.execute(_context(tmp_path)))
+    assert stub.schemas[0] is None  # student unconstrained
+    assert stub.schemas[1] == TEACHER_EVALUATION_SCHEMA  # teacher unchanged
 
 
 def test_force_finish_step_constrains_student_to_finish_only_schema(tmp_path):

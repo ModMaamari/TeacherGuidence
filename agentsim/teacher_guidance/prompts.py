@@ -27,14 +27,24 @@ _TOOL_REFERENCE = """Available tools (action.tool) and their params:
 - synthesize: {}
 - finish: {"answer": "...", "citations": [{"doc_id": "...", "span": "..."}]}"""
 
-_STUDENT_ACTION_SCHEMA = """Return ONLY a JSON object with this shape (no prose outside JSON):
+_STUDENT_ACTION_SCHEMA = """Output EXACTLY ONE JSON object and nothing else — no prose, no
+markdown, no code fences before or after it. Shape:
 {
-  "thought": "brief private reasoning",
+  "thought": "one or two sentences of concrete reasoning about your single best next step",
   "decision": {"category": "need_decomposition|need_retrieval|need_reformulation|sufficient_evidence|synthesize|verify|finish",
                "parametric_knowledge_used": false},
   "action": {"tool": "decompose|reformulate|search|extract|verify|synthesize|finish", "params": {}},
   "new_facts_extracted": [{"doc_id": "...", "span": "verbatim span", "fact": "grounded fact"}]
-}"""
+}
+Rules:
+- Choose the SINGLE most useful next tool; do not default to "synthesize" — only synthesize
+  after you have extracted the facts you need.
+- Fill "action.params" with the exact keys that tool needs (see the tool list above); never
+  leave a tool's required params empty.
+- Prefer this progression when evidence is missing: search -> extract the specific
+  supporting sentences -> (verify if needed) -> finish. Follow the teacher's guidance.
+- As soon as you have enough evidence to answer, use "finish" with a concise, well-grounded
+  "answer" — do not keep searching once you can answer."""
 
 # A single neutral example, included only to reinforce the JSON FORMAT. Its content is
 # generic and unrelated to any dataset question, so it cannot leak gold information.
@@ -58,6 +68,7 @@ def build_student_visible_state(context: Any, step_index: int, budget: int) -> D
         "question": context.query,
         "step": step_index,
         "budget": budget,
+        "disclose_budget": md.get("disclose_budget", True),
         "previous_actions": md.get("previous_actions", []),
         "retrieved_docs": md.get("retrieved_docs", []),
         "extracted_facts": md.get("extracted_facts", []),
@@ -85,7 +96,17 @@ def build_student_prompt(
     parts.append(_TOOL_REFERENCE)
     parts.append("Retrieval backend is 'hotpot_local' (search only the current question's documents).")
     parts.append(f"Question: {state.get('question', '')}")
-    parts.append(f"Step {state.get('step')} of budget {state.get('budget')}.")
+    # Budget disclosure: in the default mode the student sees its exact step budget; in the
+    # hidden-budget mode it only sees the current step number and is told to be efficient
+    # and answer as soon as it can (the budget is revealed only on the forced final step).
+    if state.get("disclose_budget", True):
+        parts.append(f"Step {state.get('step')} of budget {state.get('budget')}.")
+    else:
+        parts.append(
+            f"This is step {state.get('step')}. Work efficiently: retrieve only what you need "
+            "and use \"finish\" with your answer as soon as you are confident — do not waste "
+            "steps once you can answer."
+        )
 
     if state.get("revised_plan") is not None:
         parts.append("Your current revised plan (follow it unless evidence requires deviating):")
@@ -227,13 +248,22 @@ def build_initial_plan_prompt(state: Dict[str, Any], plan_review_config: PlanRev
     )
     parts.append(_TOOL_REFERENCE)
     parts.append(f"Question: {state.get('question', '')}")
-    budget_clause = _budget_clause(state)
-    if budget_clause:
-        parts.append(budget_clause)
-    parts.append(
-        f"Produce at most {_plan_step_cap(state, plan_review_config)} steps describing how to "
-        "retrieve and verify evidence (not a final answer)."
-    )
+    cap = _plan_step_cap(state, plan_review_config)
+    if state.get("disclose_budget", True):
+        budget_clause = _budget_clause(state)
+        if budget_clause:
+            parts.append(budget_clause)
+        parts.append(
+            f"Produce at most {cap} steps describing how to retrieve and verify evidence "
+            "(not a final answer)."
+        )
+    else:
+        # Hidden-budget mode: don't reveal the budget; ask for a minimal, efficient plan.
+        parts.append(
+            "Write the SHORTEST efficient plan that retrieves and verifies just enough "
+            f"evidence to answer, then finishes — aim for as few steps as possible (no more "
+            f"than {cap}). The final step must be 'finish'. Do not pad the plan."
+        )
     parts.append(
         "Return ONLY a JSON object:\n"
         "{\n"

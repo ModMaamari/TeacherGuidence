@@ -59,5 +59,5 @@ def test_budget_workflow_and_plan_params_are_configurable():
 def test_student_schema_opt_out_threads_to_mode_config():
     mc = build_fau_smoke_template(student_use_response_schema=False)["mode_config"]
     assert mc["student_use_response_schema"] is False
-    # default stays on
-    assert build_fau_smoke_template()["mode_config"]["student_use_response_schema"] is True
+    # default is now off (universal unconstrained)
+    assert build_fau_smoke_template()["mode_config"]["student_use_response_schema"] is False

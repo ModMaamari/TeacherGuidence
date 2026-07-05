@@ -147,9 +147,9 @@ def main() -> None:
     ap.add_argument("--workflow", default="hotpot_teacher_guided_b12_plan_review")
     ap.add_argument("--planning-steps", type=int, default=3, help="plan review/revise rounds")
     ap.add_argument("--max-plan-steps", type=int, default=12)
-    ap.add_argument("--student-no-schema", action="store_true",
-                    help="disable grammar-constrained decoding for student calls (models "
-                         "that collapse under llama.cpp grammar constraints, e.g. MiniCPM5)")
+    ap.add_argument("--student-use-schema", action="store_true",
+                    help="opt into grammar-constrained decoding for student calls (default is "
+                         "OFF -- universal, since it collapses some models e.g. MiniCPM5)")
     ap.add_argument("--out-root", default="data/simulation_output/fau_run")
     ap.add_argument("--run-name", default="run", help="consolidated run dir name under out-root")
     ap.add_argument("--no-consolidate", action="store_true",
@@ -188,7 +188,7 @@ def main() -> None:
                 num_samples=len(shard_lines), questions_path=str(qpath), corpus_path=args.corpus,
                 output_dir=w["output_dir"], budget=args.budget, workflow=args.workflow,
                 planning_steps=args.planning_steps, max_plan_steps=args.max_plan_steps,
-                student_use_response_schema=not args.student_no_schema,
+                student_use_response_schema=args.student_use_schema,
             )
             tpath = TEMPLATES_DIR / f"{w['template_id']}.yaml"
             tpath.write_text(yaml.dump(template, sort_keys=False), encoding="utf-8")

@@ -55,7 +55,7 @@ def build_fau_smoke_template(
     planning_steps: int = 1,
     max_plan_steps: int = 6,
     teacher_router: list = None,
-    student_use_response_schema: bool = True,
+    student_use_response_schema: bool = False,
 ) -> dict:
     mode_config = {
         "budget": budget,
