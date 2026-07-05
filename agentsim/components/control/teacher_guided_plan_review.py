@@ -134,12 +134,17 @@ class TeacherGuidedPlanReview(ControlComponent):
                 teacher_model, teacher_temp, start, plan_review_started_at,
             )
 
+        # student_use_response_schema=False disables grammar-constrained decoding for
+        # student calls (some models collapse under llama.cpp grammar constraints --
+        # see teacher_guided_agent_step.execute); the parse/repair path covers them.
+        use_student_schema = context.metadata.get("student_use_response_schema", True)
+
         # 1. Initial plan (student).
         initial_prompt = build_initial_plan_prompt(state, config)
         initial_call, initial_raw = await timed_completion(
             self.llm_client, prompt=initial_prompt, model=student_model, temperature=student_temp,
             max_tokens=context.metadata.get("student_plan_max_tokens", 900),
-            response_schema=STUDENT_PLAN_SCHEMA,
+            response_schema=STUDENT_PLAN_SCHEMA if use_student_schema else None,
         )
         initial_plan_calls = [initial_call]
         initial_plan, _ = parse_student_plan(initial_raw)
@@ -189,7 +194,7 @@ class TeacherGuidedPlanReview(ControlComponent):
             revision_call, revision_raw = await timed_completion(
                 self.llm_client, prompt=revision_prompt, model=student_model, temperature=student_temp,
                 max_tokens=context.metadata.get("student_plan_max_tokens", 900),
-                response_schema=REVISED_STUDENT_PLAN_SCHEMA,
+                response_schema=REVISED_STUDENT_PLAN_SCHEMA if use_student_schema else None,
             )
             round_rec["revision_calls"] = [revision_call]
             round_rec["revision_call_ms"] = revision_call["elapsed_ms"]

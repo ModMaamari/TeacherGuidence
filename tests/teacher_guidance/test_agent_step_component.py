@@ -459,3 +459,34 @@ def test_teacher_sees_raw_text_when_student_totally_unparseable(tmp_path):
     assert "FAILED TO PARSE" in step["teacher_prompt"]
     # the blank default action's empty tool must not silently stand in for the raw text
     assert '"tool": ""' not in step["teacher_prompt"]
+
+
+def test_student_schema_disabled_by_metadata_flag(tmp_path):
+    # student_use_response_schema=False must drop the student's grammar constraint
+    # (some models collapse under it) while leaving the teacher's schema intact.
+    student = json.dumps({
+        "thought": "search", "decision": {"category": "need_retrieval", "parametric_knowledge_used": False},
+        "action": {"tool": "search", "params": {"query": "Oberoi Group headquarters", "k": 3}},
+        "new_facts_extracted": [],
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.6, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "continue",
+    })
+
+    class SchemaCapturingStub:
+        def __init__(self):
+            self.schemas = []
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, response_schema=None, **kw):
+            self.schemas.append(response_schema)
+            return teacher if "teacher evaluating" in prompt else student
+
+    ctx = _context(tmp_path)
+    ctx.metadata["student_use_response_schema"] = False
+    stub = SchemaCapturingStub()
+    comp = TeacherGuidedAgentStep(config={"step_index": 1, "budget": 5}, llm_client=stub)
+    asyncio.run(comp.execute(ctx))
+
+    assert stub.schemas[0] is None  # student unconstrained
+    assert stub.schemas[1] == TEACHER_EVALUATION_SCHEMA  # teacher unchanged

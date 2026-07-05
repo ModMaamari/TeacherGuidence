@@ -222,7 +222,14 @@ class TeacherGuidedAgentStep(ControlComponent):
         student_prompt = build_student_prompt(state, guidance_config, force_finish)
         # On the final step, constrain generation to a finish-only schema so the model
         # commits an actual answer from its context rather than searching again.
-        action_schema = STUDENT_FINISH_ACTION_SCHEMA if force_finish else STUDENT_ACTION_SCHEMA
+        # student_use_response_schema=False disables grammar-constrained decoding for the
+        # student entirely: some models (observed: MiniCPM5-1B) collapse to degenerate
+        # shortest-path actions under llama.cpp grammar constraints while producing valid,
+        # sensible JSON unconstrained -- the prompt + parse/repair path handles the rest.
+        if context.metadata.get("student_use_response_schema", True):
+            action_schema = STUDENT_FINISH_ACTION_SCHEMA if force_finish else STUDENT_ACTION_SCHEMA
+        else:
+            action_schema = None
         student_action, student_raw, parse_info, repair_attempts, student_calls = await self._student_action_with_repair(
             context, student_prompt, student_model, student_temp, response_schema=action_schema
         )
@@ -362,17 +369,16 @@ class TeacherGuidedAgentStep(ControlComponent):
         """Call the student; if the action is unparseable or has an invalid tool, re-ask
         it (up to student_max_repair_attempts) with a generic, gold-free correction note.
 
-        ``response_schema`` is the grammar-constraining JSON schema handed to Ollama;
-        defaults to the full all-tools STUDENT_ACTION_SCHEMA, but the final force-finish
-        step passes the finish-only schema so the model must commit an answer.
+        ``response_schema`` is the grammar-constraining JSON schema handed to Ollama
+        (all-tools on normal steps, finish-only on the force-finish step), or ``None`` to
+        disable constrained decoding entirely (student_use_response_schema=False -- see
+        ``execute``); the caller always passes it explicitly.
 
         Returns ``(student_action, final_raw, parse_info, repair_attempts, calls)``, where
         ``calls`` is a list with one call-log entry per HTTP request made (see
         ``llm_call_log.timed_completion``) -- including failed attempts, so a truncated
         first attempt's raw text/response isn't lost.
         """
-        if response_schema is None:
-            response_schema = STUDENT_ACTION_SCHEMA
         max_repairs = int(context.metadata.get("student_max_repair_attempts", 1))
         max_tokens = context.metadata.get("student_max_tokens", 1200)
         prompt = student_prompt
