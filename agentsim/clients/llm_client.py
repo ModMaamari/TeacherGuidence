@@ -344,30 +344,57 @@ class LLMClient:
 
     async def get_completion_with_fallback(self, models, *, prompt: str, **kwargs):
         """Try each model in ``models`` in order, returning ``(result, used_model)`` from
-        the first that succeeds. A rate-limit (HTTP 429), unavailability, or connection
-        error falls through to the next model; every model but the last one is called
-        fail-fast (``max_retries=0``) so falling through is quick, while the last model
-        keeps normal retry behaviour as the final fallback. Re-raises the last error if
-        all models fail.
+        the first that succeeds.
 
-        Used to route teacher calls FAU -> OpenRouter-free -> OpenRouter-paid: free
-        options first for cost, paid last for reliability.
+        Robustness contract (checked per call, so every step re-evaluates availability):
+
+        * **Skip unconfigured providers up front.** A model whose provider is missing its
+          key/endpoint (``config.provider_available``) is never attempted -- this both
+          saves a guaranteed-failing round-trip and avoids the hard crash a provider like
+          FAU raises (a plain ``ValueError`` for a missing key, which is not an HTTP
+          error). The remaining configured models are the effective chain.
+        * **Fall through on ANY failure, not just HTTP errors.** A rate-limit (429),
+          connection error, timeout, malformed response, or unexpected exception from one
+          model falls through to the next. Only a truly empty/unconfigured chain, or the
+          last configured model failing, surfaces an error.
+        * Every model but the last configured one is called fail-fast (``max_retries=0``)
+          so falling through is quick; the last keeps normal retry behaviour as the final
+          fallback.
+
+        Used to route teacher calls FAU -> OpenRouter-free -> OpenRouter-paid: FAU (free
+        academic gateway) first, then OpenRouter's free tier, then the paid model last for
+        reliability.
         """
         if not models:
             raise ValueError("get_completion_with_fallback requires at least one model")
-        last_exc: Optional[Exception] = None
-        for i, model in enumerate(models):
-            is_last = i == len(models) - 1
+
+        available = [m for m in models if config.provider_available(m)]
+        for m in models:
+            if m not in available:
+                logger.info(
+                    f"[router] skipping '{m}' -- provider not configured "
+                    "(missing API key/endpoint)"
+                )
+        if not available:
+            raise ValueError(
+                f"[router] no configured provider among {list(models)}; set the relevant "
+                "API key/endpoint in .env (e.g. FAU_LLM_API_KEY / CUSTOM_LLM_API_KEY)"
+            )
+
+        last_exc: Optional[BaseException] = None
+        for i, model in enumerate(available):
+            is_last = i == len(available) - 1
             call_kwargs = dict(kwargs)
             if not is_last:
-                call_kwargs["max_retries"] = 0  # fail fast, fall through on rate limit
+                call_kwargs["max_retries"] = 0  # fail fast, fall through on any error
             try:
                 result = await self.get_completion(prompt=prompt, model=model, **call_kwargs)
                 return result, model
-            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            except Exception as exc:  # noqa: BLE001 -- resilience: fall through on anything
                 last_exc = exc
                 logger.warning(
-                    f"[router] teacher model '{model}' failed ({type(exc).__name__}); "
+                    f"[router] teacher model '{model}' failed "
+                    f"({type(exc).__name__}: {str(exc)[:150]}); "
                     f"{'falling through to next' if not is_last else 'no fallback left'}"
                 )
         raise last_exc  # type: ignore[misc]

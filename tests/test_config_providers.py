@@ -22,3 +22,25 @@ def test_fau_provider_config_has_endpoint_and_key():
     cfg = config.get_provider_config("fau")
     assert cfg["endpoint"]  # defaults to the FAU gateway URL
     assert "api_key" in cfg
+
+
+def test_provider_available_reflects_credentials(monkeypatch):
+    cls = type(config)
+    # FAU: available only when both endpoint and key are set.
+    monkeypatch.setattr(cls, "FAU_LLM_ENDPOINT", "https://hub.nhr.fau.de/api/llmgw/v1")
+    monkeypatch.setattr(cls, "FAU_LLM_API_KEY", "sk-fau")
+    assert config.provider_available("fau/gpt-oss-120b") is True
+    monkeypatch.setattr(cls, "FAU_LLM_API_KEY", None)
+    assert config.provider_available("fau/gpt-oss-120b") is False
+
+    # custom/OpenRouter: needs endpoint + key.
+    monkeypatch.setattr(cls, "CUSTOM_LLM_ENDPOINT", "https://openrouter.ai/api")
+    monkeypatch.setattr(cls, "CUSTOM_LLM_API_KEY", "sk-or")
+    assert config.provider_available("custom/openai/gpt-oss-120b") is True
+    monkeypatch.setattr(cls, "CUSTOM_LLM_API_KEY", None)
+    assert config.provider_available("custom/openai/gpt-oss-120b") is False
+
+
+def test_provider_available_ollama_needs_only_endpoint(monkeypatch):
+    monkeypatch.setattr(type(config), "OLLAMA_ENDPOINT", "http://127.0.0.1:11434")
+    assert config.provider_available("ollama/qwen3.5:0.8b") is True

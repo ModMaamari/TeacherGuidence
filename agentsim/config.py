@@ -127,6 +127,27 @@ class Config:
             return "openai"
     
     @classmethod
+    def provider_available(cls, model_id: str) -> bool:
+        """True if the provider backing this model has the credentials/endpoint it needs
+        to be callable right now.
+
+        Used by the router (``LLMClient.get_completion_with_fallback``) to *skip* an
+        unconfigured provider instead of attempting a call that can only fail -- e.g. a
+        ``fau/`` model when ``FAU_LLM_API_KEY`` is unset. Checking here keeps the failure
+        cheap (no wasted HTTP round-trip) and, crucially, avoids a hard crash on providers
+        (like FAU) that raise a non-HTTP ``ValueError`` for a missing key.
+        """
+        provider = cls.get_provider_from_model_id(model_id)
+        if provider == "fau":
+            return bool(cls.FAU_LLM_ENDPOINT and cls.FAU_LLM_API_KEY)
+        if provider == "custom":
+            return bool(cls.CUSTOM_LLM_ENDPOINT and cls.CUSTOM_LLM_API_KEY)
+        if provider == "ollama":
+            return bool(cls.OLLAMA_ENDPOINT)
+        # Hosted providers (openai/anthropic/google/...): callable iff their key is set.
+        return bool(cls.get_api_key_for_provider(provider))
+
+    @classmethod
     def get_api_key_for_provider(cls, provider: str) -> Optional[str]:
         """Get API key for a specific provider"""
         provider_keys: Dict[str, Optional[str]] = {

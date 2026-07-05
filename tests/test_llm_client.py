@@ -338,7 +338,17 @@ def _http_error(status=429):
                                  response=_status_response({}, status_code=status))
 
 
-def test_router_returns_first_success():
+ROUTER = ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"]
+
+
+@pytest.fixture
+def all_providers_available(monkeypatch):
+    """Force every model in the router to count as configured, so the fallthrough logic
+    is tested independent of which API keys happen to be set in the environment."""
+    monkeypatch.setattr(config, "provider_available", lambda m: True)
+
+
+def test_router_returns_first_success(all_providers_available):
     client = LLMClient()
     calls = []
 
@@ -348,15 +358,14 @@ def test_router_returns_first_success():
 
     client.get_completion = fake_get_completion
     result, used = asyncio.run(client.get_completion_with_fallback(
-        ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"],
-        prompt="hi", return_raw=True,
+        ROUTER, prompt="hi", return_raw=True,
     ))
     assert used == "fau/gpt-oss-120b"
     assert result["text"].endswith("fau/gpt-oss-120b")
     assert calls == [("fau/gpt-oss-120b", 0)]  # first is fail-fast, and it succeeded
 
 
-def test_router_falls_through_on_rate_limit():
+def test_router_falls_through_on_rate_limit(all_providers_available):
     client = LLMClient()
     seen = []
 
@@ -367,15 +376,61 @@ def test_router_falls_through_on_rate_limit():
         return {"text": "free served it"}
 
     client.get_completion = fake_get_completion
-    result, used = asyncio.run(client.get_completion_with_fallback(
-        ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"],
-        prompt="hi",
-    ))
+    result, used = asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
     assert used == "custom/openai/gpt-oss-120b:free"
     assert seen == ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free"]
 
 
-def test_router_uses_paid_last_and_raises_if_all_fail():
+def test_router_falls_through_on_non_http_error(all_providers_available):
+    # Robustness: a non-HTTP failure (e.g. a provider raising ValueError for a missing
+    # key, or a malformed-response error) must fall through, not crash the whole run.
+    client = LLMClient()
+    seen = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        seen.append(model)
+        if model == "fau/gpt-oss-120b":
+            raise ValueError("FAU_LLM_API_KEY not configured")
+        if model == "custom/openai/gpt-oss-120b:free":
+            raise KeyError("choices")  # malformed response shape
+        return {"text": "paid served it"}
+
+    client.get_completion = fake_get_completion
+    result, used = asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
+    assert used == "custom/openai/gpt-oss-120b"
+    assert seen == ROUTER  # tried all three in order
+
+
+def test_router_skips_unconfigured_providers(monkeypatch):
+    # FAU not configured -> the router skips it entirely (no attempt) and starts at the
+    # next configured provider, re-checked on this very call.
+    monkeypatch.setattr(config, "provider_available", lambda m: not m.startswith("fau/"))
+    client = LLMClient()
+    seen = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        seen.append(model)
+        return {"text": "served by " + model}
+
+    client.get_completion = fake_get_completion
+    result, used = asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
+    assert used == "custom/openai/gpt-oss-120b:free"
+    assert "fau/gpt-oss-120b" not in seen  # never attempted
+
+
+def test_router_raises_when_no_provider_configured(monkeypatch):
+    monkeypatch.setattr(config, "provider_available", lambda m: False)
+    client = LLMClient()
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        raise AssertionError("must not be called when nothing is configured")
+
+    client.get_completion = fake_get_completion
+    with pytest.raises(ValueError, match="no configured provider"):
+        asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
+
+
+def test_router_uses_paid_last_and_raises_if_all_fail(all_providers_available):
     client = LLMClient()
     order = []
 
@@ -385,10 +440,7 @@ def test_router_uses_paid_last_and_raises_if_all_fail():
 
     client.get_completion = fake_get_completion
     with pytest.raises(httpx.HTTPStatusError):
-        asyncio.run(client.get_completion_with_fallback(
-            ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free", "custom/openai/gpt-oss-120b"],
-            prompt="hi",
-        ))
+        asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
     # last model called with default retries (None = normal), earlier ones fail-fast (0)
     assert order[0][1] == 0 and order[1][1] == 0
     assert order[2][1] is None
