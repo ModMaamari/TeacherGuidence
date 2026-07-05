@@ -147,6 +147,35 @@ def build_student_prompt(
 _RAW_TEXT_TRUNCATE = 1500
 
 
+def build_forced_answer_prompt(state: Dict[str, Any]) -> str:
+    """Last-ditch, plain-text final-answer prompt for the forced-finish step.
+
+    Used only when the normal force-finish step failed to yield a committed answer (the
+    student emitted another search instead of a ``finish``, and there was no prior
+    candidate/draft/extracted fact to fall back on -- which is exactly the case that used
+    to leave ``final_answer == "unknown"``). Rather than fabricating "unknown", we ask the
+    student model one more time to turn whatever it has already retrieved into its single
+    best answer, in free text (no JSON, no tool call) so nothing structural can go wrong.
+    """
+    parts: List[str] = []
+    parts.append(
+        "You have run out of retrieval steps. You must now give your single best final "
+        "answer to the question, based ONLY on the evidence you already gathered below. "
+        "You cannot search again."
+    )
+    parts.append(f"Question: {state.get('question', '')}")
+    parts.append("Retrieved documents (previews): " + _json(state.get("retrieved_docs", [])))
+    parts.append("Extracted facts: " + _json(state.get("extracted_facts", [])))
+    if state.get("draft_answer"):
+        parts.append(f"Draft answer so far: {state.get('draft_answer')}")
+    parts.append(
+        "Output ONLY your final answer as a short phrase -- no JSON, no code fences, no "
+        "explanation, no surrounding quotes. If the evidence is incomplete, still give your "
+        "single best answer; do not reply \"unknown\" or \"I don't know\"."
+    )
+    return "\n\n".join(parts)
+
+
 def build_teacher_prompt(
     state: Dict[str, Any],
     gold: Dict[str, Any],

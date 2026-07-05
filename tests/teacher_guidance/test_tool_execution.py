@@ -163,6 +163,23 @@ def test_derive_final_answer_priority_and_unknown_not_resurfaced():
     assert derive_final_answer(_Ctx({})) == "unknown"
 
 
+def test_clean_forced_answer_normalizes_and_rejects_placeholders():
+    from agentsim.teacher_guidance.tool_executor import clean_forced_answer
+
+    # bare phrase, quoted / whitespace -> cleaned
+    assert clean_forced_answer('  "August 1973"  ') == "August 1973"
+    # code-fenced JSON with an answer field -> pulled out
+    assert clean_forced_answer('```json\n{"answer": "Delhi"}\n```') == "Delhi"
+    # nested action/params shape (model ignored the "no JSON" instruction)
+    assert clean_forced_answer('{"action": {"params": {"answer": "London"}}}') == "London"
+    # multi-line prose -> first non-empty line
+    assert clean_forced_answer("The Beatles\nsome trailing note") == "The Beatles"
+    # placeholders / refusals are rejected so they never become the final answer
+    assert clean_forced_answer("unknown") == ""
+    assert clean_forced_answer("I don't know the answer") == ""
+    assert clean_forced_answer("") == ""
+
+
 def test_new_facts_validated_against_evidence(context, retriever):
     execute_student_tool(context, _action("search", {"query": "Delhi", "k": 2}), retriever)
     # valid span via new_facts_extracted on a non-extract tool (synthesize)

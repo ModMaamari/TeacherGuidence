@@ -179,6 +179,85 @@ def test_force_finish_overrides_and_stops(tmp_path):
     assert ctx.metadata["teacher_guided_steps"][0]["student_action"]["action"]["tool"] == "finish"
 
 
+def test_force_finish_extracts_answer_when_nothing_committed(tmp_path):
+    # Regression: the student burns the final step on yet another search and NOTHING was
+    # committed earlier (no draft, no extracted facts, no prior finish). Instead of
+    # fabricating "unknown", a last-ditch free-text answer-extraction call must turn the
+    # retrieved context into a real final answer.
+    student_search = json.dumps({
+        "thought": "I still need the exact release month; searching again.",
+        "action": {"tool": "search", "params": {"query": "Goats Head Soup release month", "k": 3}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.2, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "force_finish",
+    })
+
+    class ForcedAnswerStub:
+        def __init__(self):
+            self.saw_forced_answer_prompt = False
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                return teacher
+            if "run out of retrieval steps" in prompt:  # the forced-answer prompt
+                self.saw_forced_answer_prompt = True
+                return "  \"August 1973\"  "  # quoted/whitespace -- must be cleaned
+            return student_search
+
+    ctx = _context(tmp_path)  # no draft_answer, no extracted_facts committed
+    stub = ForcedAnswerStub()
+    comp = TeacherGuidedAgentStep(
+        config={"step_index": 5, "budget": 5, "force_finish": True}, llm_client=stub
+    )
+    result = asyncio.run(comp.execute(ctx))
+
+    assert stub.saw_forced_answer_prompt is True
+    assert result.data["verdict"] == "FINISH"
+    assert ctx.metadata["stop_reason"] == "budget_forced_finish"
+    assert ctx.metadata["final_answer"] == "August 1973"  # cleaned, not "unknown"
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["student_action"]["action"]["tool"] == "finish"
+    # the extra fallback call is logged alongside the normal student call
+    assert len(step["student_calls"]) == 2
+
+
+def test_force_finish_prefers_committed_answer_over_extraction_call(tmp_path):
+    # When a usable answer already exists (a committed draft), no fallback LLM call is made.
+    student_search = json.dumps({
+        "thought": "searching once more to be sure about the headquarters",
+        "action": {"tool": "search", "params": {"query": "more", "k": 3}},
+    })
+    teacher = json.dumps({
+        "guidance_level": 3, "student_visible": {"score_continuous": 0.2, "feedback": "ok"},
+        "private_diagnosis": {}, "teacher_decision": "force_finish",
+    })
+
+    class ForcedAnswerStub:
+        def __init__(self):
+            self.forced_answer_calls = 0
+
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "teacher evaluating" in prompt:
+                return teacher
+            if "run out of retrieval steps" in prompt:
+                self.forced_answer_calls += 1
+                return "should not be used"
+            return student_search
+
+    ctx = _context(tmp_path)
+    ctx.metadata["draft_answer"] = "Delhi"
+    stub = ForcedAnswerStub()
+    comp = TeacherGuidedAgentStep(
+        config={"step_index": 5, "budget": 5, "force_finish": True}, llm_client=stub
+    )
+    asyncio.run(comp.execute(ctx))
+
+    assert stub.forced_answer_calls == 0  # committed draft used directly, no extra call
+    assert ctx.metadata["final_answer"] == "Delhi"
+    assert len(ctx.metadata["teacher_guided_steps"][0]["student_calls"]) == 1
+
+
 def test_student_repair_retry_on_invalid_action(tmp_path):
     # First student output is invalid (bad tool); a retry returns a valid action.
     bad = json.dumps({"thought": "hmm", "decision": {"category": "need_retrieval"},

@@ -29,6 +29,7 @@ from agentsim.teacher_guidance.prompts import (
     build_student_visible_state,
     build_student_prompt,
     build_teacher_prompt,
+    build_forced_answer_prompt,
 )
 from agentsim.teacher_guidance.tool_executor import execute_student_tool
 from agentsim.teacher_guidance.guidance_policy import render_student_guidance
@@ -150,15 +151,12 @@ def _visibility(context: WorkflowContext, retriever: HotpotLocalRetriever) -> Di
     }
 
 
-def _force_finish_action(context: WorkflowContext) -> StudentAction:
-    from agentsim.teacher_guidance.tool_executor import derive_final_answer
-
-    answer = derive_final_answer(context)
+def _build_finish_action(answer: str, thought: str, citations: List[Any]) -> StudentAction:
     return StudentAction.from_dict(
         {
-            "thought": "Budget exhausted; committing best available answer.",
+            "thought": thought,
             "decision": {"category": "finish", "parametric_knowledge_used": False},
-            "action": {"tool": "finish", "params": {"answer": answer, "citations": []}},
+            "action": {"tool": "finish", "params": {"answer": answer, "citations": citations}},
             "new_facts_extracted": [],
         }
     )
@@ -241,8 +239,12 @@ class TeacherGuidedAgentStep(ControlComponent):
             context, student_prompt, student_model, student_temp, response_schema=action_schema
         )
 
-        if force_finish and student_action.action.tool != "finish":
-            student_action = _force_finish_action(context)
+        if force_finish:
+            student_action, forced_call = await self._resolve_forced_finish(
+                context, state, student_action, student_model, student_temp
+            )
+            if forced_call is not None:
+                student_calls.append(forced_call)
 
         # Programmatically verify this action against the formal plan (if enabled).
         plan_adherence_info = None
@@ -369,6 +371,57 @@ class TeacherGuidedAgentStep(ControlComponent):
             },
             execution_time_ms=(time.time() - start) * 1000,
         )
+
+    async def _resolve_forced_finish(self, context, state, student_action, student_model, student_temp):
+        """Guarantee the forced-finish step commits a real answer, never "unknown".
+
+        Priority: (1) the student's own ``finish`` answer if it produced one this step,
+        (2) a previously-committed answer / synthesized draft / extracted facts (via
+        ``derive_final_answer``), (3) a last-ditch free-text answer-extraction call to the
+        student model over its retrieved context. The last tier is what fixes the
+        "unknown" regression: when the student burned the final step on another search and
+        nothing was committed earlier, we still turn its evidence into a best-effort
+        answer instead of fabricating "unknown".
+
+        Returns ``(finish_action, forced_call_entry_or_None)``; the call entry (if a
+        fallback LLM call was made) is appended to the step's ``student_calls`` so the
+        extra request is logged.
+        """
+        from agentsim.teacher_guidance.tool_executor import derive_final_answer, clean_forced_answer
+
+        gave_finish = student_action.action.tool == "finish"
+        params = student_action.action.params if gave_finish else None
+        citations = (params or {}).get("citations", []) or []
+        answer = derive_final_answer(context, params)
+
+        # The student produced a usable finish this step -- keep its action untouched
+        # (thought, decision, any new_facts_extracted) so nothing downstream regresses.
+        if gave_finish and answer != "unknown":
+            return student_action, None
+
+        forced_call = None
+        if answer == "unknown":
+            try:
+                forced_call, raw = await timed_completion(
+                    self.llm_client,
+                    prompt=build_forced_answer_prompt(state),
+                    model=student_model,
+                    temperature=student_temp,
+                    max_tokens=context.metadata.get("student_max_tokens", 1200),
+                    attempt=1,
+                )
+                cleaned = clean_forced_answer(raw)
+                if cleaned:
+                    answer = cleaned
+            except Exception as exc:  # never let the fallback crash the episode
+                logger.warning(f"[TG force-finish] answer-extraction fallback failed: {exc}")
+
+        thought = (
+            student_action.thought
+            if gave_finish and student_action.thought
+            else "Budget exhausted; committing best available answer from retrieved evidence."
+        )
+        return _build_finish_action(answer, thought, citations), forced_call
 
     async def _student_action_with_repair(
         self, context, student_prompt, student_model, student_temp, response_schema=None

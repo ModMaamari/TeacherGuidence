@@ -160,6 +160,40 @@ def _substantive(text: Any) -> str:
     return "" if s.lower() == "unknown" else s
 
 
+def clean_forced_answer(raw: str) -> str:
+    """Turn a free-text (or accidentally-JSON) forced-finish answer reply into a clean
+    answer string, or "" if there is nothing substantive.
+
+    The forced-answer prompt asks for a bare phrase, but small models sometimes still wrap
+    it in JSON or code fences, so we defensively pull ``answer`` out of a JSON object when
+    present, strip fences/quotes, and reject the "unknown"/"I don't know" placeholders via
+    ``_substantive``."""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    # Strip a leading/trailing markdown code fence if the model added one.
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", s).strip()
+    # If it came back as a JSON object, prefer its "answer" field.
+    if s.startswith("{"):
+        try:
+            import json as _json
+            obj = _json.loads(s)
+            if isinstance(obj, dict):
+                cand = obj.get("answer") or (obj.get("action", {}) or {}).get("params", {}).get("answer")
+                if isinstance(cand, str):
+                    s = cand.strip()
+        except Exception:
+            pass
+    # Collapse to the first non-empty line and strip wrapping quotes.
+    s = next((ln.strip() for ln in s.splitlines() if ln.strip()), "")
+    s = clean_span(s)
+    lowered = s.lower()
+    if lowered.startswith(("i don't know", "i do not know", "i'm not sure", "i am not sure")):
+        return ""
+    return _substantive(s)
+
+
 def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -> str:
     """Best non-empty final answer, in priority order:
 
