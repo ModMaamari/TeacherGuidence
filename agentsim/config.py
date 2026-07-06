@@ -96,6 +96,12 @@ class Config:
     # ============================================
     LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", "60"))
     LLM_MAX_RETRIES: int = int(os.getenv("LLM_MAX_RETRIES", "3"))
+    # Hard wall-clock deadline (seconds) for a single FAU gateway request. httpx's
+    # timeout is inter-byte only, so a gateway that holds the connection open trickling
+    # keepalive bytes (observed with a stalled gpt-oss-120b backend) never trips it and
+    # blocks forever. This asyncio.wait_for cap guarantees a hung FAU call raises so the
+    # teacher router falls through to OpenRouter instead of stalling the whole run.
+    FAU_TIMEOUT: int = int(os.getenv("FAU_TIMEOUT", "45"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "4096"))
     
     @classmethod

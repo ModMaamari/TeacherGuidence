@@ -28,6 +28,10 @@ class LLMClient:
         self.default_model = default_model or config.TEACHER_MODELS[0] if config.TEACHER_MODELS else "gpt-4o"
         self._embedding_model: Optional[SentenceTransformer] = None
         self._embedding_model_name: Optional[str] = None
+        # Providers that hard-timed-out this process; skipped by the fallback router for
+        # the rest of the run so one dead endpoint doesn't cost a full timeout on every
+        # subsequent call. Cleared only by restarting the process.
+        self._tripped_providers: set[str] = set()
     
     async def get_completion(
         self,
@@ -368,13 +372,20 @@ class LLMClient:
         if not models:
             raise ValueError("get_completion_with_fallback requires at least one model")
 
-        available = [m for m in models if config.provider_available(m)]
+        available = []
         for m in models:
-            if m not in available:
+            if not config.provider_available(m):
                 logger.info(
                     f"[router] skipping '{m}' -- provider not configured "
                     "(missing API key/endpoint)"
                 )
+            elif config.get_provider_from_model_id(m) in self._tripped_providers:
+                logger.info(
+                    f"[router] skipping '{m}' -- provider tripped earlier this run "
+                    "(hard timeout); will not retry until restart"
+                )
+            else:
+                available.append(m)
         if not available:
             raise ValueError(
                 f"[router] no configured provider among {list(models)}; set the relevant "
@@ -392,6 +403,11 @@ class LLMClient:
                 return result, model
             except Exception as exc:  # noqa: BLE001 -- resilience: fall through on anything
                 last_exc = exc
+                # A hard timeout means the endpoint is hung, not merely throttled: trip its
+                # provider so later calls this run skip it immediately instead of eating the
+                # full timeout every time.
+                if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+                    self._tripped_providers.add(config.get_provider_from_model_id(model))
                 logger.warning(
                     f"[router] teacher model '{model}' failed "
                     f"({type(exc).__name__}: {str(exc)[:150]}); "
@@ -443,31 +459,44 @@ class LLMClient:
             "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await self._post_json_with_backoff(
-                client, f"{endpoint.rstrip('/')}/chat/completions", headers, payload,
-                provider_label="fau", max_retries=max_retries,
-            )
-            response.raise_for_status()
-            data = response.json()
-            text = data["choices"][0]["message"].get("content") or ""
+        async def _send() -> Dict[str, Any]:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await self._post_json_with_backoff(
+                    client, f"{endpoint.rstrip('/')}/chat/completions", headers, payload,
+                    provider_label="fau", max_retries=max_retries,
+                )
+                response.raise_for_status()
+                return response.json()
 
-            if return_usage:
-                usage = data.get("usage", {})
-                result = {
-                    "text": text,
-                    "usage": {
-                        "prompt_tokens": usage.get("prompt_tokens", 0),
-                        "completion_tokens": usage.get("completion_tokens", 0),
-                        "total_tokens": usage.get("total_tokens", 0),
-                        # Academic gateway: no per-call billing is returned.
-                        "cost": usage.get("cost"),
-                    },
-                }
-                if return_raw:
-                    result["raw_response"] = data
-                return result
-            return text
+        # Hard wall-clock cap: httpx's read timeout only measures the gap between bytes,
+        # so a gateway that keeps the connection alive without ever finishing the response
+        # would hang indefinitely. asyncio.wait_for forces a TimeoutError, which the
+        # router treats like any other failure and falls through to the next provider.
+        try:
+            data = await asyncio.wait_for(_send(), timeout=config.FAU_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"FAU request exceeded hard timeout of {config.FAU_TIMEOUT}s "
+                f"(model={model_name}); falling through"
+            ) from exc
+        text = data["choices"][0]["message"].get("content") or ""
+
+        if return_usage:
+            usage = data.get("usage", {})
+            result = {
+                "text": text,
+                "usage": {
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                    # Academic gateway: no per-call billing is returned.
+                    "cost": usage.get("cost"),
+                },
+            }
+            if return_raw:
+                result["raw_response"] = data
+            return result
+        return text
 
     async def _ollama_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
         """Ollama local completion"""

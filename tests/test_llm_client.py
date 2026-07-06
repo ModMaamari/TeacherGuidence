@@ -446,6 +446,59 @@ def test_router_uses_paid_last_and_raises_if_all_fail(all_providers_available):
     assert order[2][1] is None
 
 
+def test_router_falls_through_on_hard_timeout_and_trips_provider(all_providers_available):
+    # A hung FAU endpoint surfaces as TimeoutError (from the asyncio.wait_for hard cap).
+    # The router must fall through to the next provider AND remember that FAU is dead so
+    # later calls this run don't pay the full timeout again.
+    client = LLMClient()
+    seen = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        seen.append(model)
+        if model == "fau/gpt-oss-120b":
+            raise TimeoutError("FAU request exceeded hard timeout of 45s")
+        return {"text": "served by " + model}
+
+    client.get_completion = fake_get_completion
+    result, used = asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
+    assert used == "custom/openai/gpt-oss-120b:free"  # free tier, not paid
+    assert seen == ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free"]
+    assert "fau" in client._tripped_providers
+
+
+def test_router_skips_tripped_provider_on_subsequent_call(all_providers_available):
+    # Once FAU has tripped, a later call never attempts it again -- it goes straight to
+    # the free tier, so one dead endpoint doesn't cost a timeout on every step.
+    client = LLMClient()
+    client._tripped_providers.add("fau")
+    seen = []
+
+    async def fake_get_completion(*, prompt, model, **kw):
+        seen.append(model)
+        return {"text": "served by " + model}
+
+    client.get_completion = fake_get_completion
+    result, used = asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
+    assert used == "custom/openai/gpt-oss-120b:free"
+    assert "fau/gpt-oss-120b" not in seen  # skipped, never attempted
+
+
+def test_fau_completion_raises_on_hard_timeout(monkeypatch):
+    # A gateway that never completes the response (simulated by a _send that sleeps past
+    # the hard cap) must raise TimeoutError rather than hang forever.
+    monkeypatch.setattr(type(config), "FAU_LLM_ENDPOINT", "https://fau.test/api/v1")
+    monkeypatch.setattr(type(config), "FAU_LLM_API_KEY", "sk-test")
+    monkeypatch.setattr(type(config), "FAU_TIMEOUT", 1)
+    client = LLMClient()
+
+    async def slow_post(*a, **kw):
+        await asyncio.sleep(5)  # longer than FAU_TIMEOUT
+
+    monkeypatch.setattr(client, "_post_json_with_backoff", slow_post)
+    with pytest.raises(TimeoutError, match="hard timeout"):
+        asyncio.run(client.get_completion(prompt="hi", model="fau/gpt-oss-120b"))
+
+
 def test_router_requires_models():
     with pytest.raises(ValueError):
         asyncio.run(LLMClient().get_completion_with_fallback([], prompt="hi"))
