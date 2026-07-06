@@ -83,7 +83,7 @@ function rawSection(role, calls, prompt, raw, backfilled) {
 const TIP = {
   episodes: "Number of question trajectories collected in this run.",
   guidance: "Guidance level 0–4: how much of the teacher's evaluation the student was shown. G3 = diagnostic feedback (score + explanation, no explicit next action).",
-  correct: "Answer correct: the gold answer appears in the student's final answer (handles 'answer + explanation'). Robust alternative to strict exact match.",
+  correct: "Answer correct: the teacher (which can see the gold answer) scored the student's final answer ≥ 0.40 on its 0.0–1.0 scale. Falls back to cover-match for runs with no teacher verdict.",
   teacher_correct: "Teacher verdict: the teacher (which can see the gold answer) judged whether the student's final answer is correct — a binary 0/1 and a continuous 0.0–1.0 score, compared to the deterministic cover-match verdict.",
   em: "Exact match: the student's normalized final answer equals the gold answer exactly.",
   f1: "Token-level F1 overlap between the student's final answer and the gold answer.",

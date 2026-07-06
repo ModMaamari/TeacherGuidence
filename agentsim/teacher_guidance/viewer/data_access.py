@@ -15,11 +15,28 @@ from agentsim.teacher_guidance.metrics import cover_match
 
 EPISODE_FILENAME = "teacher_guidance_episodes.jsonl"
 
+# The explorer's correct/incorrect signal is the teacher's verdict: the teacher (which can
+# see the gold answer) scores the student's final answer on a 0.0-1.0 scale
+# (``teacher_answer_score``, exported from its ``final_answer_score`` field). Any answer at
+# or above this threshold counts as correct -- a more forgiving, semantics-aware signal
+# than deterministic cover-match, which the teacher judgment supersedes when present.
+TEACHER_CORRECT_THRESHOLD = 0.40
+
 
 def _answer_correct(ep: Dict[str, Any]) -> bool:
-    """Correctness for an episode, computed on the fly for older runs that only
-    stored ``exact_match``."""
+    """Correctness for an episode.
+
+    Primary signal is the teacher verdict: ``teacher_answer_score >=
+    TEACHER_CORRECT_THRESHOLD``. Falls back to the stored ``answer_correct`` flag, then to
+    deterministic cover-match, for runs with no teacher verdict (e.g. skip_teacher runs, or
+    a teacher that didn't return the score)."""
     fm = ep.get("final_metrics", {}) or {}
+    score = fm.get("teacher_answer_score")
+    if score is not None:
+        try:
+            return float(score) >= TEACHER_CORRECT_THRESHOLD
+        except (TypeError, ValueError):
+            pass
     if "answer_correct" in fm:
         return bool(fm["answer_correct"])
     return cover_match(ep.get("final_answer", ""), ep.get("gold_answer", ""))
@@ -268,8 +285,9 @@ def get_episode(output_root: str | Path, run_id: str, qid: str) -> Optional[Dict
         for ep in _read_jsonl(episode_file):
             if str(ep.get("qid")) == str(qid):
                 fm = ep.setdefault("final_metrics", {})
-                if "answer_correct" not in fm:
-                    fm["answer_correct"] = _answer_correct(ep)
+                # Recompute so the episode-detail view uses the same teacher-verdict signal
+                # as the list/aggregate (not the stored deterministic cover-match value).
+                fm["answer_correct"] = _answer_correct(ep)
                 _backfill_raw_io(ep, episode_file.parent)
                 return ep
     return None

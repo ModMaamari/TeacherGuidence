@@ -168,3 +168,93 @@ def test_answer_correct_retroactive(tmp_path):
     run = next(r for r in da.find_runs(tmp_path) if r["run_id"] == "sim_y/runZ")
     assert run["mean_correct"] == 1.0
     assert run["mean_exact_match"] == 0.0
+
+
+def test_answer_correct_uses_teacher_score_threshold(tmp_path):
+    # The teacher verdict (teacher_answer_score >= 0.40) is the correct/incorrect signal
+    # and overrides the stored deterministic answer_correct flag.
+    def _mk(qid, score, stored_correct):
+        ep = {
+            "qid": qid, "query": "q", "gold_answer": "g", "final_answer": "a",
+            "steps": [{"t": 1}], "stop_reason": "teacher_accept",
+            "final_metrics": {
+                "exact_match": False, "answer_correct": stored_correct,
+                "teacher_answer_score": score,
+            },
+        }
+        sd = tmp_path / "run" / "uuid" / "ds" / f"sample_{qid}"
+        sd.mkdir(parents=True)
+        (sd / da.EPISODE_FILENAME).write_text(json.dumps(ep) + "\n", encoding="utf-8")
+
+    _mk("at_threshold", 0.40, False)   # >= 0.40 -> correct even though stored flag is False
+    _mk("below", 0.39, True)           # < 0.40  -> incorrect even though stored flag is True
+    _mk("high", 0.95, False)
+
+    by_qid = {e["qid"]: e for e in da.get_run_episodes(tmp_path, "run/uuid")}
+    assert by_qid["at_threshold"]["answer_correct"] is True
+    assert by_qid["below"]["answer_correct"] is False
+    assert by_qid["high"]["answer_correct"] is True
+
+    # Episode-detail view recomputes to the same teacher-verdict signal.
+    full = da.get_episode(tmp_path, "run/uuid", "below")
+    assert full["final_metrics"]["answer_correct"] is False
+
+    run = next(r for r in da.find_runs(tmp_path) if r["run_id"] == "run/uuid")
+    assert run["mean_correct"] == round(2 / 3, 4)  # 2 of 3 at/above threshold
+
+
+def test_answer_correct_falls_back_without_teacher_score(tmp_path):
+    # No teacher_answer_score (e.g. skip_teacher run) -> fall back to stored flag / cover-match.
+    ep = {
+        "qid": "q", "query": "q", "gold_answer": "no",
+        "final_answer": "No, only one was.", "steps": [{"t": 1}],
+        "stop_reason": "budget_forced_finish",
+        "final_metrics": {"exact_match": False},  # no answer_correct, no teacher score
+    }
+    sd = tmp_path / "run" / "uuid" / "ds" / "sample_001"
+    sd.mkdir(parents=True)
+    (sd / da.EPISODE_FILENAME).write_text(json.dumps(ep) + "\n", encoding="utf-8")
+    summary = da.get_run_episodes(tmp_path, "run/uuid")[0]
+    assert summary["answer_correct"] is True  # cover-match: "no" in "No, only one was."
+
+
+def test_teacher_source_classification():
+    assert da._teacher_source("fau/gpt-oss-120b") == "FAU"
+    assert da._teacher_source("custom/openai/gpt-oss-120b:free") == "OpenRouter free"
+    assert da._teacher_source("custom/openai/gpt-oss-120b") == "OpenRouter paid"
+    assert da._teacher_source("") == "unknown"
+
+
+def test_find_runs_reports_teacher_source_and_sorts_newest_first(tmp_path):
+    import os, time
+    def _mk(run, mtime, model):
+        sd = tmp_path / run / "uuid" / "hotpot_questions" / "sample_001"
+        sd.mkdir(parents=True)
+        ep = {"qid": "q", "final_metrics": {"exact_match": True, "answer_correct": True},
+              "stop_reason": "teacher_accept", "steps": [{"teacher_calls": [{"model": model}]}]}
+        f = sd / da.EPISODE_FILENAME
+        f.write_text(json.dumps(ep) + "\n", encoding="utf-8")
+        os.utime(f, (mtime, mtime))
+    _mk("old_run", 1000, "fau/gpt-oss-120b")
+    _mk("new_run", 9000, "custom/openai/gpt-oss-120b")
+    runs = da.find_runs(tmp_path)
+    assert [r["run_id"].split("/")[0] for r in runs] == ["new_run", "old_run"]  # newest first
+    old = next(r for r in runs if r["run_id"].startswith("old_run"))
+    assert old["teacher_source_pct"] == {"FAU": 100.0}
+    new = next(r for r in runs if r["run_id"].startswith("new_run"))
+    assert new["teacher_source_pct"] == {"OpenRouter paid": 100.0}
+
+
+def test_find_runs_is_cached_until_files_change(tmp_path, monkeypatch):
+    sd = tmp_path / "r" / "uuid" / "hotpot_questions" / "sample_001"
+    sd.mkdir(parents=True)
+    (sd / da.EPISODE_FILENAME).write_text(json.dumps({"qid": "q", "final_metrics": {}, "steps": []}) + "\n")
+    first = da.find_runs(tmp_path)
+    calls = {"n": 0}
+    real_read = da._read_jsonl
+    def _counting(path):
+        calls["n"] += 1
+        return real_read(path)
+    monkeypatch.setattr(da, "_read_jsonl", _counting)
+    da.find_runs(tmp_path)  # unchanged files -> served from cache, no re-read
+    assert calls["n"] == 0
