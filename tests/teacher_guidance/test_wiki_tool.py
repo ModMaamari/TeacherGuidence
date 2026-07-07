@@ -163,7 +163,18 @@ def test_wiki_update_prompt_contents():
         {"tool": "search", "status": "ok"},
     )
     assert "who?" in p and "old note" in p and "search" in p
-    assert "NEW full content" in p
+    # Rigid template + filled example so small models don't write junk notes.
+    assert "FACTS:" in p and "ANSWER:" in p and "NEXT:" in p
+    assert "EXACTLY this format" in p
+    assert "Example of a good wiki.md" in p and "Green Party" in p
+    assert "no JSON" in p
+
+
+def test_auto_mode_prompt_states_wiki_use_cases():
+    state = {"question": "q", "step": 1, "budget": 5,
+             "wiki_enabled": True, "wiki_mode": "auto", "wiki_content": ""}
+    p = build_student_prompt(state, GuidanceConfig(level=3), force_finish=False)
+    assert "never repeat a search" in p
 
 
 def test_clean_wiki_content_strips_fences_and_caps_length():

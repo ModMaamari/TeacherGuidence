@@ -61,6 +61,21 @@ _WIKI_AUTO_NOTE = (
     "candidates, and what to do next."
 )
 
+# Fixed three-line format for wiki.md. Small students write junk (raw action JSON,
+# rambling paragraphs) into a free-form wiki; a rigid fill-in template keeps the notes
+# usable and easy to both write and read back.
+_WIKI_TEMPLATE = """FACTS:
+- <one confirmed fact> (doc_id)
+ANSWER: <current best answer, or ?>
+NEXT: <the single next thing to do>"""
+
+_WIKI_EXAMPLE = """Example of a good wiki.md:
+FACTS:
+- Jill Stein ran for president in 2012 and 2016 (q1::doc2)
+- She represented the Green Party (q1::doc2)
+ANSWER: Green Party
+NEXT: verify the party name, then finish"""
+
 _WIKI_INSTRUCTIONS = (
     "You also have a personal wiki (wiki.md): a private notes file that starts empty and "
     "persists across all your steps on this question. Use it as an information bank -- "
@@ -69,6 +84,12 @@ _WIKI_INSTRUCTIONS = (
     "Keep it MINIMAL (a few short lines, not full documents) -- wiki_write replaces the "
     "whole file. You decide when to read and write; each wiki operation uses a step, so "
     "use it only when it helps you answer."
+)
+
+_WIKI_AUTO_USES = (
+    "Use the wiki to: remember facts from documents you already searched, keep your "
+    "current best answer, and note what to look up next -- so you never repeat a search "
+    "or forget a fact you already found."
 )
 
 # A single neutral example, included only to reinforce the JSON FORMAT. Its content is
@@ -173,6 +194,7 @@ def build_student_prompt(
         parts.append(f"Current draft answer: {state.get('draft_answer')}")
 
     if wiki_auto:
+        parts.append(_WIKI_AUTO_USES)
         parts.append("Your wiki.md:\n" + (state.get("wiki_content") or "(empty)"))
     elif wiki_tools:
         if state.get("wiki_content") is not None:
@@ -207,7 +229,11 @@ def build_wiki_update_prompt(
     state: Dict[str, Any], student_action: Dict[str, Any], tool_observation: Dict[str, Any]
 ) -> str:
     """Auto-wiki-mode prompt: after each step, ask the student to rewrite wiki.md from
-    what it just did/observed. Free text output (no JSON) so nothing structural can fail."""
+    what it just did/observed. Free text output (no JSON) so nothing structural can fail.
+
+    The prompt pins wiki.md to a rigid three-line template (FACTS / ANSWER / NEXT) with
+    a filled example -- small students degrade into raw action-JSON or rambling prose
+    when the format is left open (observed with qwen3.5:0.8b)."""
     parts: List[str] = []
     parts.append(
         "You maintain a personal wiki (wiki.md) of MINIMAL notes that helps you solve a "
@@ -219,10 +245,14 @@ def build_wiki_update_prompt(
     parts.append("Action you just took: " + _json(student_action))
     parts.append("Tool observation: " + _json(tool_observation))
     parts.append(
-        "Output the NEW full content of wiki.md and NOTHING else -- plain text, no JSON, "
-        "no code fences, no commentary. Keep it under 120 words: only key entities, "
-        "confirmed facts (with doc ids), your current best answer candidate, and what to "
-        "do next. Drop anything no longer useful."
+        "Rewrite wiki.md using EXACTLY this format:\n" + _WIKI_TEMPLATE
+    )
+    parts.append(_WIKI_EXAMPLE)
+    parts.append(
+        "Rules: output ONLY the new wiki.md content in that format -- no JSON, no code "
+        "fences, no commentary. At most 5 FACTS lines; keep each line short. Copy facts "
+        "worth keeping from the current wiki.md, add what you just learned, drop what is "
+        "no longer useful. If you cannot answer yet, write \"ANSWER: ?\"."
     )
     return "\n\n".join(parts)
 
