@@ -23,6 +23,10 @@ TOOLS = (
     "verify",
     "synthesize",
     "finish",
+    # Wiki notes tools (only offered to the student when wiki_enabled is set on the
+    # run; always accepted here so post-hoc validation of wiki-run data never fails).
+    "wiki_read",
+    "wiki_write",
 )
 
 DECISION_CATEGORIES = (
@@ -33,6 +37,8 @@ DECISION_CATEGORIES = (
     "synthesize",
     "verify",
     "finish",
+    # Category for wiki_read/wiki_write actions (wiki-enabled runs only).
+    "manage_wiki",
 )
 
 TEACHER_DECISIONS = ("continue", "accept_finish", "reject_finish", "force_finish")

@@ -21,6 +21,7 @@ def test_student_action_schema_generation_includes_tool_enum():
     tool_schema = schema["$defs"]["ToolCallModel"]["properties"]["tool"]
     assert set(tool_schema["enum"]) == {
         "decompose", "reformulate", "search", "extract", "verify", "synthesize", "finish",
+        "wiki_read", "wiki_write",
     }
 
 

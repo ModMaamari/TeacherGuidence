@@ -169,10 +169,38 @@ class FinishCall(_Strict):
     params: FinishParams
 
 
+class WikiReadParams(_Strict):
+    pass
+
+
+class WikiWriteParams(_Strict):
+    content: str = Field(..., min_length=1)
+
+
+class WikiReadCall(_Strict):
+    tool: Literal["wiki_read"]
+    params: WikiReadParams = WikiReadParams()
+
+
+class WikiWriteCall(_Strict):
+    tool: Literal["wiki_write"]
+    params: WikiWriteParams
+
+
 ToolCallUnion = Annotated[
     Union[
         DecomposeCall, ReformulateCall, SearchCall, ExtractCall,
         VerifyCall, SynthesizeCall, FinishCall,
+    ],
+    Field(discriminator="tool"),
+]
+
+# Wiki-enabled runs get the same union extended with the two wiki tools, so the
+# baseline (wiki-disabled) generation grammar stays byte-identical to before.
+WikiToolCallUnion = Annotated[
+    Union[
+        DecomposeCall, ReformulateCall, SearchCall, ExtractCall,
+        VerifyCall, SynthesizeCall, FinishCall, WikiReadCall, WikiWriteCall,
     ],
     Field(discriminator="tool"),
 ]
@@ -185,6 +213,13 @@ class StudentActionGenerationModel(StudentActionModel):
 
     thought: str = Field(..., min_length=15)
     action: ToolCallUnion
+
+
+class StudentActionWikiGenerationModel(StudentActionGenerationModel):
+    """Generation schema for wiki-enabled runs: identical to the standard one plus
+    the wiki_read/wiki_write tools in the action grammar."""
+
+    action: WikiToolCallUnion
 
 
 class StudentFinishActionGenerationModel(_Strict):
