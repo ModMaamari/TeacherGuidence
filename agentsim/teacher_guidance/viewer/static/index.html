@@ -5,61 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Teacher Guidance — Trajectory Explorer</title>
   <link rel="stylesheet" href="/static/styles.css" />
+  <script>
+    // Apply the saved theme before first paint to avoid a light-mode flash.
+    (function () {
+      var t = localStorage.getItem("tg-theme");
+      if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <button id="back-to-runs" class="back-btn" type="button" title="Back to all runs" hidden>← Runs</button>
+    <a class="brand" href="#/" title="All runs">
       <div class="brand-mark">TG</div>
       <div class="brand-text">
         <h1>Trajectory Explorer</h1>
-        <span class="brand-sub">Teacher Guidance dataset</span>
+        <span class="brand-sub">Teacher Guidance</span>
       </div>
-    </div>
+    </a>
+
+    <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb"></nav>
 
     <div class="topbar-controls">
-      <label class="field run-picker" hidden>
-        <span>Run</span>
-        <select id="run-select"></select>
-      </label>
-      <label class="toggle">
+      <label class="toggle" title="Reveal gold answers and the teacher's private diagnosis (never shown to the student).">
         <input type="checkbox" id="private-toggle" checked />
-        <span>Show teacher-private</span>
+        <span>Teacher-private</span>
       </label>
+      <button id="theme-toggle" class="icon-btn" type="button" title="Toggle light/dark theme">◐</button>
+      <button id="refresh-btn" class="icon-btn" type="button" title="Reload data from disk">⟳</button>
     </div>
   </header>
 
-  <!-- Main page: table of runs -->
-  <section id="runs-view" class="runs-view">
-    <h2 class="runs-title">Runs</h2>
-    <div class="table-scroll">
-      <table id="runs-table" class="runs-table"></table>
-    </div>
-  </section>
-
-  <div id="run-stats" class="run-stats" hidden></div>
-
-  <main class="layout" id="run-view" hidden>
-    <aside class="sidebar">
-      <div class="sidebar-head">
-        <input type="search" id="episode-search" placeholder="Filter questions…" />
-        <span id="episode-count" class="muted"></span>
-      </div>
-      <ul id="episode-list" class="episode-list"></ul>
-    </aside>
-
-    <section id="detail" class="detail">
-      <div class="empty-state">
-        <h2>Select an episode</h2>
-        <p>Pick a run, then a question on the left to inspect its full trajectory.</p>
-      </div>
-    </section>
-  </main>
-
-  <div class="jump-nav" aria-hidden="false">
-    <button id="jump-top" class="jump-btn" type="button" title="Jump to top">↑ Top</button>
-    <button id="jump-bottom" class="jump-btn" type="button" title="Jump to bottom">↓ Bottom</button>
-  </div>
+  <main id="app"></main>
 
   <script src="/static/app.js"></script>
 </body>
