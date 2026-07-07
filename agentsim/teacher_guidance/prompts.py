@@ -56,17 +56,20 @@ _STUDENT_ACTION_SCHEMA_WIKI = """Return ONLY a JSON object with this shape (no p
 # rewrite it. No budget steps are consumed and the action grammar stays the baseline one.
 _WIKI_AUTO_NOTE = (
     "You keep a personal wiki (wiki.md): a MINIMAL notes file that persists across all "
-    "your steps on this question. Its current content is shown below, and after each "
-    "step you will be asked to update it. Rely on it to remember key facts, answer "
-    "candidates, and what to do next."
+    "your steps on this question. READ it below before choosing your action -- it is "
+    "your memory of everything you have learned so far. After each step you will be "
+    "asked to edit it: correct anything it got wrong, add what you just learned, and "
+    "keep your best answer up to date."
 )
 
 # Fixed three-line format for wiki.md. Small students write junk (raw action JSON,
 # rambling paragraphs) into a free-form wiki; a rigid fill-in template keeps the notes
-# usable and easy to both write and read back.
+# usable and easy to both write and read back. ANSWER must always name a concrete best
+# guess: an earlier "ANSWER: ?" variant taught small models to answer "unknown" even
+# when their own FACTS contained the gold answer (observed with qwen3.5:2b).
 _WIKI_TEMPLATE = """FACTS:
 - <one confirmed fact> (doc_id)
-ANSWER: <current best answer, or ?>
+ANSWER: <your current best guess -- always name one, never "?" or "unknown">
 NEXT: <the single next thing to do>"""
 
 _WIKI_EXAMPLE = """Example of a good wiki.md:
@@ -237,7 +240,7 @@ def build_wiki_update_prompt(
     parts: List[str] = []
     parts.append(
         "You maintain a personal wiki (wiki.md) of MINIMAL notes that helps you solve a "
-        "question over multiple retrieval steps. You just completed a step; update the "
+        "question over multiple retrieval steps. You just completed a step; EDIT the "
         "wiki now so your next step can rely on it."
     )
     parts.append(f"Question: {state.get('question', '')}")
@@ -245,14 +248,21 @@ def build_wiki_update_prompt(
     parts.append("Action you just took: " + _json(student_action))
     parts.append("Tool observation: " + _json(tool_observation))
     parts.append(
-        "Rewrite wiki.md using EXACTLY this format:\n" + _WIKI_TEMPLATE
+        "Edit the wiki like a careful reviewer:\n"
+        "1. Check every existing line against the observation above -- CORRECT or DELETE "
+        "any line that is wrong, outdated, or contradicted by the new evidence.\n"
+        "2. ADD any new fact from the observation that helps answer the question "
+        "(with its doc_id). Do not duplicate facts already listed.\n"
+        "3. UPDATE the ANSWER line to your current best guess. Always commit to one "
+        "concrete candidate -- never write \"?\", \"unknown\", or leave it blank; if the "
+        "FACTS name a plausible answer, use it.\n"
+        "4. UPDATE the NEXT line to the single most useful next step."
     )
+    parts.append("Output wiki.md using EXACTLY this format:\n" + _WIKI_TEMPLATE)
     parts.append(_WIKI_EXAMPLE)
     parts.append(
-        "Rules: output ONLY the new wiki.md content in that format -- no JSON, no code "
-        "fences, no commentary. At most 5 FACTS lines; keep each line short. Copy facts "
-        "worth keeping from the current wiki.md, add what you just learned, drop what is "
-        "no longer useful. If you cannot answer yet, write \"ANSWER: ?\"."
+        "Output ONLY the new wiki.md content in that format -- no JSON, no code fences, "
+        "no commentary. At most 5 FACTS lines; keep each line short."
     )
     return "\n\n".join(parts)
 
@@ -281,6 +291,11 @@ def build_forced_answer_prompt(state: Dict[str, Any]) -> str:
     parts.append("Extracted facts: " + _json(state.get("extracted_facts", [])))
     if state.get("draft_answer"):
         parts.append(f"Draft answer so far: {state.get('draft_answer')}")
+    # Wiki-enabled episodes: the notes often already contain the answer (its ANSWER
+    # line is the student's own running best guess), so surface them here where the
+    # final answer is committed.
+    if state.get("wiki_content"):
+        parts.append("Your wiki.md notes:\n" + state.get("wiki_content"))
     parts.append(
         "Output ONLY your final answer as a short phrase -- no JSON, no code fences, no "
         "explanation, no surrounding quotes. If the evidence is incomplete, still give your "

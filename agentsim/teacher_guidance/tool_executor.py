@@ -226,6 +226,20 @@ def clean_wiki_content(raw: str, max_chars: int = 2000) -> str:
     return s
 
 
+def wiki_answer_candidate(wiki_text: Any) -> str:
+    """Extract the ANSWER line's value from a templated wiki.md, or "".
+
+    The auto-wiki template keeps the student's running best guess on an
+    ``ANSWER: <candidate>`` line; that self-committed candidate is a better final
+    answer than the "unknown" placeholder. Placeholder values ("?", "unknown") are
+    rejected via ``_substantive``."""
+    for line in str(wiki_text or "").splitlines():
+        if line.strip().lower().startswith("answer:"):
+            value = line.split(":", 1)[1].strip()
+            return "" if value == "?" else _substantive(value)
+    return ""
+
+
 def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -> str:
     """Best non-empty final answer, in priority order:
 
@@ -235,8 +249,9 @@ def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -
        keep going, and then budget ran out: that committed answer must not be thrown away
        and replaced with "unknown" on the forced finish,
     3. the synthesized draft,
-    4. the concatenated extracted facts,
-    5. the "unknown" placeholder (never empty).
+    4. the wiki's ANSWER line (wiki-enabled runs: the student's own best guess),
+    5. the concatenated extracted facts,
+    6. the "unknown" placeholder (never empty).
     """
     params = params or {}
     answer = _substantive(params.get("answer"))
@@ -244,6 +259,8 @@ def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -
         answer = _substantive(context.metadata.get("candidate_final_answer"))
     if not answer:
         answer = _substantive(context.metadata.get("draft_answer"))
+    if not answer:
+        answer = wiki_answer_candidate(context.metadata.get("wiki"))
     if not answer:
         facts = context.metadata.get("extracted_facts", []) or []
         answer = " ".join(str(f.get("fact", "")).strip() for f in facts).strip()

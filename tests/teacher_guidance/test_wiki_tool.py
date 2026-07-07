@@ -170,11 +170,50 @@ def test_wiki_update_prompt_contents():
     assert "no JSON" in p
 
 
+def test_wiki_update_prompt_demands_editing_not_appending():
+    p = build_wiki_update_prompt({"question": "q", "wiki_content": "x"}, {}, {})
+    # Review-and-edit semantics: verify existing lines, fix/remove wrong ones, dedupe.
+    assert "CORRECT or DELETE" in p
+    assert "Do not duplicate" in p
+    # ANSWER must always commit to a concrete candidate -- the earlier "ANSWER: ?"
+    # variant taught qwen2b to answer "unknown" over its own correct FACTS.
+    assert 'never write "?"' in p
+    assert "ANSWER: ?" not in p
+
+
 def test_auto_mode_prompt_states_wiki_use_cases():
     state = {"question": "q", "step": 1, "budget": 5,
              "wiki_enabled": True, "wiki_mode": "auto", "wiki_content": ""}
     p = build_student_prompt(state, GuidanceConfig(level=3), force_finish=False)
     assert "never repeat a search" in p
+
+
+def test_forced_answer_prompt_includes_wiki():
+    from agentsim.teacher_guidance.prompts import build_forced_answer_prompt
+
+    state = {"question": "q", "wiki_content": "FACTS:\n- key fact (d1)\nANSWER: Delhi\nNEXT: finish"}
+    p = build_forced_answer_prompt(state)
+    assert "wiki.md" in p and "ANSWER: Delhi" in p
+    # No wiki -> no wiki section (baseline runs untouched).
+    assert "wiki" not in build_forced_answer_prompt({"question": "q"}).lower()
+
+
+def test_derive_final_answer_uses_wiki_answer_line():
+    from agentsim.teacher_guidance.tool_executor import derive_final_answer, wiki_answer_candidate
+
+    assert wiki_answer_candidate("FACTS:\n- f (d)\nANSWER: Green Party\nNEXT: done") == "Green Party"
+    assert wiki_answer_candidate("ANSWER: ?") == ""
+    assert wiki_answer_candidate("ANSWER: unknown") == ""
+    assert wiki_answer_candidate("no answer line") == ""
+    assert wiki_answer_candidate(None) == ""
+
+    ctx = WorkflowContext(task_id="q1", query="q", metadata={
+        "wiki": "FACTS:\n- Tse Tse Fly formed in 1988 (d1)\nANSWER: Tse Tse Fly\nNEXT: finish",
+    })
+    # No params answer / candidate / draft -> wiki ANSWER beats "unknown".
+    assert derive_final_answer(ctx, {}) == "Tse Tse Fly"
+    # An explicit answer still wins over the wiki.
+    assert derive_final_answer(ctx, {"answer": "The Beatles"}) == "The Beatles"
 
 
 def test_clean_wiki_content_strips_fences_and_caps_length():
@@ -203,7 +242,7 @@ def test_auto_mode_component_updates_wiki_after_step(tmp_path):
 
     class StubLLM:
         async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
-            if "update the wiki" in prompt.lower() or "NEW full content" in prompt:
+            if "edit the wiki" in prompt.lower():
                 return "key fact: Doc found"
             if "teacher evaluating" in prompt:
                 return teacher_json
