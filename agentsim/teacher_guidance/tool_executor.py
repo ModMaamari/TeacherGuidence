@@ -55,6 +55,10 @@ def _candidate_doc_ids(context: Any) -> Optional[List[str]]:
 def _record_action(context: Any, action: StudentAction) -> None:
     summary = {"tool": action.action.tool, "params": action.action.params}
     context.metadata.setdefault("previous_actions", []).append(summary)
+    # A wiki_read's content is surfaced in the *next* step's student prompt only
+    # (one-shot); executing any new action retires the pending read. If this action
+    # is itself a wiki_read, _do_wiki_read re-arms it afterwards.
+    context.metadata.pop("wiki_just_read", None)
 
 
 def _ingest_facts(context: Any, action: StudentAction) -> List[Dict[str, Any]]:
@@ -143,6 +147,22 @@ def _do_verify(context: Any, params: Dict[str, Any], retriever) -> ToolObservati
     return ToolObservation(
         tool="verify", status="ok", data={"claim": claim, "supported": supported, "results": results}
     )
+
+
+def _do_wiki_read(context: Any) -> ToolObservation:
+    """Read the episode's wiki notes (wiki.md). The content is returned in the
+    observation and stashed on the context so the next step's student prompt shows it."""
+    content = str(context.metadata.get("wiki", "") or "")
+    context.metadata["wiki_just_read"] = content
+    return ToolObservation(tool="wiki_read", status="ok", data={"content": content, "chars": len(content)})
+
+
+def _do_wiki_write(context: Any, params: Dict[str, Any]) -> ToolObservation:
+    """Replace the episode's wiki notes with the given content (full rewrite -- the
+    student is instructed to keep the file minimal, so it re-emits what it keeps)."""
+    content = str(params.get("content", "") or "").strip()
+    context.metadata["wiki"] = content
+    return ToolObservation(tool="wiki_write", status="ok", data={"chars": len(content)})
 
 
 def _do_synthesize(context: Any) -> ToolObservation:
@@ -255,6 +275,10 @@ def execute_student_tool(context: Any, action: StudentAction, retriever) -> Dict
         obs = _do_verify(context, params, retriever)
     elif tool == "synthesize":
         obs = _do_synthesize(context)
+    elif tool == "wiki_read":
+        obs = _do_wiki_read(context)
+    elif tool == "wiki_write":
+        obs = _do_wiki_write(context, params)
     elif tool == "finish":
         obs = _do_finish(context, params)
     else:
