@@ -93,6 +93,8 @@ def _episode_summary(ep: Dict[str, Any]) -> Dict[str, Any]:
         "plan_review_enabled": bool((ep.get("plan_review") or {}).get("enabled", False)),
         "guidance_level": ep.get("guidance_level"),
         "wiki_mode": (ep.get("wiki_mode") or "tools") if ep.get("wiki_enabled") else None,
+        "student_model": ep.get("student_model", ""),
+        "teacher_model": ep.get("teacher_model", ""),
     }
 
 
@@ -120,8 +122,13 @@ def _iter_teacher_call_models(ep: Dict[str, Any]):
             yield call.get("model")
 
 
-# Cache find_runs by a cheap stat-signature of every episode file, so repeat /api/runs
-# calls don't re-read and re-parse every episode (the source of the explorer's slow load).
+# Two-level cache:
+#   _FILE_CACHE  path -> parsed per-episode summaries + per-file aggregates, keyed by the
+#                file's (mtime_ns, size). Incremental: when one episode file changes (a
+#                run in progress appending samples), ONLY that file is re-parsed.
+#   _RUNS_CACHE  output_root -> fully aggregated /api/runs payload, keyed by the stat
+#                signature of every episode file (a stat scan, no reads/parses).
+_FILE_CACHE: Dict[str, Dict[str, Any]] = {}
 _RUNS_CACHE: Dict[str, Any] = {}
 
 
@@ -137,10 +144,78 @@ def _runs_signature(output_root: Path) -> tuple:
     return tuple(sig)
 
 
+def _file_entry(episode_file: Path) -> Optional[Dict[str, Any]]:
+    """Per-file cache entry: episode summaries + teacher-source counts, re-parsed only
+    when the file's (mtime_ns, size) signature changes."""
+    try:
+        st = episode_file.stat()
+    except OSError:
+        return None
+    sig = (st.st_mtime_ns, st.st_size)
+    key = str(episode_file)
+    cached = _FILE_CACHE.get(key)
+    if cached is not None and cached["sig"] == sig:
+        return cached
+    episodes = _read_jsonl(episode_file)
+    source_counts: Dict[str, int] = {}
+    for ep in episodes:
+        for model in _iter_teacher_call_models(ep):
+            src = _teacher_source(model)
+            source_counts[src] = source_counts.get(src, 0) + 1
+    entry = {
+        "sig": sig,
+        "mtime": st.st_mtime,
+        "summaries": [_episode_summary(ep) for ep in episodes],
+        "source_counts": source_counts,
+    }
+    _FILE_CACHE[key] = entry
+    return entry
+
+
+def _run_summary(run_id: str, summaries: List[Dict[str, Any]],
+                 source_counts: Dict[str, int], mtime: float) -> Dict[str, Any]:
+    em = [1.0 if s["exact_match"] else 0.0 for s in summaries]
+    correct = [1.0 if s["answer_correct"] else 0.0 for s in summaries]
+    f1 = [float(s["f1"] or 0.0) for s in summaries]
+    doc = [float(s["supporting_doc_recall"] or 0.0) for s in summaries]
+    steps = [int(s["num_steps"] or 0) for s in summaries]
+    stop_reasons: Dict[str, int] = {}
+    for s in summaries:
+        sr = s.get("stop_reason") or "?"
+        stop_reasons[sr] = stop_reasons.get(sr, 0) + 1
+    total_calls = sum(source_counts.values()) or 1
+    teacher_source_pct = {
+        k: round(100.0 * v / total_calls, 1)
+        for k, v in sorted(source_counts.items(), key=lambda kv: -kv[1])
+    }
+    first = summaries[0]
+    return {
+        "run_id": run_id,
+        "label": run_id,
+        "num_episodes": len(summaries),
+        "mtime": mtime,
+        "guidance_level": first.get("guidance_level"),
+        # Agent-wiki runs: "tools" | "auto" (None when the wiki was disabled).
+        "wiki_mode": first.get("wiki_mode"),
+        "student_model": first.get("student_model", ""),
+        "teacher_model": first.get("teacher_model", ""),
+        "mean_exact_match": _mean(em),
+        "mean_correct": _mean(correct),
+        "mean_f1": _mean(f1),
+        "mean_doc_recall": _mean(doc),
+        "mean_steps": _mean([float(s) for s in steps]),
+        "stop_reasons": stop_reasons,
+        "teacher_calls": sum(source_counts.values()),
+        "teacher_source_pct": teacher_source_pct,
+    }
+
+
 def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
     """Group all episode files by run and return one summary per run, newest first.
 
-    Cached on a stat-signature of the episode files so repeated calls are fast.
+    Incremental: aggregates are memoized per output_root on a cheap stat signature, and
+    when the signature changes only the episode files that actually changed are
+    re-parsed (per-file cache) -- a run appending samples doesn't invalidate the rest.
     """
     output_root = Path(output_root)
     if not output_root.exists():
@@ -152,63 +227,29 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
         return cached[1]
 
     runs: Dict[str, Dict[str, Any]] = {}
+    seen_files = set()
     for episode_file in output_root.rglob(EPISODE_FILENAME):
-        run_dir = _run_dir_for(episode_file)
-        run_id = _run_id(output_root, run_dir)
-        episodes = _read_jsonl(episode_file)
-        bucket = runs.setdefault(
-            run_id,
-            {"run_id": run_id, "label": run_id, "episodes": [], "mtime": 0.0},
-        )
-        bucket["episodes"].extend(episodes)
-        try:
-            bucket["mtime"] = max(bucket["mtime"], episode_file.stat().st_mtime)
-        except OSError:
-            pass
-
-    result: List[Dict[str, Any]] = []
-    for run_id, bucket in runs.items():
-        episodes = bucket["episodes"]
-        if not episodes:
+        entry = _file_entry(episode_file)
+        if entry is None or not entry["summaries"]:
             continue
-        em = [1.0 if (e.get("final_metrics", {}) or {}).get("exact_match") else 0.0 for e in episodes]
-        correct = [1.0 if _answer_correct(e) else 0.0 for e in episodes]
-        f1 = [float((e.get("final_metrics", {}) or {}).get("f1", 0.0) or 0.0) for e in episodes]
-        doc = [float((e.get("final_metrics", {}) or {}).get("supporting_doc_recall", 0.0) or 0.0) for e in episodes]
-        stop_reasons: Dict[str, int] = {}
-        source_counts: Dict[str, int] = {}
-        for e in episodes:
-            sr = e.get("stop_reason", "?")
-            stop_reasons[sr] = stop_reasons.get(sr, 0) + 1
-            for model in _iter_teacher_call_models(e):
-                src = _teacher_source(model)
-                source_counts[src] = source_counts.get(src, 0) + 1
-        total_calls = sum(source_counts.values()) or 1
-        teacher_source_pct = {
-            k: round(100.0 * v / total_calls, 1)
-            for k, v in sorted(source_counts.items(), key=lambda kv: -kv[1])
-        }
-        first = episodes[0]
-        result.append(
-            {
-                "run_id": run_id,
-                "label": run_id,
-                "num_episodes": len(episodes),
-                "mtime": bucket["mtime"],
-                "guidance_level": first.get("guidance_level"),
-                # Agent-wiki runs: "tools" | "auto" (None when the wiki was disabled).
-                "wiki_mode": (first.get("wiki_mode") or "tools") if first.get("wiki_enabled") else None,
-                "student_model": first.get("student_model", ""),
-                "teacher_model": first.get("teacher_model", ""),
-                "mean_exact_match": _mean(em),
-                "mean_correct": _mean(correct),
-                "mean_f1": _mean(f1),
-                "mean_doc_recall": _mean(doc),
-                "stop_reasons": stop_reasons,
-                "teacher_calls": sum(source_counts.values()),
-                "teacher_source_pct": teacher_source_pct,
-            }
+        seen_files.add(str(episode_file))
+        run_id = _run_id(output_root, _run_dir_for(episode_file))
+        bucket = runs.setdefault(
+            run_id, {"summaries": [], "source_counts": {}, "mtime": 0.0}
         )
+        bucket["summaries"].extend(entry["summaries"])
+        for k, v in entry["source_counts"].items():
+            bucket["source_counts"][k] = bucket["source_counts"].get(k, 0) + v
+        bucket["mtime"] = max(bucket["mtime"], entry["mtime"])
+
+    # Drop cache entries for files that no longer exist (deleted/moved runs).
+    for stale in [k for k in _FILE_CACHE if k.startswith(str(output_root)) and k not in seen_files]:
+        _FILE_CACHE.pop(stale, None)
+
+    result = [
+        _run_summary(run_id, b["summaries"], b["source_counts"], b["mtime"])
+        for run_id, b in runs.items()
+    ]
     # Newest run first (by most-recent episode file mtime).
     result.sort(key=lambda r: r["mtime"], reverse=True)
     _RUNS_CACHE[str(output_root)] = (signature, result)
@@ -234,12 +275,15 @@ def _episode_files_for_run(output_root: Path, run_id: str) -> List[Path]:
 
 
 def get_run_episodes(output_root: str | Path, run_id: str) -> List[Dict[str, Any]]:
-    """Return per-episode summaries for a run, ordered by sample path."""
+    """Return per-episode summaries for a run, ordered by sample path.
+
+    Served from the per-file summary cache -- unchanged files are never re-parsed."""
     output_root = Path(output_root)
     summaries: List[Dict[str, Any]] = []
     for episode_file in _episode_files_for_run(output_root, run_id):
-        for ep in _read_jsonl(episode_file):
-            summaries.append(_episode_summary(ep))
+        entry = _file_entry(episode_file)
+        if entry is not None:
+            summaries.extend(entry["summaries"])
     return summaries
 
 

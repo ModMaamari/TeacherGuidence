@@ -274,3 +274,46 @@ def test_wiki_mode_surfaces_in_run_and_episode_summaries(tmp_path):
     assert da._episode_summary({"qid": "q2", "final_metrics": {}, "steps": []})["wiki_mode"] is None
     # tools mode is the default label when only wiki_enabled is set.
     assert da._episode_summary({"qid": "q3", "final_metrics": {}, "steps": [], "wiki_enabled": True})["wiki_mode"] == "tools"
+
+
+def test_file_cache_reparse_only_changed_files(tmp_path, monkeypatch):
+    """Two episode files; touching one re-parses only that one."""
+    def _write(run, qid):
+        sd = tmp_path / run / "uuid" / "ds" / f"sample_{qid}"
+        sd.mkdir(parents=True)
+        p = sd / da.EPISODE_FILENAME
+        p.write_text(json.dumps({"qid": qid, "final_metrics": {}, "steps": []}) + "\n")
+        return p
+
+    p1 = _write("run_a", "q1")
+    p2 = _write("run_b", "q2")
+    da._RUNS_CACHE.clear(); da._FILE_CACHE.clear()
+    da.find_runs(tmp_path)
+
+    parsed = []
+    real = da._read_jsonl
+    monkeypatch.setattr(da, "_read_jsonl", lambda p: (parsed.append(str(p)), real(p))[1])
+
+    import os
+    (p2).write_text(json.dumps({"qid": "q2", "final_metrics": {"exact_match": True}, "steps": []}) + "\n")
+    os.utime(p2, (p2.stat().st_atime, p2.stat().st_mtime + 10))
+    runs = da.find_runs(tmp_path)
+    assert len(runs) == 2
+    assert str(p2) in parsed and str(p1) not in parsed
+
+
+def test_get_run_episodes_served_from_file_cache(tmp_path, monkeypatch):
+    sd = tmp_path / "r" / "uuid" / "ds" / "sample_001"
+    sd.mkdir(parents=True)
+    (sd / da.EPISODE_FILENAME).write_text(json.dumps({"qid": "q1", "final_metrics": {}, "steps": []}) + "\n")
+    da._RUNS_CACHE.clear(); da._FILE_CACHE.clear()
+    da.find_runs(tmp_path)  # warms the per-file cache
+    calls = {"n": 0}
+    real = da._read_jsonl
+    def _counting(p):
+        calls["n"] += 1
+        return real(p)
+    monkeypatch.setattr(da, "_read_jsonl", _counting)
+    eps = da.get_run_episodes(tmp_path, "r/uuid")
+    assert eps[0]["qid"] == "q1"
+    assert calls["n"] == 0  # unchanged file -> served from cache
