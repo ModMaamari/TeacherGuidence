@@ -138,6 +138,10 @@ class TeacherGuidanceEpisodeExporter:
             "path_optimality": compute_path_optimality(step_records),
             "plan_adherence": md.get("plan_adherence"),
             "stop_reason": md.get("stop_reason", "error"),
+            # Agent-wiki runs: record the flag and the wiki's final content so wiki
+            # usage can be analyzed per episode (absent/false on non-wiki runs).
+            "wiki_enabled": bool(md.get("wiki_enabled", False)),
+            "wiki_final": (str(md.get("wiki", "") or "") if md.get("wiki_enabled") else None),
         }
 
     def _gather_corpus(self, context: Any, gold: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
