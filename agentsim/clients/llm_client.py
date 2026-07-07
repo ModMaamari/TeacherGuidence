@@ -285,31 +285,45 @@ class LLMClient:
             # guarantee here rather than relying on schema conformance being honored.
             payload["response_format"] = {"type": "json_object"}
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{endpoint.rstrip('/')}/v1/chat/completions",
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-            data = response.json()
-            text = data["choices"][0]["message"]["content"]
+        async def _send() -> Any:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{endpoint.rstrip('/')}/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                response.raise_for_status()
+                return response.json()
 
-            if return_usage:
-                usage = data.get("usage", {})
-                result = {
-                    "text": text,
-                    "usage": {
-                        "prompt_tokens": usage.get("prompt_tokens", 0),
-                        "completion_tokens": usage.get("completion_tokens", 0),
-                        "total_tokens": usage.get("total_tokens", 0),
-                        "cost": usage.get("cost"),
-                    }
+        # Hard wall-clock cap, same rationale as _fau_completion: httpx's read timeout
+        # only measures the gap between bytes, so a half-dead connection that trickles
+        # keepalive bytes hangs forever (observed in production: an OpenRouter blip left
+        # six workers frozen mid-call for 10+ minutes with the API healthy again).
+        # asyncio.wait_for turns that into an error the caller's retry/router can handle.
+        try:
+            data = await asyncio.wait_for(_send(), timeout=config.CUSTOM_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"custom/OpenRouter request exceeded hard timeout of "
+                f"{config.CUSTOM_TIMEOUT}s (model={model_name})"
+            ) from exc
+        text = data["choices"][0]["message"]["content"]
+
+        if return_usage:
+            usage = data.get("usage", {})
+            result = {
+                "text": text,
+                "usage": {
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                    "cost": usage.get("cost"),
                 }
-                if return_raw:
-                    result["raw_response"] = data
-                return result
-            return text
+            }
+            if return_raw:
+                result["raw_response"] = data
+            return result
+        return text
 
     async def _post_json_with_backoff(self, client, url, headers, payload, provider_label="fau", max_retries=None):
         """POST ``payload`` and retry on transient throttling (HTTP 429) or

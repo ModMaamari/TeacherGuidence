@@ -502,3 +502,22 @@ def test_fau_completion_raises_on_hard_timeout(monkeypatch):
 def test_router_requires_models():
     with pytest.raises(ValueError):
         asyncio.run(LLMClient().get_completion_with_fallback([], prompt="hi"))
+
+
+def test_custom_completion_raises_on_hard_timeout(monkeypatch):
+    # Same guarantee for the OpenRouter/custom path: a half-dead connection that never
+    # completes (simulated by an httpx post that sleeps past the cap) must raise
+    # TimeoutError rather than hang the worker forever.
+    import httpx as _httpx
+
+    monkeypatch.setattr(type(config), "CUSTOM_LLM_ENDPOINT", "https://openrouter.test/api")
+    monkeypatch.setattr(type(config), "CUSTOM_LLM_API_KEY", "sk-test")
+    monkeypatch.setattr(type(config), "CUSTOM_TIMEOUT", 1)
+    client = LLMClient()
+
+    async def slow_post(self, *a, **kw):
+        await asyncio.sleep(5)  # longer than CUSTOM_TIMEOUT
+
+    monkeypatch.setattr(_httpx.AsyncClient, "post", slow_post)
+    with pytest.raises(TimeoutError, match="hard timeout"):
+        asyncio.run(client.get_completion(prompt="hi", model="custom/openai/gpt-oss-120b"))

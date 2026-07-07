@@ -102,6 +102,11 @@ class Config:
     # blocks forever. This asyncio.wait_for cap guarantees a hung FAU call raises so the
     # teacher router falls through to OpenRouter instead of stalling the whole run.
     FAU_TIMEOUT: int = int(os.getenv("FAU_TIMEOUT", "45"))
+    # Same wall-clock cap for a single custom/OpenRouter request (observed in
+    # production: a momentary OpenRouter blip left workers frozen mid-call for 10+
+    # minutes with the API healthy again). Generous default because a reasoning
+    # teacher's long generation is legitimate.
+    CUSTOM_TIMEOUT: int = int(os.getenv("CUSTOM_TIMEOUT", "180"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "4096"))
     
     @classmethod
