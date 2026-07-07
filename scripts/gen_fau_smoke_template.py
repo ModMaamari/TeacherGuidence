@@ -58,6 +58,7 @@ def build_fau_smoke_template(
     student_use_response_schema: bool = True,
     disclose_budget: bool = True,
     wiki_enabled: bool = False,
+    wiki_mode: str = "tools",
 ) -> dict:
     mode_config = {
         "budget": budget,
@@ -67,6 +68,7 @@ def build_fau_smoke_template(
         "student_use_response_schema": student_use_response_schema,
         "disclose_budget": disclose_budget,
         "wiki_enabled": wiki_enabled,
+        "wiki_mode": wiki_mode,
         "corpus_path": corpus_path,
         "retrieval_backend": "hotpot_local",
         "skip_teacher": False,
