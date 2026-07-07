@@ -8,7 +8,12 @@ from agentsim.workflow.context import WorkflowContext
 from agentsim.teacher_guidance.local_retrieval import HotpotLocalRetriever
 from agentsim.teacher_guidance.schemas import StudentAction, TOOLS, DECISION_CATEGORIES
 from agentsim.teacher_guidance.tool_executor import execute_student_tool
-from agentsim.teacher_guidance.prompts import build_student_visible_state, build_student_prompt
+from agentsim.teacher_guidance.prompts import (
+    build_student_visible_state,
+    build_student_prompt,
+    build_wiki_update_prompt,
+)
+from agentsim.teacher_guidance.tool_executor import clean_wiki_content
 from agentsim.teacher_guidance.schemas import GuidanceConfig
 from agentsim.teacher_guidance.json_utils import parse_student_action
 from agentsim.teacher_guidance.pydantic_schemas import (
@@ -127,6 +132,94 @@ def test_prompt_omits_wiki_when_disabled():
     state = {"question": "q", "step": 1, "budget": 5}
     p = build_student_prompt(state, GuidanceConfig(level=3), force_finish=False)
     assert "wiki" not in p.lower()
+
+
+# ---------------------------------------------------------------------------
+# Auto wiki mode (wiki_mode == "auto")
+# ---------------------------------------------------------------------------
+def test_auto_mode_state_includes_wiki_content_every_step():
+    ctx = WorkflowContext(
+        task_id="q1", query="q",
+        metadata={"wiki_enabled": True, "wiki_mode": "auto", "wiki": "notes"},
+    )
+    state = build_student_visible_state(ctx, 3, 5)
+    assert state["wiki_mode"] == "auto" and state["wiki_content"] == "notes"
+    assert "wiki_chars" not in state
+
+
+def test_auto_mode_prompt_shows_wiki_but_no_wiki_tools():
+    state = {"question": "q", "step": 1, "budget": 5,
+             "wiki_enabled": True, "wiki_mode": "auto", "wiki_content": "saved note"}
+    p = build_student_prompt(state, GuidanceConfig(level=3), force_finish=False)
+    assert "saved note" in p and "wiki.md" in p
+    assert "wiki_read" not in p and "wiki_write" not in p
+
+
+def test_wiki_update_prompt_contents():
+    state = {"question": "who?", "wiki_content": "old note"}
+    p = build_wiki_update_prompt(
+        state,
+        {"action": {"tool": "search", "params": {"query": "x"}}},
+        {"tool": "search", "status": "ok"},
+    )
+    assert "who?" in p and "old note" in p and "search" in p
+    assert "NEW full content" in p
+
+
+def test_clean_wiki_content_strips_fences_and_caps_length():
+    assert clean_wiki_content("```markdown\nnote\n```") == "note"
+    assert clean_wiki_content("  plain  ") == "plain"
+    assert len(clean_wiki_content("x" * 5000)) == 2000
+    assert clean_wiki_content(None) == ""
+
+
+def test_auto_mode_component_updates_wiki_after_step(tmp_path):
+    import asyncio
+    from agentsim.components.control.teacher_guided_agent_step import TeacherGuidedAgentStep
+
+    student_json = json.dumps({
+        "thought": "search for the relevant document first",
+        "decision": {"category": "need_retrieval", "parametric_knowledge_used": False},
+        "action": {"tool": "search", "params": {"query": "Doc", "k": 1}},
+        "new_facts_extracted": [],
+    })
+    teacher_json = json.dumps({
+        "guidance_level": 3,
+        "student_visible": {"score_binary": 1, "score_continuous": 0.9, "feedback": "good", "hint": None},
+        "private_diagnosis": {},
+        "teacher_decision": "continue",
+    })
+
+    class StubLLM:
+        async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
+            if "update the wiki" in prompt.lower() or "NEW full content" in prompt:
+                return "key fact: Doc found"
+            if "teacher evaluating" in prompt:
+                return teacher_json
+            return student_json
+
+    corpus_path = tmp_path / "corpus.jsonl"
+    with open(corpus_path, "w", encoding="utf-8") as f:
+        for row in CORPUS:
+            f.write(json.dumps(row) + "\n")
+    ctx = WorkflowContext(
+        task_id="q1", query="A question?",
+        metadata={
+            "corpus_path": str(corpus_path),
+            "student_model": "stub", "teacher_model": "stub",
+            "guidance": {"level": 3},
+            "gold": {"answer": "x", "gold_doc_ids": ["q1::doc0"]},
+            "retrieval_scope": {"qid": "q1"},
+            "wiki_enabled": True, "wiki_mode": "auto",
+        },
+    )
+    comp = TeacherGuidedAgentStep({"step_index": 1, "budget": 5}, llm_client=StubLLM())
+    result = asyncio.run(comp.execute(ctx))
+    assert result.success
+    assert ctx.metadata["wiki"] == "key fact: Doc found"
+    step = ctx.metadata["teacher_guided_steps"][0]
+    assert step["wiki_after"] == "key fact: Doc found"
+    assert step["wiki_update_call"] is not None
 
 
 # ---------------------------------------------------------------------------
