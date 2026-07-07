@@ -147,6 +147,8 @@ def main() -> None:
     ap.add_argument("--student-no-schema", action="store_true",
                     help="disable grammar-constrained student decoding (default: on)")
     ap.add_argument("--hidden-budget", action="store_true")
+    ap.add_argument("--wiki", action="store_true",
+                    help="enable the per-episode agent wiki (wiki_read/wiki_write tools)")
     ap.add_argument("--teacher-model", default="fau/gpt-oss-120b",
                     help="teacher model id (first provider tried)")
     ap.add_argument("--teacher-router", default=None,
@@ -200,6 +202,7 @@ def main() -> None:
                 planning_steps=args.planning_steps, max_plan_steps=args.max_plan_steps,
                 student_use_response_schema=not args.student_no_schema,
                 disclose_budget=not args.hidden_budget,
+                wiki_enabled=args.wiki,
             )
             tpath = TEMPLATES_DIR / f"{w['template_id']}.yaml"
             tpath.write_text(yaml.dump(template, sort_keys=False), encoding="utf-8")
