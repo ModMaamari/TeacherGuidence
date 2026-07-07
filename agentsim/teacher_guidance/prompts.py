@@ -36,6 +36,31 @@ _STUDENT_ACTION_SCHEMA = """Return ONLY a JSON object with this shape (no prose 
   "new_facts_extracted": [{"doc_id": "...", "span": "verbatim span", "fact": "grounded fact"}]
 }"""
 
+# Wiki-enabled variants: identical to the above plus the wiki_read/wiki_write tools
+# (and the manage_wiki decision category). The baseline text stays byte-identical so
+# wiki-disabled runs are unaffected.
+_WIKI_TOOL_REFERENCE_EXTRA = """- wiki_read: {}  (read your wiki.md notes)
+- wiki_write: {"content": "..."}  (replace your wiki.md notes with new content)"""
+
+_STUDENT_ACTION_SCHEMA_WIKI = """Return ONLY a JSON object with this shape (no prose outside JSON):
+{
+  "thought": "brief private reasoning",
+  "decision": {"category": "need_decomposition|need_retrieval|need_reformulation|sufficient_evidence|synthesize|verify|manage_wiki|finish",
+               "parametric_knowledge_used": false},
+  "action": {"tool": "decompose|reformulate|search|extract|verify|synthesize|wiki_read|wiki_write|finish", "params": {}},
+  "new_facts_extracted": [{"doc_id": "...", "span": "verbatim span", "fact": "grounded fact"}]
+}"""
+
+_WIKI_INSTRUCTIONS = (
+    "You also have a personal wiki (wiki.md): a private notes file that starts empty and "
+    "persists across all your steps on this question. Use it as an information bank -- "
+    "when you learn something important (key entities, confirmed facts, partial answers, "
+    "what to look up next), save it with wiki_write; recall it later with wiki_read. "
+    "Keep it MINIMAL (a few short lines, not full documents) -- wiki_write replaces the "
+    "whole file. You decide when to read and write; each wiki operation uses a step, so "
+    "use it only when it helps you answer."
+)
+
 # A single neutral example, included only to reinforce the JSON FORMAT. Its content is
 # generic and unrelated to any dataset question, so it cannot leak gold information.
 _STUDENT_EXAMPLE = """Format example only (your content and tool will differ):
@@ -68,6 +93,13 @@ def build_student_visible_state(context: Any, step_index: int, budget: int) -> D
     }
     if md.get("revised_plan") is not None:
         state["revised_plan"] = md.get("revised_plan")
+    if md.get("wiki_enabled"):
+        state["wiki_enabled"] = True
+        state["wiki_chars"] = len(str(md.get("wiki", "") or ""))
+        # One-shot content surfacing: present only on the step right after a wiki_read
+        # (execute_student_tool clears it when the next action runs).
+        if md.get("wiki_just_read") is not None:
+            state["wiki_content"] = md.get("wiki_just_read")
     return state
 
 
@@ -79,11 +111,16 @@ def build_student_prompt(
     state: Dict[str, Any], guidance_config: GuidanceConfig, force_finish: bool
 ) -> str:
     parts: List[str] = []
+    wiki_enabled = bool(state.get("wiki_enabled"))
     parts.append(
         "You are an information-seeking retrieval agent solving a question using tools. "
         "You must ground every fact in retrieved documents and must NOT answer from memory."
     )
-    parts.append(_TOOL_REFERENCE)
+    if wiki_enabled:
+        parts.append(_TOOL_REFERENCE + "\n" + _WIKI_TOOL_REFERENCE_EXTRA)
+        parts.append(_WIKI_INSTRUCTIONS)
+    else:
+        parts.append(_TOOL_REFERENCE)
     parts.append("Retrieval backend is 'hotpot_local' (search only the current question's documents).")
     parts.append(f"Question: {state.get('question', '')}")
     # Budget disclosure: in the default mode the student sees its exact step budget; in the
@@ -117,6 +154,18 @@ def build_student_prompt(
     if state.get("draft_answer"):
         parts.append(f"Current draft answer: {state.get('draft_answer')}")
 
+    if wiki_enabled:
+        if state.get("wiki_content") is not None:
+            content = state.get("wiki_content") or "(empty)"
+            parts.append("Your wiki.md (from your wiki_read):\n" + content)
+        elif state.get("wiki_chars"):
+            parts.append(
+                f"Your wiki.md has {state.get('wiki_chars')} characters of saved notes "
+                "(use wiki_read to view them)."
+            )
+        else:
+            parts.append("Your wiki.md is currently empty.")
+
     prev = state.get("previous_teacher_guidance")
     if prev:
         parts.append("Previous teacher guidance: " + _json(prev))
@@ -129,7 +178,7 @@ def build_student_prompt(
             "retrieved/extracted evidence."
         )
 
-    parts.append(_STUDENT_ACTION_SCHEMA)
+    parts.append(_STUDENT_ACTION_SCHEMA_WIKI if wiki_enabled else _STUDENT_ACTION_SCHEMA)
     parts.append(_STUDENT_EXAMPLE)
     return "\n\n".join(parts)
 
