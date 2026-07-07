@@ -81,3 +81,27 @@ def test_unknown_route_404(base_url):
     with pytest.raises(urllib.error.HTTPError) as exc:
         _get(f"{base_url}/nope")
     assert exc.value.code == 404
+
+
+def test_gzip_when_accepted(base_url):
+    import gzip as _gzip
+
+    req = urllib.request.Request(f"{base_url}/api/runs", headers={"Accept-Encoding": "gzip"})
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        body = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip":
+            body = _gzip.decompress(body)
+        data = json.loads(body.decode("utf-8"))
+    assert data[0]["run_id"] == "sim/run1"
+
+
+def test_etag_304_revalidation(base_url):
+    import urllib.error
+
+    with urllib.request.urlopen(f"{base_url}/api/runs", timeout=5) as resp:
+        etag = resp.headers.get("ETag")
+    assert etag
+    req = urllib.request.Request(f"{base_url}/api/runs", headers={"If-None-Match": etag})
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(req, timeout=5)
+    assert exc.value.code == 304

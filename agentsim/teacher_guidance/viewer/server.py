@@ -14,6 +14,8 @@ Routes:
 
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,25 +34,49 @@ _CONTENT_TYPES = {
     ".svg": "image/svg+xml",
 }
 
+# Don't bother compressing tiny payloads -- the gzip header would eat the savings.
+_GZIP_MIN_BYTES = 512
+
 
 class ViewerHandler(BaseHTTPRequestHandler):
-    server_version = "TeacherGuidanceViewer/1.0"
+    server_version = "TeacherGuidanceViewer/2.0"
 
     # --- helpers -----------------------------------------------------------
-    def _send_json(self, payload: Any, status: int = 200) -> None:
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+    def _accepts_gzip(self) -> bool:
+        return "gzip" in (self.headers.get("Accept-Encoding") or "").lower()
 
     def _send_bytes(self, body: bytes, content_type: str, status: int = 200) -> None:
+        """Send a response body with ETag/304 revalidation and gzip compression.
+
+        Episode payloads carry every raw prompt/response of a trajectory (hundreds of
+        KB); gzip cuts them ~10x, and the ETag lets the browser skip the transfer
+        entirely when nothing changed."""
+        etag = '"' + hashlib.sha1(body).hexdigest()[:20] + '"'
+        if status == 200 and self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.end_headers()
+            return
+        encoded = body
+        encoding = None
+        if len(body) >= _GZIP_MIN_BYTES and self._accepts_gzip():
+            encoded = gzip.compress(body, compresslevel=6)
+            encoding = "gzip"
         self.send_response(status)
         self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Length", str(len(encoded)))
+        if status == 200:
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-cache")  # revalidate via ETag
+        if encoding:
+            self.send_header("Content-Encoding", encoding)
+        self.send_header("Vary", "Accept-Encoding")
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(encoded)
+
+    def _send_json(self, payload: Any, status: int = 200) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self._send_bytes(body, "application/json; charset=utf-8", status)
 
     def _serve_static(self, rel_path: str) -> None:
         # Constrain to STATIC_DIR (reject traversal).
