@@ -214,6 +214,18 @@ def clean_forced_answer(raw: str) -> str:
     return _substantive(s)
 
 
+def clean_wiki_content(raw: str, max_chars: int = 2000) -> str:
+    """Normalize a free-text wiki-update reply into storable wiki.md content: strip a
+    wrapping markdown code fence if the model added one, and hard-cap the length so a
+    rambling model can never blow up every subsequent step's prompt."""
+    s = str(raw or "").strip()
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", s).strip()
+    if len(s) > max_chars:
+        s = s[:max_chars].rstrip()
+    return s
+
+
 def derive_final_answer(context: Any, params: Optional[Dict[str, Any]] = None) -> str:
     """Best non-empty final answer, in priority order:
 

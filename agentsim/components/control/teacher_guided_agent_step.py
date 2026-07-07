@@ -30,6 +30,7 @@ from agentsim.teacher_guidance.prompts import (
     build_student_prompt,
     build_teacher_prompt,
     build_forced_answer_prompt,
+    build_wiki_update_prompt,
 )
 from agentsim.teacher_guidance.tool_executor import execute_student_tool
 from agentsim.teacher_guidance.guidance_policy import render_student_guidance
@@ -317,6 +318,17 @@ class TeacherGuidedAgentStep(ControlComponent):
 
         done = self._update_done(context, student_action, teacher_eval.teacher_decision, force_finish)
 
+        # Auto wiki mode: after every (non-final) step, one dedicated call asks the
+        # student to rewrite wiki.md from what it just did/observed. The read half is
+        # implicit -- build_student_visible_state puts the wiki into every step's prompt.
+        wiki_update_call = None
+        wiki_auto = bool(context.metadata.get("wiki_enabled")) and \
+            context.metadata.get("wiki_mode", "tools") == "auto"
+        if wiki_auto and not done:
+            wiki_update_call = await self._update_wiki(
+                context, state, student_action, tool_observation, student_model, student_temp
+            )
+
         step_record = {
             "t": step_index,
             "student_prompt": student_prompt,
@@ -341,6 +353,9 @@ class TeacherGuidedAgentStep(ControlComponent):
             "step_ended_at": datetime.now(timezone.utc).isoformat(),
             "step_elapsed_ms": (time.time() - start) * 1000,
         }
+        if wiki_auto:
+            step_record["wiki_update_call"] = wiki_update_call
+            step_record["wiki_after"] = context.metadata.get("wiki", "")
         context.metadata.setdefault("teacher_guided_steps", []).append(step_record)
         context.metadata["last_teacher_guidance_for_student"] = rendered_guidance
 
@@ -427,6 +442,30 @@ class TeacherGuidedAgentStep(ControlComponent):
             else "Budget exhausted; committing best available answer from retrieved evidence."
         )
         return _build_finish_action(answer, thought, citations), forced_call
+
+    async def _update_wiki(
+        self, context, state, student_action, tool_observation, student_model, student_temp
+    ):
+        """Auto-wiki write half: one free-text call that rewrites wiki.md after a step.
+
+        Never crashes the episode -- on any failure the wiki simply keeps its previous
+        content. Returns the call-log entry (or None) so the step record shows the call."""
+        from agentsim.teacher_guidance.tool_executor import clean_wiki_content
+
+        try:
+            call_entry, raw = await timed_completion(
+                self.llm_client,
+                prompt=build_wiki_update_prompt(state, student_action.to_dict(), tool_observation),
+                model=student_model,
+                temperature=student_temp,
+                max_tokens=context.metadata.get("wiki_max_tokens", 400),
+                attempt=1,
+            )
+            context.metadata["wiki"] = clean_wiki_content(raw)
+            return call_entry
+        except Exception as exc:
+            logger.warning(f"[TG wiki] auto wiki update failed (keeping previous wiki): {exc}")
+            return None
 
     async def _student_action_with_repair(
         self, context, student_prompt, student_model, student_temp, response_schema=None

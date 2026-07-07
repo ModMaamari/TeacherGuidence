@@ -112,6 +112,8 @@ class TeacherGuidanceEpisodeExporter:
                 "metrics": s.get("metrics"),
                 "leakage_check": s.get("leakage_check"),
                 "stop_condition": s.get("stop_condition", "CONTINUE"),
+                "wiki_update_call": s.get("wiki_update_call"),
+                "wiki_after": s.get("wiki_after"),
                 "step_started_at": s.get("step_started_at"),
                 "step_ended_at": s.get("step_ended_at"),
                 "step_elapsed_ms": s.get("step_elapsed_ms"),
@@ -141,6 +143,7 @@ class TeacherGuidanceEpisodeExporter:
             # Agent-wiki runs: record the flag and the wiki's final content so wiki
             # usage can be analyzed per episode (absent/false on non-wiki runs).
             "wiki_enabled": bool(md.get("wiki_enabled", False)),
+            "wiki_mode": (md.get("wiki_mode", "tools") if md.get("wiki_enabled") else None),
             "wiki_final": (str(md.get("wiki", "") or "") if md.get("wiki_enabled") else None),
         }
 

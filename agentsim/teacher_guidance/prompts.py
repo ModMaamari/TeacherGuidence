@@ -51,6 +51,16 @@ _STUDENT_ACTION_SCHEMA_WIKI = """Return ONLY a JSON object with this shape (no p
   "new_facts_extracted": [{"doc_id": "...", "span": "verbatim span", "fact": "grounded fact"}]
 }"""
 
+# Auto wiki mode (wiki_mode == "auto"): the wiki is not a tool. It is read into every
+# step's prompt automatically, and after every step a dedicated call asks the student to
+# rewrite it. No budget steps are consumed and the action grammar stays the baseline one.
+_WIKI_AUTO_NOTE = (
+    "You keep a personal wiki (wiki.md): a MINIMAL notes file that persists across all "
+    "your steps on this question. Its current content is shown below, and after each "
+    "step you will be asked to update it. Rely on it to remember key facts, answer "
+    "candidates, and what to do next."
+)
+
 _WIKI_INSTRUCTIONS = (
     "You also have a personal wiki (wiki.md): a private notes file that starts empty and "
     "persists across all your steps on this question. Use it as an information bank -- "
@@ -95,11 +105,16 @@ def build_student_visible_state(context: Any, step_index: int, budget: int) -> D
         state["revised_plan"] = md.get("revised_plan")
     if md.get("wiki_enabled"):
         state["wiki_enabled"] = True
-        state["wiki_chars"] = len(str(md.get("wiki", "") or ""))
-        # One-shot content surfacing: present only on the step right after a wiki_read
-        # (execute_student_tool clears it when the next action runs).
-        if md.get("wiki_just_read") is not None:
-            state["wiki_content"] = md.get("wiki_just_read")
+        state["wiki_mode"] = md.get("wiki_mode", "tools")
+        if state["wiki_mode"] == "auto":
+            # Auto mode: the wiki is read into every step's prompt.
+            state["wiki_content"] = str(md.get("wiki", "") or "")
+        else:
+            state["wiki_chars"] = len(str(md.get("wiki", "") or ""))
+            # One-shot content surfacing: present only on the step right after a
+            # wiki_read (execute_student_tool clears it when the next action runs).
+            if md.get("wiki_just_read") is not None:
+                state["wiki_content"] = md.get("wiki_just_read")
     return state
 
 
@@ -111,16 +126,19 @@ def build_student_prompt(
     state: Dict[str, Any], guidance_config: GuidanceConfig, force_finish: bool
 ) -> str:
     parts: List[str] = []
-    wiki_enabled = bool(state.get("wiki_enabled"))
+    wiki_auto = bool(state.get("wiki_enabled")) and state.get("wiki_mode") == "auto"
+    wiki_tools = bool(state.get("wiki_enabled")) and not wiki_auto
     parts.append(
         "You are an information-seeking retrieval agent solving a question using tools. "
         "You must ground every fact in retrieved documents and must NOT answer from memory."
     )
-    if wiki_enabled:
+    if wiki_tools:
         parts.append(_TOOL_REFERENCE + "\n" + _WIKI_TOOL_REFERENCE_EXTRA)
         parts.append(_WIKI_INSTRUCTIONS)
     else:
         parts.append(_TOOL_REFERENCE)
+        if wiki_auto:
+            parts.append(_WIKI_AUTO_NOTE)
     parts.append("Retrieval backend is 'hotpot_local' (search only the current question's documents).")
     parts.append(f"Question: {state.get('question', '')}")
     # Budget disclosure: in the default mode the student sees its exact step budget; in the
@@ -154,7 +172,9 @@ def build_student_prompt(
     if state.get("draft_answer"):
         parts.append(f"Current draft answer: {state.get('draft_answer')}")
 
-    if wiki_enabled:
+    if wiki_auto:
+        parts.append("Your wiki.md:\n" + (state.get("wiki_content") or "(empty)"))
+    elif wiki_tools:
         if state.get("wiki_content") is not None:
             content = state.get("wiki_content") or "(empty)"
             parts.append("Your wiki.md (from your wiki_read):\n" + content)
@@ -178,8 +198,32 @@ def build_student_prompt(
             "retrieved/extracted evidence."
         )
 
-    parts.append(_STUDENT_ACTION_SCHEMA_WIKI if wiki_enabled else _STUDENT_ACTION_SCHEMA)
+    parts.append(_STUDENT_ACTION_SCHEMA_WIKI if wiki_tools else _STUDENT_ACTION_SCHEMA)
     parts.append(_STUDENT_EXAMPLE)
+    return "\n\n".join(parts)
+
+
+def build_wiki_update_prompt(
+    state: Dict[str, Any], student_action: Dict[str, Any], tool_observation: Dict[str, Any]
+) -> str:
+    """Auto-wiki-mode prompt: after each step, ask the student to rewrite wiki.md from
+    what it just did/observed. Free text output (no JSON) so nothing structural can fail."""
+    parts: List[str] = []
+    parts.append(
+        "You maintain a personal wiki (wiki.md) of MINIMAL notes that helps you solve a "
+        "question over multiple retrieval steps. You just completed a step; update the "
+        "wiki now so your next step can rely on it."
+    )
+    parts.append(f"Question: {state.get('question', '')}")
+    parts.append("Current wiki.md:\n" + (state.get("wiki_content") or "(empty)"))
+    parts.append("Action you just took: " + _json(student_action))
+    parts.append("Tool observation: " + _json(tool_observation))
+    parts.append(
+        "Output the NEW full content of wiki.md and NOTHING else -- plain text, no JSON, "
+        "no code fences, no commentary. Keep it under 120 words: only key entities, "
+        "confirmed facts (with doc ids), your current best answer candidate, and what to "
+        "do next. Drop anything no longer useful."
+    )
     return "\n\n".join(parts)
 
 
