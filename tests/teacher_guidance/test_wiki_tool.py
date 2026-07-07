@@ -163,22 +163,28 @@ def test_wiki_update_prompt_contents():
         {"tool": "search", "status": "ok"},
     )
     assert "who?" in p and "old note" in p and "search" in p
-    # Rigid template + filled example so small models don't write junk notes.
-    assert "FACTS:" in p and "ANSWER:" in p and "NEXT:" in p
-    assert "EXACTLY this format" in p
-    assert "Example of a good wiki.md" in p and "Green Party" in p
+    # Surgical edit protocol: command list + example, no full-document rewrites.
+    assert "ADD:" in p and "EDIT <n>:" in p and "DEL <n>" in p and "KEEP" in p
+    assert "Example output" in p
+    assert "Do NOT rewrite the whole wiki" in p
     assert "no JSON" in p
 
 
 def test_wiki_update_prompt_demands_editing_not_appending():
     p = build_wiki_update_prompt({"question": "q", "wiki_content": "x"}, {}, {})
     # Review-and-edit semantics: verify existing lines, fix/remove wrong ones, dedupe.
-    assert "CORRECT or DELETE" in p
-    assert "Do not duplicate" in p
+    assert "correct or delete" in p
+    assert "no duplicates" in p
     # ANSWER must always commit to a concrete candidate -- the earlier "ANSWER: ?"
     # variant taught qwen2b to answer "unknown" over its own correct FACTS.
-    assert 'never write "?"' in p
+    assert 'never "?" or "unknown"' in p
     assert "ANSWER: ?" not in p
+
+
+def test_wiki_update_prompt_numbers_facts_for_editing():
+    state = {"question": "q", "wiki_content": "FACTS:\n- alpha (d1)\n- beta (d2)\nANSWER: x\nNEXT: y"}
+    p = build_wiki_update_prompt(state, {}, {})
+    assert "1. alpha (d1)" in p and "2. beta (d2)" in p
 
 
 def test_auto_mode_prompt_states_wiki_use_cases():
@@ -243,7 +249,7 @@ def test_auto_mode_component_updates_wiki_after_step(tmp_path):
     class StubLLM:
         async def get_completion(self, prompt, model=None, temperature=0.0, max_tokens=None, **kw):
             if "edit the wiki" in prompt.lower():
-                return "key fact: Doc found"
+                return "ADD: Doc found in corpus (q1::doc0)\nANSWER: Doc\nNEXT: finish"
             if "teacher evaluating" in prompt:
                 return teacher_json
             return student_json
@@ -266,10 +272,14 @@ def test_auto_mode_component_updates_wiki_after_step(tmp_path):
     comp = TeacherGuidedAgentStep({"step_index": 1, "budget": 5}, llm_client=StubLLM())
     result = asyncio.run(comp.execute(ctx))
     assert result.success
-    assert ctx.metadata["wiki"] == "key fact: Doc found"
+    expected = "FACTS:\n- Doc found in corpus (q1::doc0)\nANSWER: Doc\nNEXT: finish"
+    assert ctx.metadata["wiki"] == expected
     step = ctx.metadata["teacher_guided_steps"][0]
-    assert step["wiki_after"] == "key fact: Doc found"
+    assert step["wiki_after"] == expected
     assert step["wiki_update_call"] is not None
+    # The applied edit ops are recorded on the step for analysis/export.
+    assert [a.split()[0] for a in step["wiki_edit_ops"]["applied"]] == ["ADD", "ANSWER", "NEXT"]
+    assert step["wiki_edit_ops"]["ignored"] == []
 
 
 # ---------------------------------------------------------------------------

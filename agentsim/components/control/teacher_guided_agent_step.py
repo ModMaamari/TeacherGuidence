@@ -356,6 +356,7 @@ class TeacherGuidedAgentStep(ControlComponent):
         if wiki_auto:
             step_record["wiki_update_call"] = wiki_update_call
             step_record["wiki_after"] = context.metadata.get("wiki", "")
+            step_record["wiki_edit_ops"] = context.metadata.pop("wiki_edit_ops", None)
         context.metadata.setdefault("teacher_guided_steps", []).append(step_record)
         context.metadata["last_teacher_guidance_for_student"] = rendered_guidance
 
@@ -446,11 +447,15 @@ class TeacherGuidedAgentStep(ControlComponent):
     async def _update_wiki(
         self, context, state, student_action, tool_observation, student_model, student_temp
     ):
-        """Auto-wiki write half: one free-text call that rewrites wiki.md after a step.
+        """Auto-wiki write half: one short call emitting surgical edit commands
+        (ADD/EDIT/DEL/ANSWER/NEXT/KEEP) that ``wiki.apply_wiki_edits`` applies
+        deterministically -- the model only generates the changed lines, never the
+        whole file. Applied/ignored ops land in ``metadata['wiki_edit_ops']`` for the
+        step record.
 
         Never crashes the episode -- on any failure the wiki simply keeps its previous
         content. Returns the call-log entry (or None) so the step record shows the call."""
-        from agentsim.teacher_guidance.tool_executor import clean_wiki_content
+        from agentsim.teacher_guidance.wiki import apply_wiki_edits
 
         try:
             call_entry, raw = await timed_completion(
@@ -461,9 +466,11 @@ class TeacherGuidedAgentStep(ControlComponent):
                 max_tokens=context.metadata.get("wiki_max_tokens", 400),
                 attempt=1,
             )
-            context.metadata["wiki"] = clean_wiki_content(raw)
+            new_wiki, applied, ignored = apply_wiki_edits(context.metadata.get("wiki", ""), raw)
+            context.metadata["wiki"] = new_wiki
+            context.metadata["wiki_edit_ops"] = {"applied": applied, "ignored": ignored}
             return call_entry
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - defensive
             logger.warning(f"[TG wiki] auto wiki update failed (keeping previous wiki): {exc}")
             return None
 

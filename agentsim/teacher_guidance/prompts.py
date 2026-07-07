@@ -62,22 +62,10 @@ _WIKI_AUTO_NOTE = (
     "keep your best answer up to date."
 )
 
-# Fixed three-line format for wiki.md. Small students write junk (raw action JSON,
-# rambling paragraphs) into a free-form wiki; a rigid fill-in template keeps the notes
-# usable and easy to both write and read back. ANSWER must always name a concrete best
-# guess: an earlier "ANSWER: ?" variant taught small models to answer "unknown" even
-# when their own FACTS contained the gold answer (observed with qwen3.5:2b).
-_WIKI_TEMPLATE = """FACTS:
-- <one confirmed fact> (doc_id)
-ANSWER: <your current best guess -- always name one, never "?" or "unknown">
-NEXT: <the single next thing to do>"""
-
-_WIKI_EXAMPLE = """Example of a good wiki.md:
-FACTS:
-- Jill Stein ran for president in 2012 and 2016 (q1::doc2)
-- She represented the Green Party (q1::doc2)
-ANSWER: Green Party
-NEXT: verify the party name, then finish"""
+# wiki.md keeps a fixed FACTS/ANSWER/NEXT shape (see agentsim/teacher_guidance/wiki.py,
+# which owns parsing/rendering and the surgical edit-command engine). ANSWER must always
+# name a concrete best guess: an earlier "ANSWER: ?" variant taught small models to
+# answer "unknown" even when their own FACTS contained the gold answer (qwen3.5:2b).
 
 _WIKI_INSTRUCTIONS = (
     "You also have a personal wiki (wiki.md): a private notes file that starts empty and "
@@ -228,15 +216,34 @@ def build_student_prompt(
     return "\n\n".join(parts)
 
 
+_WIKI_EDIT_COMMANDS = """ADD: <new fact> (doc_id)       add a fact you just learned
+EDIT <n>: <corrected fact>     fix FACTS line n (it is wrong or outdated)
+DEL <n>                        delete FACTS line n (wrong or useless)
+ANSWER: <best guess>           update your best answer -- always one concrete candidate, never "?" or "unknown"
+NEXT: <next step>              update the single next thing to do
+KEEP                           nothing needs to change"""
+
+_WIKI_EDIT_EXAMPLE = """Example output (only the commands you need, usually 1-3 lines):
+ADD: Goats Head Soup was released in August 1973 (q1::doc6)
+EDIT 1: Jim Price toured with The Rolling Stones 1970-1973 (q1::doc0)
+ANSWER: August 1973"""
+
+
 def build_wiki_update_prompt(
     state: Dict[str, Any], student_action: Dict[str, Any], tool_observation: Dict[str, Any]
 ) -> str:
-    """Auto-wiki-mode prompt: after each step, ask the student to rewrite wiki.md from
-    what it just did/observed. Free text output (no JSON) so nothing structural can fail.
+    """Auto-wiki-mode prompt: after each step, ask the student for SURGICAL EDITS to
+    wiki.md instead of a full rewrite -- cheaper (only changed lines are generated) and
+    safer (a rewrite can silently drop good facts). FACTS lines are shown numbered so
+    EDIT/DEL can target them; ``wiki.apply_wiki_edits`` applies the commands
+    deterministically and tolerates malformed output (including falling back to
+    treating a full FACTS/ANSWER/NEXT document as a rewrite).
 
-    The prompt pins wiki.md to a rigid three-line template (FACTS / ANSWER / NEXT) with
-    a filled example -- small students degrade into raw action-JSON or rambling prose
-    when the format is left open (observed with qwen3.5:0.8b)."""
+    Free text output (no JSON) so nothing structural can fail; the rigid command set
+    exists because small students degrade into raw action-JSON or rambling prose when
+    the format is left open (observed with qwen3.5:0.8b)."""
+    from agentsim.teacher_guidance.wiki import render_wiki_numbered
+
     parts: List[str] = []
     parts.append(
         "You maintain a personal wiki (wiki.md) of MINIMAL notes that helps you solve a "
@@ -244,25 +251,23 @@ def build_wiki_update_prompt(
         "wiki now so your next step can rely on it."
     )
     parts.append(f"Question: {state.get('question', '')}")
-    parts.append("Current wiki.md:\n" + (state.get("wiki_content") or "(empty)"))
+    parts.append(
+        "Your wiki.md (FACTS lines are numbered so you can edit them):\n"
+        + render_wiki_numbered(state.get("wiki_content") or "")
+    )
     parts.append("Action you just took: " + _json(student_action))
     parts.append("Tool observation: " + _json(tool_observation))
     parts.append(
-        "Edit the wiki like a careful reviewer:\n"
-        "1. Check every existing line against the observation above -- CORRECT or DELETE "
-        "any line that is wrong, outdated, or contradicted by the new evidence.\n"
-        "2. ADD any new fact from the observation that helps answer the question "
-        "(with its doc_id). Do not duplicate facts already listed.\n"
-        "3. UPDATE the ANSWER line to your current best guess. Always commit to one "
-        "concrete candidate -- never write \"?\", \"unknown\", or leave it blank; if the "
-        "FACTS name a plausible answer, use it.\n"
-        "4. UPDATE the NEXT line to the single most useful next step."
+        "Check every FACTS line against the observation above: correct or delete lines "
+        "that are wrong, outdated, or contradicted; add new facts that help answer the "
+        "question (with doc_id, no duplicates); keep ANSWER as your current best guess "
+        "-- if the FACTS name a plausible answer, use it."
     )
-    parts.append("Output wiki.md using EXACTLY this format:\n" + _WIKI_TEMPLATE)
-    parts.append(_WIKI_EXAMPLE)
+    parts.append("Update the wiki with edit commands, one per line:\n" + _WIKI_EDIT_COMMANDS)
+    parts.append(_WIKI_EDIT_EXAMPLE)
     parts.append(
-        "Output ONLY the new wiki.md content in that format -- no JSON, no code fences, "
-        "no commentary. At most 5 FACTS lines; keep each line short."
+        "Output ONLY edit commands -- no JSON, no code fences, no commentary, at most 6 "
+        "lines. Do NOT rewrite the whole wiki; emit just the changes."
     )
     return "\n\n".join(parts)
 

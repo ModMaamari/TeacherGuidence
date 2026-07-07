@@ -114,6 +114,7 @@ class TeacherGuidanceEpisodeExporter:
                 "stop_condition": s.get("stop_condition", "CONTINUE"),
                 "wiki_update_call": s.get("wiki_update_call"),
                 "wiki_after": s.get("wiki_after"),
+                "wiki_edit_ops": s.get("wiki_edit_ops"),
                 "step_started_at": s.get("step_started_at"),
                 "step_ended_at": s.get("step_ended_at"),
                 "step_elapsed_ms": s.get("step_elapsed_ms"),
