@@ -37,6 +37,7 @@ from agentsim.teacher_guidance.metrics import compute_step_metrics
 from agentsim.teacher_guidance.llm_call_log import timed_completion
 from agentsim.teacher_guidance.pydantic_schemas import (
     StudentActionGenerationModel,
+    StudentActionWikiGenerationModel,
     StudentFinishActionGenerationModel,
     TeacherEvaluationModel,
 )
@@ -45,6 +46,8 @@ from agentsim.teacher_guidance.pydantic_schemas import (
 # validation) requires substantive 'thought' content -- see pydantic_schemas.py for why
 # an all-optional schema backfires under Ollama's grammar-constrained decoding.
 STUDENT_ACTION_SCHEMA = StudentActionGenerationModel.model_json_schema()
+# Same grammar extended with wiki_read/wiki_write, used when the run has wiki_enabled.
+STUDENT_ACTION_WIKI_SCHEMA = StudentActionWikiGenerationModel.model_json_schema()
 # Finish-only schema used on the final force-finish step so the model commits a real
 # answer from its context instead of searching again (which yielded answer "unknown").
 STUDENT_FINISH_ACTION_SCHEMA = StudentFinishActionGenerationModel.model_json_schema()
@@ -230,7 +233,11 @@ class TeacherGuidedAgentStep(ControlComponent):
         if force_finish:
             action_schema = STUDENT_FINISH_ACTION_SCHEMA
         elif context.metadata.get("student_use_response_schema", True):
-            action_schema = STUDENT_ACTION_SCHEMA
+            action_schema = (
+                STUDENT_ACTION_WIKI_SCHEMA
+                if context.metadata.get("wiki_enabled")
+                else STUDENT_ACTION_SCHEMA
+            )
         else:
             action_schema = None
         student_action, student_raw, parse_info, repair_attempts, student_calls = await self._student_action_with_repair(
