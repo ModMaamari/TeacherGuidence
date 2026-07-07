@@ -258,3 +258,19 @@ def test_find_runs_is_cached_until_files_change(tmp_path, monkeypatch):
     monkeypatch.setattr(da, "_read_jsonl", _counting)
     da.find_runs(tmp_path)  # unchanged files -> served from cache, no re-read
     assert calls["n"] == 0
+
+
+def test_wiki_mode_surfaces_in_run_and_episode_summaries(tmp_path):
+    sd = tmp_path / "wiki_run" / "uuid" / "hotpot_questions" / "sample_001"
+    sd.mkdir(parents=True)
+    ep = {"qid": "q1", "final_metrics": {}, "steps": [],
+          "wiki_enabled": True, "wiki_mode": "auto", "wiki_final": "notes"}
+    (sd / da.EPISODE_FILENAME).write_text(json.dumps(ep) + "\n")
+    da._RUNS_CACHE.clear()
+    runs = da.find_runs(tmp_path)
+    assert runs[0]["wiki_mode"] == "auto"
+    assert da._episode_summary(ep)["wiki_mode"] == "auto"
+    # Disabled (or legacy pre-wiki) episodes report no wiki mode.
+    assert da._episode_summary({"qid": "q2", "final_metrics": {}, "steps": []})["wiki_mode"] is None
+    # tools mode is the default label when only wiki_enabled is set.
+    assert da._episode_summary({"qid": "q3", "final_metrics": {}, "steps": [], "wiki_enabled": True})["wiki_mode"] == "tools"

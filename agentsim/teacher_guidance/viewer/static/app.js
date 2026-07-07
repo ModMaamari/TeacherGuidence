@@ -99,7 +99,85 @@ const TIP = {
   leakage: "Leakage guard: detects and sanitizes any gold answer / title / doc-id that the teacher's student-visible feedback tried to reveal.",
   step_tool: "The tool the student invoked this step (search, extract, verify, synthesize, decompose, reformulate, finish).",
   guidance_box: "Exactly what the student saw after this step — the rendered guidance allowed at this guidance level.",
+  wiki: "Agent wiki (wiki.md): the student's private, per-episode notes file. In 'auto' mode it is read into every step's prompt and rewritten by a dedicated call after every step; in 'tools' mode the student calls wiki_read/wiki_write itself (each costs a step).",
+  wiki_diff: "How wiki.md changed at this step relative to the previous step's version — additions highlighted green, removals struck through red.",
+  wiki_final: "The content of wiki.md when the episode ended.",
 };
+
+// ---------- agent wiki (wiki.md) ----------
+// Word-level LCS diff between two wiki versions. Wikis are hard-capped at 2000 chars,
+// so the O(n·m) table stays tiny.
+function diffTokens(a, b) {
+  const tok = (s) => String(s || "").match(/\S+\s*|\s+/g) || [];
+  const A = tok(a), B = tok(b);
+  const n = A.length, m = B.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j]) { ops.push(["=", A[i]]); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push(["-", A[i]]); i++; }
+    else { ops.push(["+", B[j]]); j++; }
+  }
+  while (i < n) ops.push(["-", A[i++]]);
+  while (j < m) ops.push(["+", B[j++]]);
+  return ops;
+}
+
+function wikiDiffHtml(prev, cur) {
+  return diffTokens(prev, cur).map(([op, t]) =>
+    op === "=" ? esc(t)
+      : op === "+" ? `<ins>${esc(t)}</ins>`
+      : `<del>${esc(t)}</del>`).join("");
+}
+
+// Per-step wiki.md panel (auto mode): the version after this step, with a collapsible
+// word-level diff against the previous step's version and the raw update call.
+function renderStepWiki(s, prevWiki) {
+  if (s.wiki_after == null) return "";
+  const cur = String(s.wiki_after || "");
+  const prev = String(prevWiki || "");
+  const changed = prev !== cur;
+  const chip = changed
+    ? badge("updated", "wiki", TIP.wiki_diff)
+    : badge("unchanged", "", TIP.wiki_diff);
+  const diff = changed
+    ? `<details class="wiki-details"><summary>Show changes from previous version</summary>
+         <div class="wiki-diff">${wikiDiffHtml(prev, cur)}</div>
+       </details>`
+    : "";
+  const updCall = s.wiki_update_call
+    ? `<details class="wiki-details"><summary>Wiki update · raw model call</summary>
+         ${callAttempt("Wiki update", s.wiki_update_call)}
+       </details>`
+    : "";
+  return `<div class="block">
+    <div class="blk-label" title="${esc(TIP.wiki)}">wiki.md · after this step ${chip}</div>
+    <pre class="wiki-content">${esc(cur) || "<span class='redacted'>(empty)</span>"}</pre>
+    ${diff}${updCall}
+  </div>`;
+}
+
+// Episode-level wiki section: mode + the final wiki.md state.
+function renderWikiSection(ep) {
+  if (!ep.wiki_enabled) return "";
+  const mode = ep.wiki_mode || "tools";
+  const modeNote = mode === "auto"
+    ? "read into every step's prompt · rewritten after every step — per-step versions and diffs are in the trajectory below"
+    : "student-managed via wiki_read/wiki_write tool calls";
+  return `
+  <div class="section">
+    <h3 title="${esc(TIP.wiki)}">Agent wiki ${badge("wiki.md · " + mode, "wiki", TIP.wiki)}</h3>
+    <div class="panel">
+      <div class="muted" style="margin-bottom:8px">${esc(modeNote)}</div>
+      <div class="blk-label" title="${esc(TIP.wiki_final)}">Final state</div>
+      <pre class="wiki-content">${esc(ep.wiki_final || "") || "<span class='redacted'>(empty — never written)</span>"}</pre>
+    </div>
+  </div>`;
+}
 
 // ---------- runs ----------
 async function init() {
@@ -155,7 +233,7 @@ function renderRunsTable() {
     <th title="${esc(TIP.doc_recall)}">Doc recall</th><th>Student</th>
     <th title="${esc(TIP.teacher_source)}">Teacher source</th></tr></thead>`;
   const rows = state.runs.map((r) => `<tr class="run-row" data-run="${esc(r.run_id)}">
-    <td class="run-id">${esc(r.run_id)}</td>
+    <td class="run-id">${esc(r.run_id)}${r.wiki_mode ? " " + badge("wiki·" + r.wiki_mode, "wiki", TIP.wiki) : ""}</td>
     <td class="nowrap muted">${esc(fmtDate(r.mtime))}</td>
     <td>${r.num_episodes}</td>
     <td><b>${pct(meanCorrect(r))}</b></td>
@@ -210,6 +288,7 @@ function renderRunStats(run) {
     stat(pct(run.mean_exact_match), "mean EM", TIP.em),
     stat(num(run.mean_f1), "mean F1", TIP.f1),
     stat(pct(run.mean_doc_recall), "doc recall", TIP.doc_recall),
+    run.wiki_mode ? stat("wiki·" + run.wiki_mode, "agent wiki", TIP.wiki) : "",
     `<div class="stat" style="min-width:auto" title="${esc(TIP.student)}"><span class="v" style="font-size:13px">${esc(cleanModel(run.student_model))}</span><span class="k">student</span></div>`,
     `<div class="stat" style="min-width:auto" title="${esc(TIP.teacher)}"><span class="v" style="font-size:13px">${esc(cleanModel(run.teacher_model))}</span><span class="k">teacher</span></div>`,
     `<div class="stat" style="min-width:auto" title="${esc(TIP.stop_reason)}"><span class="v" style="font-size:12px">${esc(stops)}</span><span class="k">stop reasons</span></div>`,
@@ -294,19 +373,23 @@ function renderEpisodeDetail(ep) {
         <span title="${esc(TIP.used_steps)}">used steps <b>${esc(usedSteps)}</b></span>
         <span title="${esc(TIP.guidance)}">guidance <b>G${esc(ep.guidance_level)}</b></span>
         <span title="${esc(TIP.stop_reason)}">stop <b>${esc(ep.stop_reason)}</b></span>
+        ${ep.wiki_enabled ? `<span title="${esc(TIP.wiki)}">wiki <b>${esc(ep.wiki_mode || "tools")}</b></span>` : ""}
         <span title="${esc(TIP.student)}">student <code>${esc(cleanModel(ep.student_model))}</code></span>
         <span title="${esc(TIP.teacher)}">teacher <code>${esc(cleanModel(ep.teacher_model))}</code></span>
       </div>
     </div>`;
 
   const planHtml = renderPlanReview(ep.plan_review || {});
+  const wikiHtml = renderWikiSection(ep);
+  const steps = ep.steps || [];
   const stepsHtml = `
     <div class="section">
       <h3 title="${esc(TIP.used_steps)}">Trajectory · ${usedSteps} used steps of budget ${esc(ep.budget)}</h3>
-      <div class="timeline">${(ep.steps || []).map(renderStep).join("")}</div>
+      <div class="timeline">${steps.map((s, i) =>
+        renderStep(s, i > 0 ? steps[i - 1].wiki_after : "")).join("")}</div>
     </div>`;
 
-  document.getElementById("detail").innerHTML = header + planHtml + stepsHtml;
+  document.getElementById("detail").innerHTML = header + planHtml + wikiHtml + stepsHtml;
 }
 
 function metric(v, k, tip) {
@@ -411,7 +494,7 @@ function renderObservation(obs) {
   return `<pre class="code">${json(obs)}</pre>`;
 }
 
-function renderStep(s) {
+function renderStep(s, prevWiki) {
   const action = (s.student_action || {}).action || {};
   const decision = (s.student_action || {}).decision || {};
   const facts = (s.student_action || {}).new_facts_extracted || [];
@@ -474,6 +557,7 @@ function renderStep(s) {
         <div class="blk-label" title="${esc(TIP.guidance_box)}">Student-visible guidance</div>
         ${guidanceHtml}
       </div>
+      ${renderStepWiki(s, prevWiki)}
       <div class="block">
         <div class="blk-label">Raw model I/O</div>
         <div class="chips" style="margin-bottom:6px">${timingBadge(s.student_call_ms, "student call")}${timingBadge(s.teacher_call_ms, "teacher call")}</div>

@@ -92,6 +92,7 @@ def _episode_summary(ep: Dict[str, Any]) -> Dict[str, Any]:
         "num_steps": len(ep.get("steps", []) or []),
         "plan_review_enabled": bool((ep.get("plan_review") or {}).get("enabled", False)),
         "guidance_level": ep.get("guidance_level"),
+        "wiki_mode": (ep.get("wiki_mode") or "tools") if ep.get("wiki_enabled") else None,
     }
 
 
@@ -195,6 +196,8 @@ def find_runs(output_root: str | Path) -> List[Dict[str, Any]]:
                 "num_episodes": len(episodes),
                 "mtime": bucket["mtime"],
                 "guidance_level": first.get("guidance_level"),
+                # Agent-wiki runs: "tools" | "auto" (None when the wiki was disabled).
+                "wiki_mode": (first.get("wiki_mode") or "tools") if first.get("wiki_enabled") else None,
                 "student_model": first.get("student_model", ""),
                 "teacher_model": first.get("teacher_model", ""),
                 "mean_exact_match": _mean(em),

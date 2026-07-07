@@ -17,6 +17,8 @@
   --warn-soft: #fef3c7;
   --private: #7c3aed;
   --private-soft: #f3e8ff;
+  --wiki: #0f766e;
+  --wiki-soft: #ccfbf1;
   --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .06);
   --radius: 12px;
   --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
@@ -146,6 +148,7 @@ body {
 .badge.accent { background: var(--accent-soft); color: var(--accent); border-color: #c7d2fe; }
 .badge.tool { background: #0f172a; color: #fff; border-color: #0f172a; font-family: var(--mono); }
 .badge.private { background: var(--private-soft); color: var(--private); border-color: #e9d5ff; }
+.badge.wiki { background: var(--wiki-soft); color: var(--wiki); border-color: #99f6e4; }
 
 .metric { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); }
 .metric .mv { font-weight: 700; font-size: 14px; }
@@ -215,6 +218,34 @@ body:not(.hide-private) .when-hidden { display: none; }
 .raw-blocks pre.code { border-radius: 0 0 8px 8px; }
 .raw-missing { margin-top: 8px; font-size: 12px; color: var(--muted); font-style: italic; }
 .badge.timing { font-family: var(--mono); }
+
+/* ---------- Agent wiki (wiki.md) ---------- */
+.wiki-content {
+  margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.6;
+  background: #f7fdfb; color: var(--text); border: 1px solid #99f6e4;
+  border-left: 3px solid var(--wiki); border-radius: 0 10px 10px 0;
+  padding: 12px 14px; white-space: pre-wrap; word-break: break-word;
+}
+.wiki-details { margin-top: 8px; }
+.wiki-details > summary {
+  cursor: pointer; font-size: 12px; font-weight: 600; color: var(--wiki);
+  padding: 4px 0; user-select: none; list-style: none;
+}
+.wiki-details > summary::-webkit-details-marker { display: none; }
+.wiki-details > summary::before { content: "▸ "; color: var(--muted); }
+.wiki-details[open] > summary::before { content: "▾ "; }
+.wiki-diff {
+  margin-top: 6px; font-family: var(--mono); font-size: 12px; line-height: 1.7;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 14px; white-space: pre-wrap; word-break: break-word;
+}
+.wiki-diff ins {
+  text-decoration: none; background: var(--good-soft); color: #14532d;
+  border-radius: 3px; padding: 1px 2px;
+}
+.wiki-diff del {
+  background: var(--bad-soft); color: #7f1d1d; border-radius: 3px; padding: 1px 2px;
+}
 
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
