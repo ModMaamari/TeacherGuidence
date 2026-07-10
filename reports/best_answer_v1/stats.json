@@ -1,0 +1,107 @@
+{
+  "n_questions": 3000,
+  "runs": {
+    "b1": {
+      "mean_score_all": 0.11813924680249467,
+      "mean_score_correct": 0.40597679313572055,
+      "n_correct": 873,
+      "correct_rate": 0.291,
+      "mean_components_correct": {
+        "steps": 1.0,
+        "f1": 0.24497594501718156,
+        "doc_recall": 0.0,
+        "exact_match": 0.1134020618556701,
+        "cover_match": 0.6059564719358533,
+        "length": 0.1958376510689837
+      }
+    },
+    "b2": {
+      "mean_score_all": 0.37503571126532004,
+      "mean_score_correct": 0.5978252570648035,
+      "n_correct": 1882,
+      "correct_rate": 0.6273333333333333,
+      "mean_components_correct": {
+        "steps": 0.875,
+        "f1": 0.4155670031880974,
+        "doc_recall": 0.8270456960680127,
+        "exact_match": 0.25717321997874604,
+        "cover_match": 0.7890541976620616,
+        "length": 0.36282399502643403
+      }
+    },
+    "b3": {
+      "mean_score_all": 0.40890829203235146,
+      "mean_score_correct": 0.5824904444905292,
+      "n_correct": 2106,
+      "correct_rate": 0.702,
+      "mean_components_correct": {
+        "steps": 0.75664767331434,
+        "f1": 0.42170546058879477,
+        "doc_recall": 0.8950617283950617,
+        "exact_match": 0.2597340930674264,
+        "cover_match": 0.8095916429249762,
+        "length": 0.36539264354877177
+      }
+    },
+    "b4": {
+      "mean_score_all": 0.3982616846970908,
+      "mean_score_correct": 0.5360184181656672,
+      "n_correct": 2229,
+      "correct_rate": 0.743,
+      "mean_components_correct": {
+        "steps": 0.6486092418124719,
+        "f1": 0.3793556751906694,
+        "doc_recall": 0.9167788245850157,
+        "exact_match": 0.2126514131897712,
+        "cover_match": 0.8043965903992822,
+        "length": 0.32093851978847193
+      }
+    },
+    "b5h": {
+      "mean_score_all": 0.42147090218318833,
+      "mean_score_correct": 0.5607151692015809,
+      "n_correct": 2255,
+      "correct_rate": 0.7516666666666667,
+      "mean_components_correct": {
+        "steps": 0.5833148558758315,
+        "f1": 0.455108869179602,
+        "doc_recall": 0.9203991130820399,
+        "exact_match": 0.29046563192904656,
+        "cover_match": 0.8239467849223947,
+        "length": 0.3989352743519988
+      }
+    },
+    "b9h": {
+      "mean_score_all": 0.3820277702652461,
+      "mean_score_correct": 0.4874875843452736,
+      "n_correct": 2351,
+      "correct_rate": 0.7836666666666666,
+      "mean_components_correct": {
+        "steps": 0.30247766907698853,
+        "f1": 0.4467642279880913,
+        "doc_recall": 0.9304551254785198,
+        "exact_match": 0.27605274351339854,
+        "cover_match": 0.8260314759676733,
+        "length": 0.39290662355236194
+      }
+    }
+  },
+  "ds1_winner_counts": {
+    "b1": 36,
+    "b2": 945,
+    "b3": 612,
+    "b4": 377,
+    "b5h": 414,
+    "b9h": 351
+  },
+  "questions_with_no_correct_answer": 265,
+  "weights": {
+    "steps": 0.25,
+    "f1": 0.2,
+    "doc_recall": 0.15,
+    "exact_match": 0.15,
+    "cover_match": 0.1,
+    "length": 0.15
+  },
+  "teacher_correct_threshold": 0.4
+}
