@@ -59,3 +59,11 @@ templates/simulations/fau_smoke_w*.yaml
 # Generated SFT datasets (trace -> training-data pipeline)
 data/sft/
 templates/simulations/fau_run_w*.yaml
+
+# Session handoff reports (not part of deliverables)
+reports/SESSION_SUMMARY.md
+
+# training_methods: rebuildable datasets + run artifacts (large)
+training_methods/*/data/
+training_methods/*/runs/
+training_methods/common/data/
