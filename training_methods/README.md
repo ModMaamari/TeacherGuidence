@@ -35,6 +35,20 @@ risks) and `GUIDE.md` (step-by-step commands).
   correctly by ANY teacher-guided run (265 hard − 118 recovered). Base-model score is
   ~0 by construction; hits here are the strongest evidence of real generalization.
 - `compare_evals.py` — merges eval metrics into markdown results tables.
+- `teacher_eval_agent.py` — teacher-IN-loop eval arm: same HF student policy, but the
+  real teacher (gpt-oss-120b via the FAU→OpenRouter router) reviews the plan and every
+  step through the actual harness components; `--concurrency N` overlaps teacher API
+  waits across episodes (GPU generation stays serialized).
+- `run_eval_sharded.sh` + `merge_eval_shards.py` — split any eval across several GPUs
+  (`GPUS=1,2,3 run_eval_sharded.sh <eval|teacher> <out> <tag> [args]`) and merge the
+  shards into one `episodes.jsonl` + `metrics.json`.
+
+**Eval speed:** `eval_agent.py --batch-size N` (and `m2_rft/generate_rollouts.py
+--batch-size N`) run N episodes in lockstep with batched generation — ~2.5× per GPU at
+N=8 with identical semantics (greedy answers can differ cosmetically under batched
+padding). All `run_pipeline.sh` evals default to `EVAL_BATCH=8`; m2 rollouts to
+`ROLLOUT_BATCH=8`; the m1 orchestration also takes `TEACHER_CONCURRENCY` (default 3).
+Combine with sharding for another ~linear factor.
 
 ## Environment
 
