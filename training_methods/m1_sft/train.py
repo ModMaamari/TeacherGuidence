@@ -55,9 +55,16 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--smoke", action="store_true",
                     help="tiny run (64 examples, 8 optimizer steps) to validate the pipeline")
+    ap.add_argument("--run-dir", default=None,
+                    help="explicit artifacts dir (required for multi-GPU torchrun so all "
+                         "ranks share one dir; default: a fresh timestamped dir)")
     args = ap.parse_args()
 
-    run_dir = timestamped_dir(args.out_base, args.tag + ("_smoke" if args.smoke else ""))
+    if args.run_dir:
+        run_dir = Path(args.run_dir)
+        run_dir.mkdir(parents=True, exist_ok=True)
+    else:
+        run_dir = timestamped_dir(args.out_base, args.tag + ("_smoke" if args.smoke else ""))
     log = setup_logger("m1_train", run_dir / "train.log")
     log.info(f"args: {vars(args)}")
     log.info(f"artifacts: {run_dir}")
@@ -118,17 +125,18 @@ def main() -> None:
 
     adapter_dir = run_dir / "adapter"
     trainer.save_model(str(adapter_dir))
-    tokenizer.save_pretrained(str(adapter_dir))
-    log.info(f"adapter saved: {adapter_dir}")
-
     final = dict(result.metrics)
     if dev_rows and not args.smoke:
         final.update(trainer.evaluate())
         log.info(f"final eval: {final}")
-    write_json(run_dir / "final_metrics.json", final)
-    with open(run_dir / "trainer_state.json", "w") as f:
-        json.dump(trainer.state.log_history, f, indent=2)
-    print(json.dumps({"run_dir": str(run_dir), "adapter": str(adapter_dir), **{k: v for k, v in final.items() if isinstance(v, (int, float))}}, indent=2))
+    # under torchrun only rank 0 writes shared artifacts (atomic renames race otherwise)
+    if trainer.is_world_process_zero():
+        tokenizer.save_pretrained(str(adapter_dir))
+        log.info(f"adapter saved: {adapter_dir}")
+        write_json(run_dir / "final_metrics.json", final)
+        with open(run_dir / "trainer_state.json", "w") as f:
+            json.dump(trainer.state.log_history, f, indent=2)
+        print(json.dumps({"run_dir": str(run_dir), "adapter": str(adapter_dir), **{k: v for k, v in final.items() if isinstance(v, (int, float))}}, indent=2))
 
 
 if __name__ == "__main__":
