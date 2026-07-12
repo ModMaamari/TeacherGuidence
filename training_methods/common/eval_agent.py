@@ -59,6 +59,8 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=1,
                     help=">1 runs episodes in lockstep with batched generation "
                          "(~batch-size-fold fewer forward passes; same semantics)")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="seed torch/random/numpy (meaningful with --temperature > 0)")
     args = ap.parse_args()
 
     run_dir = timestamped_dir(args.out, args.tag)
@@ -74,8 +76,19 @@ def main() -> None:
     retriever = HotpotLocalRetriever(args.corpus)
     log.info(f"loaded {len(questions)} questions | corpus={args.corpus}")
 
+    if args.seed is not None:
+        import random as _random
+
+        import numpy as _np
+        import torch as _torch
+        _random.seed(args.seed)
+        _np.random.seed(args.seed)
+        _torch.manual_seed(args.seed)
+        log.info(f"seeded everything with {args.seed}")
+
     policy = PolicyModel(args.model, args.adapter, device=args.device)
     log.info(f"policy loaded: {args.model} adapter={args.adapter}")
+    t_run0 = __import__("time").time()
 
     episodes = []
     with open(run_dir / "episodes.jsonl", "w") as w:
@@ -116,9 +129,27 @@ def main() -> None:
     n = len(episodes)
     doc_recalls = [e["final_metrics"]["doc_recall"] for e in episodes
                    if e["final_metrics"]["doc_recall"] is not None]
+
+    import torch as _torch
+    gpu_peak_gb = round(_torch.cuda.max_memory_allocated() / 1e9, 3) if _torch.cuda.is_available() else None
+    gstats = [s.get("gen_stats") for e in episodes for s in e["steps"]]
+    gstats += [(e.get("plan") or {}).get("gen_stats") for e in episodes]
+    gstats = [g for g in gstats if g]
+    tok_prompt = sum(g["prompt_tokens"] for g in gstats)
+    tok_out = sum(g["completion_tokens"] for g in gstats)
+    gen_time = round(sum(g["gen_s"] for g in gstats), 1)
     agg = {
         "model": args.model,
         "adapter": args.adapter,
+        "seed": args.seed,
+        "temperature": args.temperature,
+        "batch_size": args.batch_size,
+        "wall_time_s": round(__import__("time").time() - t_run0, 1),
+        "gpu_peak_mem_gb": gpu_peak_gb,
+        "student_prompt_tokens": tok_prompt,
+        "student_completion_tokens": tok_out,
+        "student_gen_time_s": gen_time,
+        "tokens_per_episode": round((tok_prompt + tok_out) / max(n, 1), 1),
         "n": n,
         "budget": args.budget,
         "em": round(sum(e["final_metrics"]["exact_match"] for e in episodes) / n, 4),

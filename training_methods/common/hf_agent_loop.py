@@ -106,6 +106,8 @@ class PolicyModel:
             self.model = PeftModel.from_pretrained(self.model, adapter_path)
         self.model.eval()
         self.device = device
+        # per-row stats of the most recent generate/generate_batch call
+        self.last_stats: List[Dict[str, Any]] = []
 
     def generate(
         self,
@@ -126,11 +128,18 @@ class PolicyModel:
             kwargs.update(do_sample=True, temperature=temperature, top_p=0.95)
         else:
             kwargs.update(do_sample=False)
+        t0 = time.time()
         with torch.no_grad():
             out = self.model.generate(**enc, **kwargs)
-        return self.tokenizer.decode(
-            out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True
-        ).strip()
+        n_prompt = int(enc["input_ids"].shape[1])
+        completion_ids = out[0][n_prompt:]
+        self.last_stats = [{
+            "prompt_tokens": n_prompt,
+            "completion_tokens": int(completion_ids.shape[0]),
+            "gen_s": round(time.time() - t0, 3),
+            "batch_size": 1,
+        }]
+        return self.tokenizer.decode(completion_ids, skip_special_tokens=True).strip()
 
     def generate_batch(
         self,
@@ -167,13 +176,26 @@ class PolicyModel:
             kwargs.update(do_sample=True, temperature=temperature, top_p=0.95)
         else:
             kwargs.update(do_sample=False)
+        t0 = time.time()
         with torch.no_grad():
             out = self.model.generate(**enc, **kwargs)
+        gen_s = round(time.time() - t0, 3)
         prompt_len = enc["input_ids"].shape[1]  # same for all rows (left padding)
-        return [
-            self.tokenizer.decode(out[i][prompt_len:], skip_special_tokens=True).strip()
-            for i in range(len(messages_list))
-        ]
+        pad_id = self.tokenizer.pad_token_id or self.tokenizer.eos_token_id
+        texts, stats = [], []
+        n = len(messages_list)
+        for i in range(n):
+            completion_ids = out[i][prompt_len:]
+            real_prompt = int((enc["input_ids"][i] != pad_id).sum())
+            texts.append(self.tokenizer.decode(completion_ids, skip_special_tokens=True).strip())
+            stats.append({
+                "prompt_tokens": real_prompt,
+                "completion_tokens": int((completion_ids != pad_id).sum()),
+                "gen_s": round(gen_s / n, 3),  # amortized share of the batch pass
+                "batch_size": n,
+            })
+        self.last_stats = stats
+        return texts
 
 
 def _messages(user_prompt: str) -> List[Dict[str, str]]:
@@ -221,7 +243,8 @@ def run_episode(
         plan_obj, plan_info = parse_student_plan(plan_raw)
         if plan_info.get("json_valid") and isinstance(plan_obj, dict) and plan_obj.get("steps"):
             ctx.metadata["revised_plan"] = plan_obj
-        plan_record = {"prompt": plan_prompt, "raw": plan_raw, "valid": bool(plan_info.get("json_valid"))}
+        plan_record = {"prompt": plan_prompt, "raw": plan_raw, "valid": bool(plan_info.get("json_valid")),
+                       "gen_stats": (policy.last_stats or [None])[0]}
 
     stop_reason = "budget_forced_finish"
     final_answer = ""
@@ -230,10 +253,20 @@ def run_episode(
         state = build_student_visible_state(ctx, t, budget)
         prompt = build_student_prompt(state, GuidanceConfig(), force_finish)
         raw = policy.generate(_messages(prompt), max_new_tokens, temperature)
+        gen_stat = (policy.last_stats or [None])[0]
         action, info = _safe_parse_action(raw)
         if not info.get("action_valid"):
             # one retry with an explicit format reminder
             raw = policy.generate(_messages(prompt + INVALID_RETRY_NOTE), max_new_tokens, temperature)
+            retry_stat = (policy.last_stats or [None])[0]
+            if gen_stat and retry_stat:
+                gen_stat = {
+                    "prompt_tokens": gen_stat["prompt_tokens"] + retry_stat["prompt_tokens"],
+                    "completion_tokens": gen_stat["completion_tokens"] + retry_stat["completion_tokens"],
+                    "gen_s": round(gen_stat["gen_s"] + retry_stat["gen_s"], 3),
+                    "batch_size": retry_stat.get("batch_size", 1),
+                    "retried": True,
+                }
             action, info = _safe_parse_action(raw)
 
         step_rec: Dict[str, Any] = {
@@ -242,6 +275,7 @@ def run_episode(
             "student_raw": raw,
             "student_action": action.to_dict() if action is not None else {},
             "action_valid": bool(info.get("action_valid")) and action is not None,
+            "gen_stats": gen_stat,
         }
         if step_rec["action_valid"]:
             obs = execute_student_tool(ctx, action, retriever)
@@ -308,6 +342,7 @@ class _EpisodeState:
         self.phase = "plan" if with_plan else "step"
         self.t = 0 if with_plan else 1
         self.retrying = False       # invalid action: one retry with the format note
+        self._pending_stat = None   # gen stats of the invalid attempt, folded into the retry
         self.cur_prompt = ""        # prompt of the in-flight generation
         self.plan_record: Optional[Dict[str, Any]] = None
         self.steps: List[Dict[str, Any]] = []
@@ -330,14 +365,24 @@ class _EpisodeState:
             self.cur_prompt = base + INVALID_RETRY_NOTE if self.retrying else base
         return self.cur_prompt
 
-    def advance(self, raw: str, retriever: HotpotLocalRetriever, logger=None) -> None:
+    def advance(self, raw: str, retriever: HotpotLocalRetriever, logger=None, gen_stat=None) -> None:
         """Consume one generation; mutates state exactly like run_episode's loop body."""
+        if gen_stat and self._pending_stat:
+            gen_stat = {
+                "prompt_tokens": self._pending_stat["prompt_tokens"] + gen_stat["prompt_tokens"],
+                "completion_tokens": self._pending_stat["completion_tokens"] + gen_stat["completion_tokens"],
+                "gen_s": round(self._pending_stat["gen_s"] + gen_stat["gen_s"], 3),
+                "batch_size": gen_stat.get("batch_size", 1),
+                "retried": True,
+            }
+            self._pending_stat = None
         if self.phase == "plan":
             plan_obj, plan_info = parse_student_plan(raw)
             if plan_info.get("json_valid") and isinstance(plan_obj, dict) and plan_obj.get("steps"):
                 self.ctx.metadata["revised_plan"] = plan_obj
             self.plan_record = {
                 "prompt": self.cur_prompt, "raw": raw, "valid": bool(plan_info.get("json_valid")),
+                "gen_stats": gen_stat,
             }
             self.phase, self.t = "step", 1
             return
@@ -346,6 +391,7 @@ class _EpisodeState:
         action, info = _safe_parse_action(raw)
         if not info.get("action_valid") and not self.retrying:
             self.retrying = True    # regenerate this same step with the format note
+            self._pending_stat = gen_stat
             return
         self.retrying = False
 
@@ -355,6 +401,7 @@ class _EpisodeState:
             "student_raw": raw,
             "student_action": action.to_dict() if action is not None else {},
             "action_valid": bool(info.get("action_valid")) and action is not None,
+            "gen_stats": gen_stat,
         }
         if step_rec["action_valid"]:
             obs = execute_student_tool(self.ctx, action, retriever)
@@ -432,9 +479,10 @@ def run_episodes_batched(
             active.append(_EpisodeState(queue.pop(0), budget, disclose_budget, with_plan))
         prompts = [_messages(ep.next_prompt()) for ep in active]
         outs = policy.generate_batch(prompts, max_new_tokens, temperature)
+        stats = policy.last_stats or [None] * len(outs)
         still_active: List[_EpisodeState] = []
-        for ep, raw in zip(active, outs):
-            ep.advance(raw, retriever, logger)
+        for ep, raw, st in zip(active, outs, stats):
+            ep.advance(raw, retriever, logger, gen_stat=st)
             if ep.done:
                 rec = ep.episode()
                 episodes.append(rec)

@@ -88,7 +88,12 @@ class HybridLLMClient:
                     max_tokens or 1200,
                     temperature,
                 )
-            return {"text": text, "raw_response": None, "usage": None} if return_raw else text
+                usage = None
+                if getattr(self.policy, "last_stats", None):
+                    st = self.policy.last_stats[0]
+                    usage = {"prompt_tokens": st["prompt_tokens"],
+                             "completion_tokens": st["completion_tokens"]}
+            return {"text": text, "raw_response": None, "usage": usage} if return_raw else text
         return await self.teacher.get_completion(
             prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens,
             return_raw=return_raw, response_schema=response_schema, **kwargs,
@@ -98,7 +103,8 @@ class HybridLLMClient:
         return await self.teacher.get_completion_with_fallback(router_models, **kwargs)
 
 
-def build_metadata(row: Dict[str, Any], budget: int, corpus_path: str, disclose_budget: bool) -> Dict[str, Any]:
+def build_metadata(row: Dict[str, Any], budget: int, corpus_path: str, disclose_budget: bool,
+                   student_temperature: float = 0.0) -> Dict[str, Any]:
     """Per-episode context metadata, mirroring standard.py's mode_config injection
     with the b-run (g3, plan-review) settings."""
     gold = row.get("gold") or {"answer": row.get("answer", "")}
@@ -121,8 +127,7 @@ def build_metadata(row: Dict[str, Any], budget: int, corpus_path: str, disclose_
         "skip_teacher": False,
         "teacher_max_tokens": 2500,
         "teacher_max_tokens_retry": 4000,
-        # greedy student for comparability with the teacherless eval arms
-        "student_temperature": 0.0,
+        "student_temperature": student_temperature,
         "teacher_temperature": 0.1,
         "guidance": {
             "level": 3,
@@ -178,13 +183,14 @@ async def run_teacher_episode(
     disclose_budget: bool,
     with_plan: bool,
     log,
+    student_temperature: float = 0.0,
 ) -> Dict[str, Any]:
     qid = row["id"]
     gold = row.get("answer", "") or (row.get("gold") or {}).get("answer", "")
     gold_doc_ids = set((row.get("gold") or {}).get("gold_doc_ids", []) or [])
 
     started = time.time()
-    metadata = build_metadata(row, budget, corpus_path, disclose_budget)
+    metadata = build_metadata(row, budget, corpus_path, disclose_budget, student_temperature)
     if not with_plan:
         metadata["plan_review_config"]["enabled"] = False
     ctx = WorkflowContext(task_id=qid, query=row["query"], metadata=metadata)
@@ -253,6 +259,9 @@ def main() -> None:
     ap.add_argument("--concurrency", type=int, default=1,
                     help=">1 runs episodes concurrently: teacher API waits overlap "
                          "with (GPU-serialized) student generation of other episodes")
+    ap.add_argument("--student-temperature", type=float, default=0.0)
+    ap.add_argument("--seed", type=int, default=None,
+                    help="seed torch/random/numpy (meaningful with --student-temperature > 0)")
     args = ap.parse_args()
 
     run_dir = timestamped_dir(args.out, args.tag)
@@ -268,9 +277,20 @@ def main() -> None:
         log.info(f"shard {i}/{n}: {len(questions)} questions")
     log.info(f"loaded {len(questions)} questions | corpus={args.corpus}")
 
+    if args.seed is not None:
+        import random as _random
+
+        import numpy as _np
+        import torch as _torch
+        _random.seed(args.seed)
+        _np.random.seed(args.seed)
+        _torch.manual_seed(args.seed)
+        log.info(f"seeded everything with {args.seed}")
+
     policy = PolicyModel(args.model, args.adapter, device=args.device)
     log.info(f"policy loaded: {args.model} adapter={args.adapter}")
     client = HybridLLMClient(policy, LLMClient())
+    t_run0 = time.time()
 
     async def run_all() -> List[Dict[str, Any]]:
         episodes: List[Dict[str, Any]] = []
@@ -284,6 +304,7 @@ def main() -> None:
                             client, q, args.budget, args.corpus,
                             disclose_budget=not args.hidden_budget,
                             with_plan=not args.no_plan, log=log,
+                            student_temperature=args.student_temperature,
                         )
                     except Exception as exc:  # noqa: BLE001 -- keep the eval going
                         log.error(f"qid={q.get('id')} episode crashed: {type(exc).__name__}: {exc}")
@@ -323,11 +344,39 @@ def main() -> None:
         for s in e["steps"]:
             d = (s.get("teacher_full") or {}).get("teacher_decision") or "unknown"
             teacher_decisions[d] = teacher_decisions.get(d, 0) + 1
+    # token/time accounting from the per-call logs the harness components keep
+    import torch as _torch
+    stu_pt = stu_ct = tea_pt = tea_ct = 0
+    stu_ms = tea_ms = 0.0
+    for e in episodes:
+        for s in e["steps"]:
+            for c in (s.get("student_calls") or []):
+                u = c.get("usage") or {}
+                stu_pt += u.get("prompt_tokens") or 0
+                stu_ct += u.get("completion_tokens") or 0
+                stu_ms += c.get("elapsed_ms") or 0
+            for c in (s.get("teacher_calls") or []):
+                u = c.get("usage") or {}
+                tea_pt += u.get("prompt_tokens") or 0
+                tea_ct += u.get("completion_tokens") or 0
+                tea_ms += c.get("elapsed_ms") or 0
     agg = {
         "arm": "teacher_in_loop",
         "model": args.model,
         "adapter": args.adapter,
         "teacher_router": list(TEACHER_ROUTER),
+        "seed": args.seed,
+        "student_temperature": args.student_temperature,
+        "concurrency": args.concurrency,
+        "wall_time_s": round(time.time() - t_run0, 1),
+        "gpu_peak_mem_gb": round(_torch.cuda.max_memory_allocated() / 1e9, 3)
+        if _torch.cuda.is_available() else None,
+        "student_prompt_tokens": stu_pt,
+        "student_completion_tokens": stu_ct,
+        "student_call_time_s": round(stu_ms / 1000, 1),
+        "teacher_prompt_tokens": tea_pt,
+        "teacher_completion_tokens": tea_ct,
+        "teacher_call_time_s": round(tea_ms / 1000, 1),
         "n": n,
         "budget": args.budget,
         "em": round(sum(e["final_metrics"]["exact_match"] for e in episodes) / n, 4),
