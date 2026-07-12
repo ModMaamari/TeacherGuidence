@@ -34,6 +34,9 @@ ARGS=(serve "$MODEL"
   --gpu-memory-utilization "$MEM_UTIL")
 if [ -n "$ADAPTERS" ]; then
   ARGS+=(--enable-lora --max-lora-rank 64)
+  # architectures that wrap the LM as a "tower" (e.g. Qwen3.5's
+  # *ForConditionalGeneration) silently skip LoRA on it without this
+  [ "${TOWER_LORA:-0}" = "1" ] && ARGS+=(--enable-tower-connector-lora)
   for kv in $ADAPTERS; do ARGS+=(--lora-modules "$kv"); done
 fi
 

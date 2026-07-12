@@ -61,8 +61,14 @@ def build_job(arm: str, seed: int, run_dir: Path, args, server_url: str = "") ->
         common += ["--limit", str(args.limit)]
     trained = arm in ("m1", "m1_teacher")
     if args.backend == "vllm":
-        served = args.served_adapter_name if trained else "student"
-        common += ["--backend", "vllm", "--server-url", server_url, "--served-model", served]
+        if args.merged_model:
+            # merged-weights serving: trained arms talk to the +100 port twin server
+            host, port = server_url.rsplit(":", 1)
+            url = f"{host}:{int(port) + 100}" if trained else server_url
+            common += ["--backend", "vllm", "--server-url", url, "--served-model", "student"]
+        else:
+            served = args.served_adapter_name if trained else "student"
+            common += ["--backend", "vllm", "--server-url", server_url, "--served-model", served]
     if arm in ("m1", "base"):
         cmd = [PY, str(REPO_ROOT / "training_methods/common/eval_agent.py"),
                "--temperature", str(args.student_temperature),
@@ -81,26 +87,39 @@ def build_job(arm: str, seed: int, run_dir: Path, args, server_url: str = "") ->
 
 
 def start_vllm_servers(gpus, args, run_dir: Path, log):
-    """One vLLM server per GPU serving the base model + the adapter as a LoRA
-    module; returns (procs, urls). Jobs then run as pure HTTP clients."""
+    """Per GPU: one server for the base model (+ the adapter as a LoRA module when
+    LoRA serving works for the architecture). With --merged-model, a twin server on
+    port+100 serves the merged trained weights instead (for architectures whose
+    LoRA module names vLLM cannot map, e.g. Qwen3.5). Returns (procs, urls)."""
     import os
 
     from training_methods.common.vllm_backend import wait_ready
-    procs, urls = [], []
-    for i, gpu in enumerate(gpus):
-        port = args.vllm_base_port + i
-        env = {**os.environ, "GPU": str(gpu), "PORT": str(port),
-               "MODEL": args.model,
-               "ADAPTERS": f"{args.served_adapter_name}={args.adapter}",
-               "MEM_UTIL": str(args.vllm_mem_util),
-               "LOG": str(run_dir / f"vllm_gpu{gpu}.log")}
+    procs, urls, waits = [], [], []
+
+    def launch(gpu, port, model, adapters, mem_util):
+        env = {**os.environ, "GPU": str(gpu), "PORT": str(port), "MODEL": model,
+               "ADAPTERS": adapters, "MEM_UTIL": str(mem_util),
+               "LOG": str(run_dir / f"vllm_gpu{gpu}_p{port}.log")}
         p = subprocess.Popen(["bash", str(REPO_ROOT / "training_methods/common/serve_vllm.sh")],
                              env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              cwd=str(REPO_ROOT))
         procs.append(p)
+
+    for i, gpu in enumerate(gpus):
+        port = args.vllm_base_port + i
+        if args.merged_model:
+            mem = args.vllm_mem_util / 2
+            launch(gpu, port, args.model, "", mem)
+            launch(gpu, port + 100, args.merged_model, "", mem)
+            waits += [(f"http://127.0.0.1:{port}", "student"),
+                      (f"http://127.0.0.1:{port + 100}", "student")]
+        else:
+            launch(gpu, port, args.model,
+                   f"{args.served_adapter_name}={args.adapter}", args.vllm_mem_util)
+            waits.append((f"http://127.0.0.1:{port}", args.served_adapter_name))
         urls.append(f"http://127.0.0.1:{port}")
-    for url in urls:
-        names = wait_ready(url, args.served_adapter_name, timeout_s=900)
+    for url, model_name in waits:
+        names = wait_ready(url, model_name, timeout_s=900)
         log.info(f"vllm server ready: {url} serving {names}")
     return procs, urls
 
@@ -171,6 +190,9 @@ def main() -> None:
     ap.add_argument("--vllm-base-port", type=int, default=8300)
     ap.add_argument("--vllm-mem-util", type=float, default=0.85)
     ap.add_argument("--served-adapter-name", default="m1")
+    ap.add_argument("--merged-model", default=None,
+                    help="path to merged trained weights; serves them on twin "
+                         "(+100) ports for the trained arms instead of LoRA modules")
     ap.add_argument("--clients-per-server", type=int, default=2,
                     help="vllm backend: concurrent eval jobs per server "
                          "(continuous batching absorbs them)")
@@ -178,6 +200,8 @@ def main() -> None:
                     help="2 questions, 2 seeds, budget 2 — validates the whole flow")
     ap.add_argument("--arms", default=",".join(ARMS),
                     help="comma-separated subset of arms to run")
+    ap.add_argument("--exp-tag", default="exp",
+                    help="experiment dir name suffix (e.g. exp_qwen05b)")
     ap.add_argument("--exp-dir", default=None,
                     help="write into an EXISTING experiment dir (adds runs; the judge "
                          "then re-scores every run in the dir for one consistent file)")
@@ -190,7 +214,7 @@ def main() -> None:
         run_dir = Path(args.exp_dir)
         assert run_dir.is_dir(), f"--exp-dir not found: {run_dir}"
     else:
-        run_dir = timestamped_dir(args.out_base, "exp" + ("_smoke" if args.smoke else ""))
+        run_dir = timestamped_dir(args.out_base, args.exp_tag + ("_smoke" if args.smoke else ""))
     log = setup_logger("exp_unseen100", run_dir / "experiment.log")
     seeds = [int(s) for s in args.seeds.split(",")]
     gpus = [g.strip() for g in args.gpus.split(",") if g.strip()]
