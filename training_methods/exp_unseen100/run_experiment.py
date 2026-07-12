@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 from pathlib import Path
+from typing import List
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -48,7 +49,7 @@ ADAPTER_DEFAULT = REPO_ROOT / "training_methods/m1_sft/runs/20260712T022817Z_tra
 ARMS = ("base_teacher", "m1", "m1_teacher")
 
 
-def build_job(arm: str, seed: int, run_dir: Path, args) -> dict:
+def build_job(arm: str, seed: int, run_dir: Path, args, server_url: str = "") -> dict:
     """One eval run = one subprocess command; the agent creates <run_dir>/<ts>_<tag>."""
     tag = f"{arm}_s{seed}"
     common = [
@@ -58,20 +59,50 @@ def build_job(arm: str, seed: int, run_dir: Path, args) -> dict:
     ]
     if args.limit:
         common += ["--limit", str(args.limit)]
+    trained = arm in ("m1", "m1_teacher")
+    if args.backend == "vllm":
+        served = args.served_adapter_name if trained else "student"
+        common += ["--backend", "vllm", "--server-url", server_url, "--served-model", served]
     if arm == "m1":
         cmd = [PY, str(REPO_ROOT / "training_methods/common/eval_agent.py"),
-               "--adapter", str(args.adapter),
                "--temperature", str(args.student_temperature),
                "--batch-size", str(args.student_batch), *common]
+        if args.backend == "hf":
+            cmd += ["--adapter", str(args.adapter)]
         est = 1  # relative cost rank: teacherless is the fast one
     else:
         cmd = [PY, str(REPO_ROOT / "training_methods/common/teacher_eval_agent.py"),
                "--student-temperature", str(args.student_temperature),
                "--concurrency", str(args.teacher_concurrency), *common]
-        if arm == "m1_teacher":
+        if arm == "m1_teacher" and args.backend == "hf":
             cmd += ["--adapter", str(args.adapter)]
         est = 3  # teacher arms are API-latency bound: schedule first
     return {"arm": arm, "seed": seed, "tag": tag, "cmd": cmd, "cost_rank": est}
+
+
+def start_vllm_servers(gpus, args, run_dir: Path, log):
+    """One vLLM server per GPU serving the base model + the adapter as a LoRA
+    module; returns (procs, urls). Jobs then run as pure HTTP clients."""
+    import os
+
+    from training_methods.common.vllm_backend import wait_ready
+    procs, urls = [], []
+    for i, gpu in enumerate(gpus):
+        port = args.vllm_base_port + i
+        env = {**os.environ, "GPU": str(gpu), "PORT": str(port),
+               "MODEL": args.model,
+               "ADAPTERS": f"{args.served_adapter_name}={args.adapter}",
+               "MEM_UTIL": str(args.vllm_mem_util),
+               "LOG": str(run_dir / f"vllm_gpu{gpu}.log")}
+        p = subprocess.Popen(["bash", str(REPO_ROOT / "training_methods/common/serve_vllm.sh")],
+                             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             cwd=str(REPO_ROOT))
+        procs.append(p)
+        urls.append(f"http://127.0.0.1:{port}")
+    for url in urls:
+        names = wait_ready(url, args.served_adapter_name, timeout_s=900)
+        log.info(f"vllm server ready: {url} serving {names}")
+    return procs, urls
 
 
 def gpu_sampler(path: Path, stop: threading.Event, interval_s: float = 15.0) -> None:
@@ -93,7 +124,10 @@ def gpu_sampler(path: Path, stop: threading.Event, interval_s: float = 15.0) -> 
             stop.wait(interval_s)
 
 
-def worker(gpu: str, jobs: "queue.Queue[dict]", results: list, run_dir: Path, log, lock) -> None:
+def worker(slot: str, jobs: "queue.Queue[dict]", results: list, run_dir: Path, log, lock,
+           gpu_env: str = "") -> None:
+    """slot = a GPU index (hf backend) or a client slot label (vllm backend, where
+    jobs are HTTP clients and gpu_env hides local CUDA)."""
     while True:
         try:
             job = jobs.get_nowait()
@@ -101,21 +135,21 @@ def worker(gpu: str, jobs: "queue.Queue[dict]", results: list, run_dir: Path, lo
             return
         t0 = time.time()
         log_file = run_dir / f"job_{job['tag']}.log"
-        log.info(f"[gpu {gpu}] START {job['tag']}")
+        log.info(f"[{slot}] START {job['tag']}")
         with open(log_file, "w") as lf:
             proc = subprocess.run(
                 job["cmd"], stdout=lf, stderr=subprocess.STDOUT,
-                env={**__import__("os").environ, "CUDA_VISIBLE_DEVICES": gpu},
+                env={**__import__("os").environ, "CUDA_VISIBLE_DEVICES": gpu_env},
                 cwd=str(REPO_ROOT),
             )
         rec = {**{k: job[k] for k in ("arm", "seed", "tag")},
-               "gpu": gpu, "rc": proc.returncode, "wall_s": round(time.time() - t0, 1)}
+               "slot": slot, "rc": proc.returncode, "wall_s": round(time.time() - t0, 1)}
         with lock:
             results.append(rec)
             with open(run_dir / "jobs.jsonl", "a") as w:
                 w.write(json.dumps(rec) + "\n")
         lvl = log.info if proc.returncode == 0 else log.error
-        lvl(f"[gpu {gpu}] DONE {job['tag']} rc={proc.returncode} in {rec['wall_s']}s")
+        lvl(f"[{slot}] DONE {job['tag']} rc={proc.returncode} in {rec['wall_s']}s")
 
 
 def main() -> None:
@@ -128,8 +162,18 @@ def main() -> None:
     ap.add_argument("--teacher-concurrency", type=int, default=5)
     ap.add_argument("--judge-concurrency", type=int, default=10)
     ap.add_argument("--adapter", default=str(ADAPTER_DEFAULT))
+    ap.add_argument("--model", default="ibm-granite/granite-4.1-3b")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out-base", default=str(EXP / "runs"))
+    ap.add_argument("--backend", choices=["hf", "vllm"], default="hf",
+                    help="vllm: one server per GPU (base + adapter as LoRA module), "
+                         "jobs run as HTTP clients, several per server")
+    ap.add_argument("--vllm-base-port", type=int, default=8300)
+    ap.add_argument("--vllm-mem-util", type=float, default=0.85)
+    ap.add_argument("--served-adapter-name", default="m1")
+    ap.add_argument("--clients-per-server", type=int, default=2,
+                    help="vllm backend: concurrent eval jobs per server "
+                         "(continuous batching absorbs them)")
     ap.add_argument("--smoke", action="store_true",
                     help="2 questions, 2 seeds, budget 2 — validates the whole flow")
     args = ap.parse_args()
@@ -144,7 +188,15 @@ def main() -> None:
     log.info(f"artifacts: {run_dir}")
     log.info(f"gpus={gpus} seeds={seeds} limit={args.limit} budget={args.budget}")
 
-    jobs = [build_job(arm, seed, run_dir, args) for arm in ARMS for seed in seeds]
+    server_procs: list = []
+    server_urls: List[str] = []
+    if args.backend == "vllm":
+        server_procs, server_urls = start_vllm_servers(gpus, args, run_dir, log)
+
+    jobs = []
+    for i, (arm, seed) in enumerate([(a, s) for a in ARMS for s in seeds]):
+        url = server_urls[i % len(server_urls)] if server_urls else ""
+        jobs.append(build_job(arm, seed, run_dir, args, server_url=url))
     jobs.sort(key=lambda j: -j["cost_rank"])  # teacher jobs first for better packing
     q: "queue.Queue[dict]" = queue.Queue()
     for j in jobs:
@@ -163,13 +215,24 @@ def main() -> None:
     t0 = time.time()
     results: list = []
     lock = threading.Lock()
-    threads = [threading.Thread(target=worker, args=(g, q, results, run_dir, log, lock))
-               for g in gpus]
+    if args.backend == "vllm":
+        # jobs are HTTP clients: no local CUDA; several client slots per server
+        threads = [
+            threading.Thread(target=worker, args=(f"srv{g}c{c}", q, results, run_dir, log, lock),
+                             kwargs={"gpu_env": ""})
+            for g in gpus for c in range(args.clients_per_server)
+        ]
+    else:
+        threads = [threading.Thread(target=worker, args=(g, q, results, run_dir, log, lock),
+                                    kwargs={"gpu_env": g})
+                   for g in gpus]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
     stop.set()
+    for p in server_procs:
+        p.terminate()
     failed = [r for r in results if r["rc"] != 0]
     log.info(f"all {len(results)} jobs done in {(time.time()-t0)/60:.1f} min; failed: {len(failed)}")
 

@@ -50,6 +50,21 @@ padding). All `run_pipeline.sh` evals default to `EVAL_BATCH=8`; m2 rollouts to
 `ROLLOUT_BATCH=8`; the m1 orchestration also takes `TEACHER_CONCURRENCY` (default 3).
 Combine with sharding for another ~linear factor.
 
+**vLLM serving backend (the fast path for heavy eval campaigns):** `.venv_vllm`
+holds a vLLM install isolated from the training stack. `serve_vllm.sh` starts an
+OpenAI-compatible server per GPU (bf16, the model's own chat template, LoRA adapters
+served unmerged by name via `--enable-lora`); both eval agents take
+`--backend vllm --server-url ... --served-model <student|adapter-name>` and keep the
+same prompts, sampling params (per-request `seed` for reproducible reps) and token/
+time instrumentation (usage comes from the server). The server continuous-batches all
+concurrent episodes, so teacher-arm student calls no longer serialize on a GPU lock
+and several eval jobs can share one server (`run_experiment.py --backend vllm
+--clients-per-server N` starts the servers itself and runs jobs as HTTP clients).
+Fairness notes: bf16 weights (no quantization distortion vs the HF path), same chat
+template, but vLLM's kernels/batching mean greedy outputs are not guaranteed
+bit-identical to HF `generate` — compare arms within one backend, and report tokens
+(hardware-independent) alongside wall time.
+
 ## Environment
 
 - `.venv_train` (Python 3.11): torch 2.6 cu124, transformers 5.13, trl 1.8, peft 0.19,
