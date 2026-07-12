@@ -105,11 +105,15 @@ def start_vllm_servers(gpus, args, run_dir: Path, log):
                              cwd=str(REPO_ROOT))
         procs.append(p)
 
+    import time as _time
     for i, gpu in enumerate(gpus):
         port = args.vllm_base_port + i
         if args.merged_model:
             mem = args.vllm_mem_util / 2
             launch(gpu, port, args.model, "", mem)
+            # stagger the twin on the same GPU: two vLLM engines profiling free
+            # memory at the same instant can race and one fails to start
+            _time.sleep(20)
             launch(gpu, port + 100, args.merged_model, "", mem)
             waits += [(f"http://127.0.0.1:{port}", "student"),
                       (f"http://127.0.0.1:{port + 100}", "student")]
