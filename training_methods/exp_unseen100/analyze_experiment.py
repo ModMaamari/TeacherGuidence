@@ -46,14 +46,17 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from scipy import stats as sps  # noqa: E402
 
-ARMS = ["base_teacher", "m1", "m1_teacher"]
+ARMS = ["base", "base_teacher", "m1", "m1_teacher"]
 ARM_LABEL = {
+    "base": "base (no guidance)",
     "base_teacher": "base + teacher",
     "m1": "m1 (internalized)",
     "m1_teacher": "m1 + teacher",
 }
-ARM_COLOR = {"base_teacher": "#2a78d6", "m1": "#1baf7a", "m1_teacher": "#eda100"}
-PAIRS = [("m1", "base_teacher"), ("m1_teacher", "m1"), ("m1_teacher", "base_teacher")]
+ARM_COLOR = {"base": "#898781", "base_teacher": "#2a78d6",
+             "m1": "#1baf7a", "m1_teacher": "#eda100"}
+PAIRS = [("m1", "base"), ("base_teacher", "base"),
+         ("m1", "base_teacher"), ("m1_teacher", "m1"), ("m1_teacher", "base_teacher")]
 
 EP_METRICS = ["em", "f1", "cover", "doc_recall", "judge_correct", "steps",
               "voluntary_finish", "elapsed_s", "tokens_total"]

@@ -1,6 +1,136 @@
 {
   "per_rep": [
     {
+      "arm": "base",
+      "seed": 11,
+      "n": 100,
+      "em": 0.09,
+      "f1": 0.1626,
+      "cover": 0.28,
+      "doc_recall": 0.685,
+      "judge_correct": 0.31,
+      "steps": 3.95,
+      "voluntary_finish": 0.03,
+      "elapsed_s": 28.081,
+      "tokens_total": 8227.41,
+      "wall_time_s": 183.3,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 822741,
+      "teacher_tokens": 0,
+      "invalid_steps": 54,
+      "time_per_question_s": 1.83,
+      "time_per_step_s": 0.46,
+      "stop_reasons": {
+        "budget_forced_finish": 28,
+        "finish": 3,
+        "budget_forced_finish_no_finish": 69
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 23,
+      "n": 100,
+      "em": 0.05,
+      "f1": 0.1481,
+      "cover": 0.3,
+      "doc_recall": 0.685,
+      "judge_correct": 0.36,
+      "steps": 3.93,
+      "voluntary_finish": 0.04,
+      "elapsed_s": 24.0394,
+      "tokens_total": 7972.85,
+      "wall_time_s": 159.9,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 797285,
+      "teacher_tokens": 0,
+      "invalid_steps": 35,
+      "time_per_question_s": 1.6,
+      "time_per_step_s": 0.41,
+      "stop_reasons": {
+        "budget_forced_finish": 24,
+        "budget_forced_finish_no_finish": 72,
+        "finish": 4
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 37,
+      "n": 100,
+      "em": 0.05,
+      "f1": 0.109,
+      "cover": 0.23,
+      "doc_recall": 0.69,
+      "judge_correct": 0.28,
+      "steps": 3.97,
+      "voluntary_finish": 0.02,
+      "elapsed_s": 27.6833,
+      "tokens_total": 8015.77,
+      "wall_time_s": 182.0,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 801577,
+      "teacher_tokens": 0,
+      "invalid_steps": 37,
+      "time_per_question_s": 1.82,
+      "time_per_step_s": 0.46,
+      "stop_reasons": {
+        "budget_forced_finish_no_finish": 83,
+        "finish": 2,
+        "budget_forced_finish": 15
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 53,
+      "n": 100,
+      "em": 0.08,
+      "f1": 0.1486,
+      "cover": 0.29,
+      "doc_recall": 0.695,
+      "judge_correct": 0.33,
+      "steps": 3.95,
+      "voluntary_finish": 0.04,
+      "elapsed_s": 24.7128,
+      "tokens_total": 8027.77,
+      "wall_time_s": 158.8,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 802777,
+      "teacher_tokens": 0,
+      "invalid_steps": 37,
+      "time_per_question_s": 1.59,
+      "time_per_step_s": 0.4,
+      "stop_reasons": {
+        "finish": 4,
+        "budget_forced_finish": 23,
+        "budget_forced_finish_no_finish": 73
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 71,
+      "n": 100,
+      "em": 0.08,
+      "f1": 0.139,
+      "cover": 0.21,
+      "doc_recall": 0.68,
+      "judge_correct": 0.26,
+      "steps": 3.98,
+      "voluntary_finish": 0.01,
+      "elapsed_s": 26.7761,
+      "tokens_total": 7957.11,
+      "wall_time_s": 176.1,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 795711,
+      "teacher_tokens": 0,
+      "invalid_steps": 33,
+      "time_per_question_s": 1.76,
+      "time_per_step_s": 0.44,
+      "stop_reasons": {
+        "budget_forced_finish": 23,
+        "budget_forced_finish_no_finish": 76,
+        "finish": 1
+      }
+    },
+    {
       "arm": "base_teacher",
       "seed": 11,
       "n": 100,
@@ -8,7 +138,7 @@
       "f1": 0.4279,
       "cover": 0.55,
       "doc_recall": 0.715,
-      "judge_correct": 0.63,
+      "judge_correct": 0.62,
       "steps": 3.93,
       "voluntary_finish": 0.04,
       "elapsed_s": 63.007,
@@ -33,7 +163,7 @@
       "f1": 0.4188,
       "cover": 0.59,
       "doc_recall": 0.69,
-      "judge_correct": 0.64,
+      "judge_correct": 0.65,
       "steps": 3.95,
       "voluntary_finish": 0.04,
       "elapsed_s": 63.8263,
@@ -83,7 +213,7 @@
       "f1": 0.4215,
       "cover": 0.56,
       "doc_recall": 0.72,
-      "judge_correct": 0.59,
+      "judge_correct": 0.6,
       "steps": 3.87,
       "voluntary_finish": 0.08,
       "elapsed_s": 62.8323,
@@ -133,7 +263,7 @@
       "f1": 0.2501,
       "cover": 0.59,
       "doc_recall": 0.735,
-      "judge_correct": 0.58,
+      "judge_correct": 0.57,
       "steps": 3.78,
       "voluntary_finish": 0.15,
       "elapsed_s": 55.5137,
@@ -159,7 +289,7 @@
       "f1": 0.2003,
       "cover": 0.48,
       "doc_recall": 0.655,
-      "judge_correct": 0.47,
+      "judge_correct": 0.46,
       "steps": 3.82,
       "voluntary_finish": 0.12,
       "elapsed_s": 60.8844,
@@ -237,7 +367,7 @@
       "f1": 0.2075,
       "cover": 0.48,
       "doc_recall": 0.78,
-      "judge_correct": 0.46,
+      "judge_correct": 0.45,
       "steps": 3.78,
       "voluntary_finish": 0.16,
       "elapsed_s": 60.4955,
@@ -288,7 +418,7 @@
       "f1": 0.294,
       "cover": 0.5895,
       "doc_recall": 0.7842,
-      "judge_correct": 0.5368,
+      "judge_correct": 0.5263,
       "steps": 3.9579,
       "voluntary_finish": 0.0316,
       "elapsed_s": 93.2127,
@@ -382,6 +512,234 @@
     }
   ],
   "per_arm": {
+    "base": {
+      "n_reps": 5,
+      "em": {
+        "mean": 0.07,
+        "sd": 0.0187,
+        "var": 0.00035,
+        "min": 0.05,
+        "max": 0.09,
+        "ci95": 0.0232,
+        "values": [
+          0.09,
+          0.05,
+          0.05,
+          0.08,
+          0.08
+        ]
+      },
+      "f1": {
+        "mean": 0.1415,
+        "sd": 0.02,
+        "var": 0.0004,
+        "min": 0.109,
+        "max": 0.1626,
+        "ci95": 0.0248,
+        "values": [
+          0.1626,
+          0.1481,
+          0.109,
+          0.1486,
+          0.139
+        ]
+      },
+      "cover": {
+        "mean": 0.262,
+        "sd": 0.0396,
+        "var": 0.00157,
+        "min": 0.21,
+        "max": 0.3,
+        "ci95": 0.0492,
+        "values": [
+          0.28,
+          0.3,
+          0.23,
+          0.29,
+          0.21
+        ]
+      },
+      "doc_recall": {
+        "mean": 0.687,
+        "sd": 0.0057,
+        "var": 3.2e-05,
+        "min": 0.68,
+        "max": 0.695,
+        "ci95": 0.0071,
+        "values": [
+          0.685,
+          0.685,
+          0.69,
+          0.695,
+          0.68
+        ]
+      },
+      "judge_correct": {
+        "mean": 0.308,
+        "sd": 0.0396,
+        "var": 0.00157,
+        "min": 0.26,
+        "max": 0.36,
+        "ci95": 0.0492,
+        "values": [
+          0.31,
+          0.36,
+          0.28,
+          0.33,
+          0.26
+        ]
+      },
+      "steps": {
+        "mean": 3.956,
+        "sd": 0.0195,
+        "var": 0.00038,
+        "min": 3.93,
+        "max": 3.98,
+        "ci95": 0.0242,
+        "values": [
+          3.95,
+          3.93,
+          3.97,
+          3.95,
+          3.98
+        ]
+      },
+      "voluntary_finish": {
+        "mean": 0.028,
+        "sd": 0.013,
+        "var": 0.00017,
+        "min": 0.01,
+        "max": 0.04,
+        "ci95": 0.0162,
+        "values": [
+          0.03,
+          0.04,
+          0.02,
+          0.04,
+          0.01
+        ]
+      },
+      "elapsed_s": {
+        "mean": 26.2585,
+        "sd": 1.7981,
+        "var": 3.233266,
+        "min": 24.0394,
+        "max": 28.081,
+        "ci95": 2.2327,
+        "values": [
+          28.081,
+          24.0394,
+          27.6833,
+          24.7128,
+          26.7761
+        ]
+      },
+      "tokens_total": {
+        "mean": 8040.182,
+        "sd": 108.6725,
+        "var": 11809.72072,
+        "min": 7957.11,
+        "max": 8227.41,
+        "ci95": 134.9348,
+        "values": [
+          8227.41,
+          7972.85,
+          8015.77,
+          8027.77,
+          7957.11
+        ]
+      },
+      "wall_time_s": {
+        "mean": 172.02,
+        "sd": 11.8864,
+        "var": 141.287,
+        "min": 158.8,
+        "max": 183.3,
+        "ci95": 14.7589,
+        "values": [
+          183.3,
+          159.9,
+          182.0,
+          158.8,
+          176.1
+        ]
+      },
+      "student_tokens": {
+        "mean": 804018.2,
+        "sd": 10867.2539,
+        "var": 118097207.2,
+        "min": 795711,
+        "max": 822741,
+        "ci95": 13493.4779,
+        "values": [
+          822741,
+          797285,
+          801577,
+          802777,
+          795711
+        ]
+      },
+      "teacher_tokens": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "var": 0.0,
+        "min": 0,
+        "max": 0,
+        "ci95": 0.0,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "time_per_question_s": {
+        "mean": 1.72,
+        "sd": 0.1173,
+        "var": 0.01375,
+        "min": 1.59,
+        "max": 1.83,
+        "ci95": 0.1456,
+        "values": [
+          1.83,
+          1.6,
+          1.82,
+          1.59,
+          1.76
+        ]
+      },
+      "time_per_step_s": {
+        "mean": 0.434,
+        "sd": 0.0279,
+        "var": 0.00078,
+        "min": 0.4,
+        "max": 0.46,
+        "ci95": 0.0347,
+        "values": [
+          0.46,
+          0.41,
+          0.46,
+          0.4,
+          0.44
+        ]
+      },
+      "invalid_steps": {
+        "mean": 39.2,
+        "sd": 8.438,
+        "var": 71.2,
+        "min": 33,
+        "max": 54,
+        "ci95": 10.4772,
+        "values": [
+          54,
+          35,
+          37,
+          37,
+          33
+        ]
+      }
+    },
     "base_teacher": {
       "n_reps": 5,
       "em": {
@@ -445,17 +803,17 @@
         ]
       },
       "judge_correct": {
-        "mean": 0.634,
-        "sd": 0.0288,
-        "var": 0.00083,
-        "min": 0.59,
+        "mean": 0.636,
+        "sd": 0.027,
+        "var": 0.00073,
+        "min": 0.6,
         "max": 0.67,
-        "ci95": 0.0358,
+        "ci95": 0.0335,
         "values": [
-          0.63,
-          0.64,
+          0.62,
+          0.65,
           0.67,
-          0.59,
+          0.6,
           0.64
         ]
       },
@@ -673,18 +1031,18 @@
         ]
       },
       "judge_correct": {
-        "mean": 0.492,
-        "sd": 0.0526,
-        "var": 0.00277,
+        "mean": 0.486,
+        "sd": 0.0513,
+        "var": 0.00263,
         "min": 0.45,
-        "max": 0.58,
-        "ci95": 0.0653,
+        "max": 0.57,
+        "ci95": 0.0637,
         "values": [
-          0.58,
-          0.47,
+          0.57,
+          0.46,
           0.45,
           0.5,
-          0.46
+          0.45
         ]
       },
       "steps": {
@@ -901,15 +1259,15 @@
         ]
       },
       "judge_correct": {
-        "mean": 0.5967,
-        "sd": 0.0359,
-        "var": 0.001286,
-        "min": 0.5368,
+        "mean": 0.5946,
+        "sd": 0.0403,
+        "var": 0.001623,
+        "min": 0.5263,
         "max": 0.6263,
-        "ci95": 0.0445,
+        "ci95": 0.05,
         "values": [
           0.61,
-          0.5368,
+          0.5263,
           0.6186,
           0.5918,
           0.6263
@@ -1070,13 +1428,53 @@
   "tests": [
     {
       "metric": "f1",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.0648,
+      "paired_t": {
+        "t": 3.298,
+        "p": 0.0014,
+        "p_holm": 0.0014
+      },
+      "wilcoxon": {
+        "W": 1095.0,
+        "p": 0.00084
+      },
+      "cohens_d_paired": 0.33,
+      "welch_reps": {
+        "t": 4.406,
+        "p": 0.0027
+      }
+    },
+    {
+      "metric": "f1",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.2898,
+      "paired_t": {
+        "t": 10.304,
+        "p": 2.38e-17,
+        "p_holm": 1.19e-16
+      },
+      "wilcoxon": {
+        "W": 66.5,
+        "p": 1.8e-14
+      },
+      "cohens_d_paired": 1.03,
+      "welch_reps": {
+        "t": 26.193,
+        "p": 1.71e-08
+      }
+    },
+    {
+      "metric": "f1",
       "pair": "m1 vs base_teacher",
       "n_questions": 100,
       "mean_diff": -0.225,
       "paired_t": {
         "t": -7.922,
         "p": 3.52e-12,
-        "p_holm": 1.06e-11
+        "p_holm": 1.41e-11
       },
       "wilcoxon": {
         "W": 387.0,
@@ -1096,7 +1494,7 @@
       "paired_t": {
         "t": 5.534,
         "p": 2.57e-07,
-        "p_holm": 5.13e-07
+        "p_holm": 7.7e-07
       },
       "wilcoxon": {
         "W": 776.0,
@@ -1116,7 +1514,7 @@
       "paired_t": {
         "t": -4.28,
         "p": 4.33e-05,
-        "p_holm": 4.33e-05
+        "p_holm": 8.65e-05
       },
       "wilcoxon": {
         "W": 1203.5,
@@ -1126,6 +1524,46 @@
       "welch_reps": {
         "t": -4.311,
         "p": 0.0096
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.25,
+      "paired_t": {
+        "t": 6.839,
+        "p": 6.66e-10,
+        "p_holm": 2.67e-09
+      },
+      "wilcoxon": {
+        "W": 319.5,
+        "p": 1.33e-08
+      },
+      "cohens_d_paired": 0.684,
+      "welch_reps": {
+        "t": 8.207,
+        "p": 6.4e-05
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.312,
+      "paired_t": {
+        "t": 9.136,
+        "p": 8.37e-15,
+        "p_holm": 4.19e-14
+      },
+      "wilcoxon": {
+        "W": 97.0,
+        "p": 1.77e-11
+      },
+      "cohens_d_paired": 0.914,
+      "welch_reps": {
+        "t": 15.6,
+        "p": 4.16e-06
       }
     },
     {
@@ -1190,13 +1628,53 @@
     },
     {
       "metric": "em",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.052,
+      "paired_t": {
+        "t": 2.982,
+        "p": 0.0036,
+        "p_holm": 0.0036
+      },
+      "wilcoxon": {
+        "W": 79.0,
+        "p": 0.0042
+      },
+      "cohens_d_paired": 0.298,
+      "welch_reps": {
+        "t": 4.67,
+        "p": 0.0017
+      }
+    },
+    {
+      "metric": "em",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.26,
+      "paired_t": {
+        "t": 8.264,
+        "p": 6.51e-13,
+        "p_holm": 3.26e-12
+      },
+      "wilcoxon": {
+        "W": 9.5,
+        "p": 2.23e-10
+      },
+      "cohens_d_paired": 0.826,
+      "welch_reps": {
+        "t": 29.069,
+        "p": 6.97e-07
+      }
+    },
+    {
+      "metric": "em",
       "pair": "m1 vs base_teacher",
       "n_questions": 100,
       "mean_diff": -0.208,
       "paired_t": {
         "t": -6.738,
         "p": 1.07e-09,
-        "p_holm": 3.22e-09
+        "p_holm": 4.29e-09
       },
       "wilcoxon": {
         "W": 73.5,
@@ -1216,7 +1694,7 @@
       "paired_t": {
         "t": 4.288,
         "p": 4.2e-05,
-        "p_holm": 8.4e-05
+        "p_holm": 0.000126
       },
       "wilcoxon": {
         "W": 196.0,
@@ -1236,7 +1714,7 @@
       "paired_t": {
         "t": -4.211,
         "p": 5.61e-05,
-        "p_holm": 5.61e-05
+        "p_holm": 0.000112
       },
       "wilcoxon": {
         "W": 351.5,
@@ -1250,62 +1728,142 @@
     },
     {
       "metric": "judge_correct",
-      "pair": "m1 vs base_teacher",
+      "pair": "m1 vs base",
       "n_questions": 100,
-      "mean_diff": -0.142,
+      "mean_diff": 0.178,
       "paired_t": {
-        "t": -4.735,
-        "p": 7.31e-06,
-        "p_holm": 2.19e-05
+        "t": 5.515,
+        "p": 2.78e-07,
+        "p_holm": 1.11e-06
       },
       "wilcoxon": {
-        "W": 547.0,
-        "p": 7.11e-05
+        "W": 428.0,
+        "p": 1.01e-06
       },
-      "cohens_d_paired": -0.474,
+      "cohens_d_paired": 0.552,
       "welch_reps": {
-        "t": -5.292,
-        "p": 0.0017
+        "t": 6.142,
+        "p": 0.000355
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.328,
+      "paired_t": {
+        "t": 10.139,
+        "p": 5.45e-17,
+        "p_holm": 2.73e-16
+      },
+      "wilcoxon": {
+        "W": 28.5,
+        "p": 1.02e-12
+      },
+      "cohens_d_paired": 1.014,
+      "welch_reps": {
+        "t": 15.293,
+        "p": 1.14e-06
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": -0.15,
+      "paired_t": {
+        "t": -5.092,
+        "p": 1.69e-06,
+        "p_holm": 5.07e-06
+      },
+      "wilcoxon": {
+        "W": 454.0,
+        "p": 1.69e-05
+      },
+      "cohens_d_paired": -0.509,
+      "welch_reps": {
+        "t": -5.786,
+        "p": 0.0011
       }
     },
     {
       "metric": "judge_correct",
       "pair": "m1_teacher vs m1",
       "n_questions": 100,
-      "mean_diff": 0.1085,
+      "mean_diff": 0.1125,
       "paired_t": {
-        "t": 4.56,
-        "p": 1.47e-05,
-        "p_holm": 2.93e-05
+        "t": 4.766,
+        "p": 6.46e-06,
+        "p_holm": 1.29e-05
       },
       "wilcoxon": {
-        "W": 445.5,
-        "p": 6.6e-05
+        "W": 439.5,
+        "p": 1.93e-05
       },
-      "cohens_d_paired": 0.456,
+      "cohens_d_paired": 0.477,
       "welch_reps": {
-        "t": 3.676,
-        "p": 0.0078
+        "t": 3.724,
+        "p": 0.0064
       }
     },
     {
       "metric": "judge_correct",
       "pair": "m1_teacher vs base_teacher",
       "n_questions": 100,
-      "mean_diff": -0.0335,
+      "mean_diff": -0.0375,
       "paired_t": {
-        "t": -1.12,
-        "p": 0.2652,
-        "p_holm": 0.2652
+        "t": -1.292,
+        "p": 0.1994,
+        "p_holm": 0.1994
       },
       "wilcoxon": {
-        "W": 893.0,
-        "p": 0.4292
+        "W": 846.5,
+        "p": 0.3599
       },
-      "cohens_d_paired": -0.112,
+      "cohens_d_paired": -0.129,
       "welch_reps": {
-        "t": -1.813,
-        "p": 0.1091
+        "t": -1.909,
+        "p": 0.098
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.04,
+      "paired_t": {
+        "t": 1.798,
+        "p": 0.0752,
+        "p_holm": 0.1505
+      },
+      "wilcoxon": {
+        "W": 1081.0,
+        "p": 0.1368
+      },
+      "cohens_d_paired": 0.18,
+      "welch_reps": {
+        "t": 1.525,
+        "p": 0.2006
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.029,
+      "paired_t": {
+        "t": 2.159,
+        "p": 0.0333,
+        "p_holm": 0.0998
+      },
+      "wilcoxon": {
+        "W": 364.0,
+        "p": 0.0518
+      },
+      "cohens_d_paired": 0.216,
+      "welch_reps": {
+        "t": 2.83,
+        "p": 0.0411
       }
     },
     {
@@ -1336,7 +1894,7 @@
       "paired_t": {
         "t": 4.57,
         "p": 1.41e-05,
-        "p_holm": 4.23e-05
+        "p_holm": 7.05e-05
       },
       "wilcoxon": {
         "W": 703.0,
@@ -1356,7 +1914,7 @@
       "paired_t": {
         "t": 4.532,
         "p": 1.64e-05,
-        "p_holm": 3.28e-05
+        "p_holm": 6.56e-05
       },
       "wilcoxon": {
         "W": 681.5,
@@ -1370,13 +1928,53 @@
     },
     {
       "metric": "tokens_total",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 534.732,
+      "paired_t": {
+        "t": 2.941,
+        "p": 0.0041,
+        "p_holm": 0.0041
+      },
+      "wilcoxon": {
+        "W": 1678.0,
+        "p": 0.0036
+      },
+      "cohens_d_paired": 0.294,
+      "welch_reps": {
+        "t": 2.536,
+        "p": 0.0581
+      }
+    },
+    {
+      "metric": "tokens_total",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 9404.538,
+      "paired_t": {
+        "t": 25.88,
+        "p": 7.41e-46,
+        "p_holm": 2.96e-45
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 3.9e-18
+      },
+      "cohens_d_paired": 2.588,
+      "welch_reps": {
+        "t": 56.34,
+        "p": 7.07e-08
+      }
+    },
+    {
+      "metric": "tokens_total",
       "pair": "m1 vs base_teacher",
       "n_questions": 100,
       "mean_diff": -8869.806,
       "paired_t": {
         "t": -22.319,
         "p": 2.04e-40,
-        "p_holm": 4.08e-40
+        "p_holm": 6.12e-40
       },
       "wilcoxon": {
         "W": 0.0,
@@ -1396,7 +1994,7 @@
       "paired_t": {
         "t": 49.407,
         "p": 1.43e-71,
-        "p_holm": 4.3e-71
+        "p_holm": 7.16e-71
       },
       "wilcoxon": {
         "W": 0.0,
@@ -1416,7 +2014,7 @@
       "paired_t": {
         "t": 6.659,
         "p": 1.56e-09,
-        "p_holm": 1.56e-09
+        "p_holm": 3.11e-09
       },
       "wilcoxon": {
         "W": 546.0,
@@ -1430,7 +2028,7 @@
     }
   ],
   "config": {
-    "gpus": "1,2,5,6,7",
+    "gpus": "2,5",
     "seeds": "11,23,37,53,71",
     "budget": 4,
     "student_temperature": 0.2,
@@ -1447,7 +2045,9 @@
     "served_adapter_name": "m1",
     "clients_per_server": 3,
     "smoke": false,
+    "arms": "base",
+    "exp_dir": "training_methods/exp_unseen100/runs/20260712T114423Z_exp",
     "n_questions": 100
   },
-  "written_at_utc": "2026-07-12T12:23:52.137450+00:00"
+  "written_at_utc": "2026-07-12T14:36:41.035355+00:00"
 }

@@ -46,7 +46,7 @@ QUESTIONS = EXP / "data" / "unseen100" / "fresh_questions.jsonl"
 CORPUS = EXP / "data" / "unseen100" / "fresh_corpus.jsonl"
 ADAPTER_DEFAULT = REPO_ROOT / "training_methods/m1_sft/runs/20260712T022817Z_train4gpu/adapter"
 
-ARMS = ("base_teacher", "m1", "m1_teacher")
+ARMS = ("base", "base_teacher", "m1", "m1_teacher")
 
 
 def build_job(arm: str, seed: int, run_dir: Path, args, server_url: str = "") -> dict:
@@ -63,11 +63,11 @@ def build_job(arm: str, seed: int, run_dir: Path, args, server_url: str = "") ->
     if args.backend == "vllm":
         served = args.served_adapter_name if trained else "student"
         common += ["--backend", "vllm", "--server-url", server_url, "--served-model", served]
-    if arm == "m1":
+    if arm in ("m1", "base"):
         cmd = [PY, str(REPO_ROOT / "training_methods/common/eval_agent.py"),
                "--temperature", str(args.student_temperature),
                "--batch-size", str(args.student_batch), *common]
-        if args.backend == "hf":
+        if args.backend == "hf" and trained:
             cmd += ["--adapter", str(args.adapter)]
         est = 1  # relative cost rank: teacherless is the fast one
     else:
@@ -176,17 +176,28 @@ def main() -> None:
                          "(continuous batching absorbs them)")
     ap.add_argument("--smoke", action="store_true",
                     help="2 questions, 2 seeds, budget 2 — validates the whole flow")
+    ap.add_argument("--arms", default=",".join(ARMS),
+                    help="comma-separated subset of arms to run")
+    ap.add_argument("--exp-dir", default=None,
+                    help="write into an EXISTING experiment dir (adds runs; the judge "
+                         "then re-scores every run in the dir for one consistent file)")
     args = ap.parse_args()
     if args.smoke:
         args.limit, args.seeds, args.budget = 2, "11,23", 2
         args.teacher_concurrency = 2
 
-    run_dir = timestamped_dir(args.out_base, "exp" + ("_smoke" if args.smoke else ""))
+    if args.exp_dir:
+        run_dir = Path(args.exp_dir)
+        assert run_dir.is_dir(), f"--exp-dir not found: {run_dir}"
+    else:
+        run_dir = timestamped_dir(args.out_base, "exp" + ("_smoke" if args.smoke else ""))
     log = setup_logger("exp_unseen100", run_dir / "experiment.log")
     seeds = [int(s) for s in args.seeds.split(",")]
     gpus = [g.strip() for g in args.gpus.split(",") if g.strip()]
+    arms = [a.strip() for a in args.arms.split(",") if a.strip()]
+    assert all(a in ARMS for a in arms), f"unknown arm in {arms}"
     log.info(f"artifacts: {run_dir}")
-    log.info(f"gpus={gpus} seeds={seeds} limit={args.limit} budget={args.budget}")
+    log.info(f"gpus={gpus} arms={arms} seeds={seeds} limit={args.limit} budget={args.budget}")
 
     server_procs: list = []
     server_urls: List[str] = []
@@ -194,7 +205,7 @@ def main() -> None:
         server_procs, server_urls = start_vllm_servers(gpus, args, run_dir, log)
 
     jobs = []
-    for i, (arm, seed) in enumerate([(a, s) for a in ARMS for s in seeds]):
+    for i, (arm, seed) in enumerate([(a, s) for a in arms for s in seeds]):
         url = server_urls[i % len(server_urls)] if server_urls else ""
         jobs.append(build_job(arm, seed, run_dir, args, server_url=url))
     jobs.sort(key=lambda j: -j["cost_rank"])  # teacher jobs first for better packing
