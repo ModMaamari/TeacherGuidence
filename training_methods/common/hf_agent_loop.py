@@ -59,9 +59,26 @@ INVALID_RETRY_NOTE = (
 
 def _safe_parse_action(raw: str):
     """parse_student_action, hardened against degenerate shapes (e.g. "action" being
-    a string) that make StudentAction.from_dict raise instead of flagging invalid."""
+    a string) that make StudentAction.from_dict raise instead of flagging invalid.
+
+    Also normalizes decision.category == "" to an omitted field before validation:
+    the harness stores an omitted category as "" (StudentAction.from_dict default),
+    the training targets reproduce that verbatim, and the pydantic schema accepts a
+    missing category but rejects the empty string.
+    """
+    from agentsim.teacher_guidance.json_utils import parse_json_object, validate_student_action
+    from agentsim.teacher_guidance.schemas import StudentAction
+
     try:
-        return parse_student_action(raw)
+        obj, info = parse_json_object(raw)
+        if info.get("json_valid") and isinstance(obj, dict):
+            dec = obj.get("decision")
+            if isinstance(dec, dict) and dec.get("category") == "":
+                dec.pop("category")
+        valid, errors = validate_student_action(obj) if info["json_valid"] else (False, info["errors"])
+        info["action_valid"] = valid
+        info["errors"] = list(info.get("errors", [])) + [e for e in errors if e not in info.get("errors", [])]
+        return StudentAction.from_dict(obj), info
     except Exception as exc:  # noqa: BLE001 -- any malformed output is just invalid
         return None, {"action_valid": False, "errors": [f"unparseable: {type(exc).__name__}"]}
 
