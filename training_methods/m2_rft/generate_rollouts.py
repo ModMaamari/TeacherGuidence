@@ -21,7 +21,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
 from training_methods.common.tm_logging import setup_logger, timestamped_dir, write_json  # noqa: E402
-from training_methods.common.hf_agent_loop import PolicyModel, load_questions, run_episode  # noqa: E402
+from training_methods.common.hf_agent_loop import (  # noqa: E402
+    PolicyModel,
+    load_questions,
+    run_episode,
+    run_episodes_batched,
+)
 from training_methods.m4_grpo.rewards import episode_reward  # noqa: E402
 from agentsim.teacher_guidance.local_retrieval import HotpotLocalRetriever  # noqa: E402
 
@@ -40,6 +45,9 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--shard", default=None, help="i/n")
     ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--batch-size", type=int, default=1,
+                    help=">1 batches episode generation (n-per-question samples of the "
+                         "same question run as separate batched episodes)")
     args = ap.parse_args()
 
     shard_sfx = f"_s{args.shard.replace('/', 'of')}" if args.shard else ""
@@ -60,19 +68,44 @@ def main() -> None:
     n_correct = 0
     total = 0
     with open(run_dir / "rollouts.jsonl", "w") as w:
-        for k, q in enumerate(questions, 1):
-            for s in range(args.n_per_question):
-                ep = run_episode(policy, q, retriever, budget=args.budget,
-                                 temperature=args.temperature)
-                ep["reward"] = episode_reward(ep)["reward"]
-                ep["sample_idx"] = s
-                total += 1
-                n_correct += bool(ep["final_metrics"]["cover_match"])
-                w.write(json.dumps(ep, ensure_ascii=False, default=str) + "\n")
-                w.flush()
-            if k % 10 == 0 or k == len(questions):
-                log.info(f"[{k}/{len(questions)}] episodes={total} cover-correct={n_correct} "
+
+        def _record(ep, sample_idx):
+            nonlocal total, n_correct
+            ep["reward"] = episode_reward(ep)["reward"]
+            ep["sample_idx"] = sample_idx
+            total += 1
+            n_correct += bool(ep["final_metrics"]["cover_match"])
+            w.write(json.dumps(ep, ensure_ascii=False, default=str) + "\n")
+            w.flush()
+            if total % 20 == 0:
+                log.info(f"episodes={total} cover-correct={n_correct} "
                          f"({n_correct/max(total,1):.1%})")
+
+        if args.batch_size > 1:
+            # flatten to n_per_question independent episodes per question, decoded in
+            # shared batches; sample_idx = completion order within the qid
+            rows = [q for q in questions for _ in range(args.n_per_question)]
+            seen: dict = {}
+
+            def _record_batched(ep):
+                s = seen.get(ep["qid"], 0)
+                seen[ep["qid"]] = s + 1
+                _record(ep, s)
+
+            run_episodes_batched(
+                policy, rows, retriever, budget=args.budget,
+                temperature=args.temperature, batch_size=args.batch_size,
+                on_episode=_record_batched,
+            )
+        else:
+            for k, q in enumerate(questions, 1):
+                for s in range(args.n_per_question):
+                    ep = run_episode(policy, q, retriever, budget=args.budget,
+                                     temperature=args.temperature)
+                    _record(ep, s)
+                if k % 10 == 0 or k == len(questions):
+                    log.info(f"[{k}/{len(questions)}] episodes={total} cover-correct={n_correct} "
+                             f"({n_correct/max(total,1):.1%})")
 
     write_json(run_dir / "rollout_stats.json", {
         "questions": len(questions), "episodes": total,

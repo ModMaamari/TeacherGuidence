@@ -65,10 +65,10 @@ fi
 
 log "[3/4] evals: dev + GOLDEN-100"
 $PY training_methods/common/eval_agent.py $MODEL_ARG --adapter "$ADAPTER" \
-  --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag grpo --budget 4 $EVAL_LIMIT
+  --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag grpo --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 $PY training_methods/common/eval_agent.py $MODEL_ARG --adapter "$ADAPTER" \
   --questions $GOLD/golden100_questions.jsonl --corpus $GOLD/golden100_corpus.jsonl \
-  --out $M/runs/eval_golden100 --tag grpo --budget 4 $EVAL_LIMIT
+  --out $M/runs/eval_golden100 --tag grpo --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 
 log "[4/4] results report"
 $PY training_methods/common/compare_evals.py --title "m4_grpo results ($TS)" \

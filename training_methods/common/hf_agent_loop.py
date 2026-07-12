@@ -132,6 +132,49 @@ class PolicyModel:
             out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True
         ).strip()
 
+    def generate_batch(
+        self,
+        messages_list: List[List[Dict[str, str]]],
+        max_new_tokens: int = 700,
+        temperature: float = 0.0,
+    ) -> List[str]:
+        """Batched version of ``generate``: one forward pass for N conversations
+        (left-padded), returning one decoded completion per conversation."""
+        import torch
+
+        if not messages_list:
+            return []
+        texts = [
+            self.tokenizer.apply_chat_template(m, add_generation_prompt=True, tokenize=False)
+            for m in messages_list
+        ]
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        prev_side = self.tokenizer.padding_side
+        self.tokenizer.padding_side = "left"
+        try:
+            # the chat template already adds special tokens
+            enc = self.tokenizer(
+                texts, return_tensors="pt", padding=True, add_special_tokens=False
+            ).to(self.model.device)
+        finally:
+            self.tokenizer.padding_side = prev_side
+        kwargs: Dict[str, Any] = dict(
+            max_new_tokens=max_new_tokens,
+            pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id,
+        )
+        if temperature and temperature > 0:
+            kwargs.update(do_sample=True, temperature=temperature, top_p=0.95)
+        else:
+            kwargs.update(do_sample=False)
+        with torch.no_grad():
+            out = self.model.generate(**enc, **kwargs)
+        prompt_len = enc["input_ids"].shape[1]  # same for all rows (left padding)
+        return [
+            self.tokenizer.decode(out[i][prompt_len:], skip_special_tokens=True).strip()
+            for i in range(len(messages_list))
+        ]
+
 
 def _messages(user_prompt: str) -> List[Dict[str, str]]:
     return [
@@ -243,6 +286,164 @@ def run_episode(
         "final_metrics": metrics,
         "elapsed_s": round(time.time() - started, 2),
     }
+
+
+class _EpisodeState:
+    """Mutable per-episode state for the batched engine (mirrors run_episode)."""
+
+    def __init__(self, row: Dict[str, Any], budget: int, disclose_budget: bool, with_plan: bool):
+        self.row = row
+        self.qid = row["id"]
+        self.gold = row.get("answer", "") or (row.get("gold") or {}).get("answer", "")
+        self.gold_doc_ids = set((row.get("gold") or {}).get("gold_doc_ids", []) or [])
+        self.ctx = WorkflowContext(
+            task_id=self.qid,
+            query=row["query"],
+            metadata={
+                "retrieval_scope": row.get("retrieval_scope", {}),
+                "disclose_budget": disclose_budget,
+            },
+        )
+        self.budget = budget
+        self.phase = "plan" if with_plan else "step"
+        self.t = 0 if with_plan else 1
+        self.retrying = False       # invalid action: one retry with the format note
+        self.cur_prompt = ""        # prompt of the in-flight generation
+        self.plan_record: Optional[Dict[str, Any]] = None
+        self.steps: List[Dict[str, Any]] = []
+        self.stop_reason = "budget_forced_finish"
+        self.final_answer = ""
+        self.done = False
+        self.started = time.time()
+
+    def next_prompt(self) -> str:
+        if self.phase == "plan":
+            state = build_student_visible_state(self.ctx, 0, self.budget)
+            pr_cfg = PlanReviewConfig(
+                enabled=True, max_initial_plan_steps=self.budget, max_revised_plan_steps=self.budget
+            )
+            self.cur_prompt = build_initial_plan_prompt(state, pr_cfg)
+        else:
+            force_finish = self.t == self.budget
+            state = build_student_visible_state(self.ctx, self.t, self.budget)
+            base = build_student_prompt(state, GuidanceConfig(), force_finish)
+            self.cur_prompt = base + INVALID_RETRY_NOTE if self.retrying else base
+        return self.cur_prompt
+
+    def advance(self, raw: str, retriever: HotpotLocalRetriever, logger=None) -> None:
+        """Consume one generation; mutates state exactly like run_episode's loop body."""
+        if self.phase == "plan":
+            plan_obj, plan_info = parse_student_plan(raw)
+            if plan_info.get("json_valid") and isinstance(plan_obj, dict) and plan_obj.get("steps"):
+                self.ctx.metadata["revised_plan"] = plan_obj
+            self.plan_record = {
+                "prompt": self.cur_prompt, "raw": raw, "valid": bool(plan_info.get("json_valid")),
+            }
+            self.phase, self.t = "step", 1
+            return
+
+        force_finish = self.t == self.budget
+        action, info = _safe_parse_action(raw)
+        if not info.get("action_valid") and not self.retrying:
+            self.retrying = True    # regenerate this same step with the format note
+            return
+        self.retrying = False
+
+        step_rec: Dict[str, Any] = {
+            "t": self.t,
+            "student_prompt": self.cur_prompt,
+            "student_raw": raw,
+            "student_action": action.to_dict() if action is not None else {},
+            "action_valid": bool(info.get("action_valid")) and action is not None,
+        }
+        if step_rec["action_valid"]:
+            obs = execute_student_tool(self.ctx, action, retriever)
+            step_rec["tool_observation"] = obs
+            tool = action.action.tool
+        else:
+            step_rec["tool_observation"] = {
+                "tool": None, "status": "invalid_action", "errors": info.get("errors", []),
+            }
+            tool = None
+        self.steps.append(step_rec)
+        if logger:
+            logger.info(f"qid={self.qid} step={self.t}/{self.budget} tool={tool} valid={step_rec['action_valid']}")
+
+        if tool == "finish":
+            self.final_answer = self.ctx.metadata.get("final_answer", "")
+            self.stop_reason = "finish" if not force_finish else "budget_forced_finish"
+            self.done = True
+        elif force_finish:
+            self.final_answer = derive_final_answer(self.ctx)
+            self.stop_reason = "budget_forced_finish_no_finish"
+            self.done = True
+        else:
+            self.t += 1
+
+    def episode(self) -> Dict[str, Any]:
+        if not self.final_answer:
+            self.final_answer = self.ctx.metadata.get("final_answer") or derive_final_answer(self.ctx)
+        retrieved_ids = set(self.ctx.metadata.get("retrieved_doc_ids", []) or [])
+        metrics = {
+            "exact_match": bool(exact_match(self.final_answer, self.gold)),
+            "f1": round(f1_score(self.final_answer, self.gold), 4),
+            "cover_match": bool(cover_match(self.final_answer, self.gold)),
+            "doc_recall": round(supporting_doc_recall(retrieved_ids, self.gold_doc_ids), 4)
+            if self.gold_doc_ids else None,
+        }
+        return {
+            "qid": self.qid,
+            "query": self.row["query"],
+            "gold_answer": self.gold,
+            "final_answer": self.final_answer,
+            "budget": self.budget,
+            "used_steps": len(self.steps),
+            "stop_reason": self.stop_reason,
+            "plan": self.plan_record,
+            "steps": self.steps,
+            "final_metrics": metrics,
+            "elapsed_s": round(time.time() - self.started, 2),
+        }
+
+
+def run_episodes_batched(
+    policy: PolicyModel,
+    question_rows: List[Dict[str, Any]],
+    retriever: HotpotLocalRetriever,
+    budget: int = 4,
+    disclose_budget: bool = True,
+    with_plan: bool = True,
+    temperature: float = 0.0,
+    max_new_tokens: int = 700,
+    batch_size: int = 8,
+    on_episode=None,
+    logger=None,
+):
+    """Run many teacherless episodes with batched generation: each iteration gathers
+    the next prompt from every in-flight episode and decodes them in ONE forward
+    pass. Per-episode semantics (plan turn, one invalid-action retry, forced finish)
+    are identical to ``run_episode``. ``on_episode(episode_dict)`` fires as each
+    episode completes; episodes are yielded in completion order."""
+    queue = list(question_rows)
+    active: List[_EpisodeState] = []
+    episodes: List[Dict[str, Any]] = []
+    while queue or active:
+        while queue and len(active) < batch_size:
+            active.append(_EpisodeState(queue.pop(0), budget, disclose_budget, with_plan))
+        prompts = [_messages(ep.next_prompt()) for ep in active]
+        outs = policy.generate_batch(prompts, max_new_tokens, temperature)
+        still_active: List[_EpisodeState] = []
+        for ep, raw in zip(active, outs):
+            ep.advance(raw, retriever, logger)
+            if ep.done:
+                rec = ep.episode()
+                episodes.append(rec)
+                if on_episode:
+                    on_episode(rec)
+            else:
+                still_active.append(ep)
+        active = still_active
+    return episodes
 
 
 def load_questions(path: str | Path, limit: Optional[int] = None) -> List[Dict[str, Any]]:

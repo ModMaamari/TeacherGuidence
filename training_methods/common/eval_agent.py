@@ -36,6 +36,7 @@ from training_methods.common.hf_agent_loop import (  # noqa: E402
     PolicyModel,
     load_questions,
     run_episode,
+    run_episodes_batched,
 )
 from agentsim.teacher_guidance.local_retrieval import HotpotLocalRetriever  # noqa: E402
 
@@ -55,6 +56,9 @@ def main() -> None:
     ap.add_argument("--temperature", type=float, default=0.0)
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--shard", default=None, help="i/n to run only shard i of n (0-based)")
+    ap.add_argument("--batch-size", type=int, default=1,
+                    help=">1 runs episodes in lockstep with batched generation "
+                         "(~batch-size-fold fewer forward passes; same semantics)")
     args = ap.parse_args()
 
     run_dir = timestamped_dir(args.out, args.tag)
@@ -75,24 +79,39 @@ def main() -> None:
 
     episodes = []
     with open(run_dir / "episodes.jsonl", "w") as w:
-        for k, q in enumerate(questions, 1):
-            ep = run_episode(
-                policy, q, retriever,
-                budget=args.budget,
-                disclose_budget=not args.hidden_budget,
-                with_plan=not args.no_plan,
-                temperature=args.temperature,
-                logger=log,
-            )
+
+        def _record(ep):
             episodes.append(ep)
             w.write(json.dumps(ep, ensure_ascii=False, default=str) + "\n")
             w.flush()
             m = ep["final_metrics"]
             log.info(
-                f"[{k}/{len(questions)}] qid={ep['qid']} em={m['exact_match']} "
+                f"[{len(episodes)}/{len(questions)}] qid={ep['qid']} em={m['exact_match']} "
                 f"f1={m['f1']} cover={m['cover_match']} steps={ep['used_steps']} "
                 f"stop={ep['stop_reason']} ans={ep['final_answer'][:60]!r}"
             )
+
+        if args.batch_size > 1:
+            run_episodes_batched(
+                policy, questions, retriever,
+                budget=args.budget,
+                disclose_budget=not args.hidden_budget,
+                with_plan=not args.no_plan,
+                temperature=args.temperature,
+                batch_size=args.batch_size,
+                on_episode=_record,
+                logger=log,
+            )
+        else:
+            for q in questions:
+                _record(run_episode(
+                    policy, q, retriever,
+                    budget=args.budget,
+                    disclose_budget=not args.hidden_budget,
+                    with_plan=not args.no_plan,
+                    temperature=args.temperature,
+                    logger=log,
+                ))
 
     n = len(episodes)
     doc_recalls = [e["final_metrics"]["doc_recall"] for e in episodes

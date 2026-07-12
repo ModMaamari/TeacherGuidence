@@ -70,9 +70,9 @@ log "[4/5] evals: dev + GOLDEN-100 for kto and dpo adapters"
 for NAME in kto dpo; do
   A=$([ "$NAME" = kto ] && echo "$KTO_ADAPTER" || echo "$DPO_ADAPTER")
   $PY training_methods/common/eval_agent.py $MODEL_ARG --adapter "$A" \
-    --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag $NAME --budget 4 $EVAL_LIMIT
+    --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag $NAME --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
   $PY training_methods/common/eval_agent.py $MODEL_ARG --adapter "$A" \
-    --questions $GOLD_Q --corpus $GOLD_C --out $M/runs/eval_golden100 --tag $NAME --budget 4 $EVAL_LIMIT
+    --questions $GOLD_Q --corpus $GOLD_C --out $M/runs/eval_golden100 --tag $NAME --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 done
 
 log "[5/5] results report"

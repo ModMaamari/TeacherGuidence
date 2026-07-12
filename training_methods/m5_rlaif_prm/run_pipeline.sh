@@ -71,10 +71,10 @@ fi
 
 log "[5/6] evals: dev + GOLDEN-100"
 CUDA_VISIBLE_DEVICES=$GPU $PY training_methods/common/eval_agent.py $MODEL_ARG --adapter "$ADAPTER" \
-  --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag rlaif --budget 4 $EVAL_LIMIT
+  --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag rlaif --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 CUDA_VISIBLE_DEVICES=$GPU $PY training_methods/common/eval_agent.py $MODEL_ARG --adapter "$ADAPTER" \
   --questions $GOLD/golden100_questions.jsonl --corpus $GOLD/golden100_corpus.jsonl \
-  --out $M/runs/eval_golden100 --tag rlaif --budget 4 $EVAL_LIMIT
+  --out $M/runs/eval_golden100 --tag rlaif --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 
 log "[6/6] results report"
 $PY training_methods/common/compare_evals.py --title "m5_rlaif_prm results ($TS)" \

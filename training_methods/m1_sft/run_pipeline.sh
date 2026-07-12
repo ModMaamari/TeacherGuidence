@@ -38,16 +38,16 @@ TRAIN_C=data/datasets/hotpot_teacher_guidance_train3000/hotpot_distractor_train_
 
 log "[3/6] eval: BASE model on dev questions"
 $PY training_methods/common/eval_agent.py --questions $DEV_Q --corpus $TRAIN_C \
-  --out $M/runs/eval_dev --tag base --budget 4 $EVAL_LIMIT
+  --out $M/runs/eval_dev --tag base --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 log "[4/6] eval: TRAINED adapter on dev questions"
 $PY training_methods/common/eval_agent.py --adapter "$ADAPTER" --questions $DEV_Q \
-  --corpus $TRAIN_C --out $M/runs/eval_dev --tag m1 --budget 4 $EVAL_LIMIT
+  --corpus $TRAIN_C --out $M/runs/eval_dev --tag m1 --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 
 log "[5/6] GOLDEN TEST: base + trained on the 100 hardest (never-answered) questions"
 $PY training_methods/common/eval_agent.py --questions $GOLD_Q --corpus $GOLD_C \
-  --out $M/runs/eval_golden100 --tag base --budget 4 $EVAL_LIMIT
+  --out $M/runs/eval_golden100 --tag base --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 $PY training_methods/common/eval_agent.py --adapter "$ADAPTER" --questions $GOLD_Q \
-  --corpus $GOLD_C --out $M/runs/eval_golden100 --tag m1 --budget 4 $EVAL_LIMIT
+  --corpus $GOLD_C --out $M/runs/eval_golden100 --tag m1 --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 
 log "[6/6] results report"
 $PY training_methods/common/compare_evals.py --title "m1_sft results ($TS)" \

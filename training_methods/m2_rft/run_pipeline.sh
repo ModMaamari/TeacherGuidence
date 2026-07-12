@@ -37,6 +37,7 @@ log "[2/6] generating rollouts"
 ROLLOUT_LIMIT=$([ "$SMOKE" = "1" ] && echo "--limit 4" || echo "")
 $PY $M/generate_rollouts.py $ADAPTER_ARG --tag "r$ROUND" $ROLLOUT_LIMIT \
   --questions "$FRESH_DIR/fresh_questions.jsonl" --corpus "$FRESH_DIR/fresh_corpus.jsonl" \
+  --batch-size "${ROLLOUT_BATCH:-8}" \
   $([ "$SMOKE" = "1" ] && echo "--budget 2 --n-per-question 1" || echo "")
 ROLLOUTS=$(ls -dt $M/runs/rollouts/*_r$ROUND*/rollouts.jsonl | head -1)
 log "rollouts: $ROLLOUTS"
@@ -59,10 +60,10 @@ TRAIN_C=data/datasets/hotpot_teacher_guidance_train3000/hotpot_distractor_train_
 
 log "[5/6] evals: dev + GOLDEN-100"
 $PY training_methods/common/eval_agent.py --adapter "$NEW_ADAPTER" \
-  --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag "rft$ROUND" --budget 4 $EVAL_LIMIT
+  --questions $DEV_Q --corpus $TRAIN_C --out $M/runs/eval_dev --tag "rft$ROUND" --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 $PY training_methods/common/eval_agent.py --adapter "$NEW_ADAPTER" \
   --questions $GOLD/golden100_questions.jsonl --corpus $GOLD/golden100_corpus.jsonl \
-  --out $M/runs/eval_golden100 --tag "rft$ROUND" --budget 4 $EVAL_LIMIT
+  --out $M/runs/eval_golden100 --tag "rft$ROUND" --budget 4 $EVAL_LIMIT --batch-size "${EVAL_BATCH:-8}"
 
 log "[6/6] results report"
 $PY training_methods/common/compare_evals.py --title "m2_rft round $ROUND results ($TS)" \
