@@ -117,7 +117,8 @@ def main() -> None:
         processing_class=tokenizer,
         peft_config=peft_config,
     )
-    write_json(run_dir / "train_config.json", {"args": vars(args), "trl_config": cfg.to_dict()})
+    if trainer.is_world_process_zero():
+        write_json(run_dir / "train_config.json", {"args": vars(args), "trl_config": cfg.to_dict()})
 
     log.info("training ...")
     result = trainer.train()
