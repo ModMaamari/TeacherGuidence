@@ -157,6 +157,11 @@ def _ordered_target(guidance: Optional[Dict[str, Any]], action: Dict[str, Any]) 
     for key in ("thought", "decision", "action", "new_facts_extracted"):
         if key in action:
             target[key] = action[key]
+    # storage records an omitted decision.category as ""; the action schema rejects
+    # the empty string, so don't teach the model to emit it
+    dec = target.get("decision")
+    if isinstance(dec, dict) and dec.get("category") == "":
+        target["decision"] = {k: v for k, v in dec.items() if k != "category"}
     for key, val in action.items():  # keep any remaining keys, stable order
         if key not in target:
             target[key] = val
@@ -196,7 +201,9 @@ def build_step_example(
         fb, restore_stats = restore_placeholder(str(guidance_in["feedback"]), gold, ctx)
         if fb.strip():
             clean_guidance = {"feedback": fb.strip()}
-            if keep_score and isinstance(guidance_in.get("score"), (int, float)):
+            # step 0's incoming guidance is plan-review feedback, whose stored score
+            # is a 0.0 default (not a judgment) -- teaching it miscalibrates the model
+            if keep_score and i > 0 and isinstance(guidance_in.get("score"), (int, float)):
                 clean_guidance = {"score": guidance_in["score"], "feedback": fb.strip()}
 
     # Leakage gate on the parts the model must generate unprompted: guidance + thought.
