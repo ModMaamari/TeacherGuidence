@@ -22,6 +22,15 @@ budget 4 · student temperature 0.2 ·
 5 seeds per arm · student granite-4.1-3b (HF bf16) ·
 teacher/judge gpt-oss-120b via FAU→OpenRouter</p>
 
+<h2>Summary — which arm beats which, and is it significant?</h2>
+<div class="overflow"><table>
+<thead><tr><th>comparison</th><th>teacher-verdict correct</th><th>Δ</th><th>significance (paired t, Holm-corrected)</th></tr></thead>
+<tbody><tr><td>base (no guidance) → m1 (internalized)</td><td>30.8% → 48.6%</td><td>+17.8 pts</td><td><b>significant</b> (p<sub>Holm</sub> = 1.11e-06, d = 0.552)</td></tr><tr><td>base (no guidance) → base + teacher</td><td>30.8% → 63.6%</td><td>+32.8 pts</td><td><b>significant</b> (p<sub>Holm</sub> = 2.73e-16, d = 1.014)</td></tr><tr><td>base + teacher → m1 (internalized)</td><td>63.6% → 48.6%</td><td>-15.0 pts</td><td><b>significant</b> (p<sub>Holm</sub> = 5.07e-06, d = -0.509)</td></tr><tr><td>m1 (internalized) → m1 + teacher</td><td>48.6% → 59.5%</td><td>+11.2 pts</td><td><b>significant</b> (p<sub>Holm</sub> = 1.29e-05, d = 0.477)</td></tr><tr><td>base + teacher → m1 + teacher</td><td>63.6% → 59.5%</td><td>-3.8 pts</td><td><b>NOT significant</b> (p<sub>Holm</sub> = 0.1994, d = -0.129)</td></tr></tbody></table></div>
+<p class="note">Statistically significant improvements (teacher-verdict correctness): <b>base (no guidance) → m1 (internalized)</b> (+17.8 pts); <b>base (no guidance) → base + teacher</b> (+32.8 pts); <b>m1 (internalized) → m1 + teacher</b> (+11.2 pts). No significant difference between <b>m1 + teacher</b> and <b>base + teacher</b> — these arms are statistically indistinguishable at α = 0.05.</p>
+<p class="note">Primary metric: post-hoc teacher-verdict correctness (semantic). Each comparison is a paired
+t-test over per-question means across seeds, Holm-corrected within the metric; d is paired Cohen's d.
+See the full test table below for EM/F1/cover/doc-recall and the non-parametric checks.</p>
+
 <h2>Arm summary (mean ± SD across seeds)</h2>
 <div class="overflow"><table>
 <thead><tr><th>metric</th><th>base (no guidance)</th><th>base + teacher</th><th>m1 (internalized)</th><th>m1 + teacher</th></tr></thead>

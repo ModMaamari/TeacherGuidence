@@ -307,6 +307,40 @@ def build_report(exp_dir: Path, out: Path, summaries, reps, tests, plots, config
             cells += f"<td{klass}>{fmt_stat(s, metric in pct_metrics)}</td>"
         return cells
 
+    # executive summary: pairwise arm comparisons on the primary metric
+    jt = {t["pair"]: t for t in tests if t["metric"] == "judge_correct" and "paired_t" in t}
+    summary_rows = ""
+    verdicts = []
+    for hi, lo in PAIRS:
+        key = f"{hi} vs {lo}"
+        t = jt.get(key)
+        if not t or hi not in summaries or lo not in summaries:
+            continue
+        m_hi = summaries[hi]["judge_correct"]["mean"]
+        m_lo = summaries[lo]["judge_correct"]["mean"]
+        p = t["paired_t"].get("p_holm", t["paired_t"]["p"])
+        sig = p < 0.05
+        direction = "improves on" if t["mean_diff"] > 0 else "trails"
+        verdict = (f"<b>{'significant' if sig else 'NOT significant'}</b>"
+                   f" (p<sub>Holm</sub> = {p}, d = {t.get('cohens_d_paired', '—')})")
+        summary_rows += (
+            f"<tr><td>{ARM_LABEL[lo]} → {ARM_LABEL[hi]}</td>"
+            f"<td>{m_lo*100:.1f}% → {m_hi*100:.1f}%</td>"
+            f"<td>{t['mean_diff']*100:+.1f} pts</td><td>{verdict}</td></tr>")
+        verdicts.append((hi, lo, t["mean_diff"], sig))
+    sig_up = [(h, l, d) for h, l, d, s in verdicts if s and d > 0]
+    non_sig = [(h, l) for h, l, d, s in verdicts if not s]
+    summary_prose = ""
+    if sig_up:
+        summary_prose += ("Statistically significant improvements (teacher-verdict correctness): "
+                          + "; ".join(f"<b>{ARM_LABEL[l]} → {ARM_LABEL[h]}</b> ({d*100:+.1f} pts)"
+                                      for h, l, d in sig_up) + ". ")
+    if non_sig:
+        summary_prose += ("No significant difference between "
+                          + "; ".join(f"<b>{ARM_LABEL[h]}</b> and <b>{ARM_LABEL[l]}</b>"
+                                      for h, l in non_sig)
+                          + " — these arms are statistically indistinguishable at α = 0.05.")
+
     metric_rows = ""
     label = {
         "em": "exact match", "f1": "F1", "cover": "cover-match", "doc_recall": "doc recall",
@@ -372,6 +406,15 @@ def build_report(exp_dir: Path, out: Path, summaries, reps, tests, plots, config
 budget {config.get('budget', 4)} · student temperature {config.get('student_temperature', 0.2)} ·
 {len({r['seed'] for r in reps})} seeds per arm · student granite-4.1-3b (HF bf16) ·
 teacher/judge gpt-oss-120b via FAU→OpenRouter</p>
+
+<h2>Summary — which arm beats which, and is it significant?</h2>
+<div class="overflow"><table>
+<thead><tr><th>comparison</th><th>teacher-verdict correct</th><th>Δ</th><th>significance (paired t, Holm-corrected)</th></tr></thead>
+<tbody>{summary_rows}</tbody></table></div>
+<p class="note">{summary_prose}</p>
+<p class="note">Primary metric: post-hoc teacher-verdict correctness (semantic). Each comparison is a paired
+t-test over per-question means across seeds, Holm-corrected within the metric; d is paired Cohen's d.
+See the full test table below for EM/F1/cover/doc-recall and the non-parametric checks.</p>
 
 <h2>Arm summary (mean ± SD across seeds)</h2>
 <div class="overflow"><table>
