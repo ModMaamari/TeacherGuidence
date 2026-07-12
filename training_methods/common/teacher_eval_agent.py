@@ -63,12 +63,15 @@ class HybridLLMClient:
     """Routes student calls (model == "hf-local") to the local HF policy and every
     other call (the teacher) to the shared ``LLMClient`` fallback router."""
 
-    def __init__(self, policy: PolicyModel, teacher_client: LLMClient):
+    def __init__(self, policy: PolicyModel, teacher_client: LLMClient,
+                 serialize_gpu: bool = True):
         self.policy = policy
         self.teacher = teacher_client
-        # serialize GPU generation across concurrent episodes; teacher API calls
-        # still overlap freely (that overlap is where the concurrency speedup lives)
-        self._gpu_lock = asyncio.Lock()
+        # HF backend: serialize GPU generation across concurrent episodes (teacher
+        # API calls still overlap -- that overlap is the concurrency speedup).
+        # vLLM backend: the server continuous-batches, so student calls run
+        # concurrently too and no lock is needed.
+        self._gpu_lock = asyncio.Lock() if serialize_gpu else None
 
     async def get_completion(
         self,
@@ -81,18 +84,21 @@ class HybridLLMClient:
         **kwargs: Any,
     ):
         if model == HF_STUDENT_SENTINEL:
-            async with self._gpu_lock:
+            if self._gpu_lock is not None:
+                async with self._gpu_lock:
+                    text = await asyncio.to_thread(
+                        self.policy.generate, _messages(prompt), max_tokens or 1200, temperature)
+                    stats = list(getattr(self.policy, "last_stats", []) or [])
+            else:
+                # concurrency-safe backend (vLLM server): last_stats would race
+                # across episodes, so take usage from this call's own result
                 text = await asyncio.to_thread(
-                    self.policy.generate,
-                    _messages(prompt),
-                    max_tokens or 1200,
-                    temperature,
-                )
-                usage = None
-                if getattr(self.policy, "last_stats", None):
-                    st = self.policy.last_stats[0]
-                    usage = {"prompt_tokens": st["prompt_tokens"],
-                             "completion_tokens": st["completion_tokens"]}
+                    self.policy.generate_with_stats, _messages(prompt), max_tokens or 1200, temperature)
+                text, stats = text[0], [text[1]]
+            usage = None
+            if stats and stats[0]:
+                usage = {"prompt_tokens": stats[0]["prompt_tokens"],
+                         "completion_tokens": stats[0]["completion_tokens"]}
             return {"text": text, "raw_response": None, "usage": usage} if return_raw else text
         return await self.teacher.get_completion(
             prompt=prompt, model=model, temperature=temperature, max_tokens=max_tokens,
@@ -262,6 +268,12 @@ def main() -> None:
     ap.add_argument("--student-temperature", type=float, default=0.0)
     ap.add_argument("--seed", type=int, default=None,
                     help="seed torch/random/numpy (meaningful with --student-temperature > 0)")
+    ap.add_argument("--backend", choices=["hf", "vllm"], default="hf",
+                    help="hf = in-process transformers; vllm = OpenAI-compatible "
+                         "server (student calls run fully concurrent)")
+    ap.add_argument("--server-url", default="http://127.0.0.1:8300")
+    ap.add_argument("--served-model", default="student",
+                    help="served model name (a LoRA module name to evaluate an adapter)")
     args = ap.parse_args()
 
     run_dir = timestamped_dir(args.out, args.tag)
@@ -287,9 +299,17 @@ def main() -> None:
         _torch.manual_seed(args.seed)
         log.info(f"seeded everything with {args.seed}")
 
-    policy = PolicyModel(args.model, args.adapter, device=args.device)
-    log.info(f"policy loaded: {args.model} adapter={args.adapter}")
-    client = HybridLLMClient(policy, LLMClient())
+    if args.backend == "vllm":
+        from training_methods.common.vllm_backend import VllmPolicy, wait_ready
+
+        served = wait_ready(args.server_url, args.served_model, timeout_s=120)
+        policy = VllmPolicy(args.server_url, args.served_model, seed=args.seed,
+                            max_parallel=max(args.concurrency * 2, 8))
+        log.info(f"vllm policy: {args.server_url} model={args.served_model} (served: {served})")
+    else:
+        policy = PolicyModel(args.model, args.adapter, device=args.device)
+        log.info(f"policy loaded: {args.model} adapter={args.adapter}")
+    client = HybridLLMClient(policy, LLMClient(), serialize_gpu=args.backend == "hf")
     t_run0 = time.time()
 
     async def run_all() -> List[Dict[str, Any]]:

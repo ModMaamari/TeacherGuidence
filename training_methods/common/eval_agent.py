@@ -61,6 +61,13 @@ def main() -> None:
                          "(~batch-size-fold fewer forward passes; same semantics)")
     ap.add_argument("--seed", type=int, default=None,
                     help="seed torch/random/numpy (meaningful with --temperature > 0)")
+    ap.add_argument("--backend", choices=["hf", "vllm"], default="hf",
+                    help="hf = in-process transformers; vllm = OpenAI-compatible "
+                         "server (continuous batching; start via serve_vllm.sh)")
+    ap.add_argument("--server-url", default="http://127.0.0.1:8300")
+    ap.add_argument("--served-model", default="student",
+                    help="served model name on the vLLM server (a LoRA module "
+                         "name to evaluate an adapter)")
     args = ap.parse_args()
 
     run_dir = timestamped_dir(args.out, args.tag)
@@ -86,8 +93,16 @@ def main() -> None:
         _torch.manual_seed(args.seed)
         log.info(f"seeded everything with {args.seed}")
 
-    policy = PolicyModel(args.model, args.adapter, device=args.device)
-    log.info(f"policy loaded: {args.model} adapter={args.adapter}")
+    if args.backend == "vllm":
+        from training_methods.common.vllm_backend import VllmPolicy, wait_ready
+
+        served = wait_ready(args.server_url, args.served_model, timeout_s=120)
+        policy = VllmPolicy(args.server_url, args.served_model, seed=args.seed,
+                            max_parallel=max(args.batch_size, 4))
+        log.info(f"vllm policy: {args.server_url} model={args.served_model} (served: {served})")
+    else:
+        policy = PolicyModel(args.model, args.adapter, device=args.device)
+        log.info(f"policy loaded: {args.model} adapter={args.adapter}")
     t_run0 = __import__("time").time()
 
     episodes = []
