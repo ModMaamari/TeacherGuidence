@@ -1,0 +1,2048 @@
+{
+  "per_rep": [
+    {
+      "arm": "base",
+      "seed": 11,
+      "n": 100,
+      "em": 0.01,
+      "f1": 0.0193,
+      "cover": 0.03,
+      "doc_recall": 0.73,
+      "judge_correct": 0.02,
+      "steps": 3.98,
+      "voluntary_finish": 0.01,
+      "elapsed_s": 25.6993,
+      "tokens_total": 8103.33,
+      "wall_time_s": 169.5,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 810333,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.7,
+      "time_per_step_s": 0.43,
+      "stop_reasons": {
+        "budget_forced_finish": 2,
+        "budget_forced_finish_no_finish": 97,
+        "finish": 1
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 23,
+      "n": 100,
+      "em": 0.0,
+      "f1": 0.0197,
+      "cover": 0.06,
+      "doc_recall": 0.775,
+      "judge_correct": 0.05,
+      "steps": 4.0,
+      "voluntary_finish": 0.0,
+      "elapsed_s": 26.0793,
+      "tokens_total": 8406.9,
+      "wall_time_s": 170.6,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 840690,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.71,
+      "time_per_step_s": 0.43,
+      "stop_reasons": {
+        "budget_forced_finish_no_finish": 100
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 37,
+      "n": 100,
+      "em": 0.0,
+      "f1": 0.0075,
+      "cover": 0.03,
+      "doc_recall": 0.78,
+      "judge_correct": 0.03,
+      "steps": 3.99,
+      "voluntary_finish": 0.01,
+      "elapsed_s": 26.0767,
+      "tokens_total": 8387.04,
+      "wall_time_s": 170.4,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 838704,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.7,
+      "time_per_step_s": 0.43,
+      "stop_reasons": {
+        "budget_forced_finish_no_finish": 99,
+        "finish": 1
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 53,
+      "n": 100,
+      "em": 0.0,
+      "f1": 0.0046,
+      "cover": 0.02,
+      "doc_recall": 0.745,
+      "judge_correct": 0.01,
+      "steps": 4.0,
+      "voluntary_finish": 0.0,
+      "elapsed_s": 27.2077,
+      "tokens_total": 8398.3,
+      "wall_time_s": 178.3,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 839830,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.78,
+      "time_per_step_s": 0.45,
+      "stop_reasons": {
+        "budget_forced_finish": 1,
+        "budget_forced_finish_no_finish": 99
+      }
+    },
+    {
+      "arm": "base",
+      "seed": 71,
+      "n": 100,
+      "em": 0.01,
+      "f1": 0.0218,
+      "cover": 0.04,
+      "doc_recall": 0.77,
+      "judge_correct": 0.04,
+      "steps": 3.97,
+      "voluntary_finish": 0.02,
+      "elapsed_s": 27.103,
+      "tokens_total": 8568.83,
+      "wall_time_s": 178.8,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 856883,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.79,
+      "time_per_step_s": 0.45,
+      "stop_reasons": {
+        "finish": 2,
+        "budget_forced_finish_no_finish": 96,
+        "budget_forced_finish": 2
+      }
+    },
+    {
+      "arm": "base_teacher",
+      "seed": 11,
+      "n": 100,
+      "em": 0.13,
+      "f1": 0.213,
+      "cover": 0.46,
+      "doc_recall": 0.795,
+      "judge_correct": 0.31,
+      "steps": 4.0,
+      "voluntary_finish": 0.0,
+      "elapsed_s": 55.2497,
+      "tokens_total": 17690.09,
+      "wall_time_s": 1125.0,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 884633,
+      "teacher_tokens": 884376,
+      "invalid_steps": 2,
+      "time_per_question_s": 11.25,
+      "time_per_step_s": 2.81,
+      "stop_reasons": {
+        "budget_forced_finish": 100
+      }
+    },
+    {
+      "arm": "base_teacher",
+      "seed": 23,
+      "n": 100,
+      "em": 0.1,
+      "f1": 0.1805,
+      "cover": 0.44,
+      "doc_recall": 0.76,
+      "judge_correct": 0.31,
+      "steps": 3.98,
+      "voluntary_finish": 0.01,
+      "elapsed_s": 55.3231,
+      "tokens_total": 17607.84,
+      "wall_time_s": 1113.8,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 885644,
+      "teacher_tokens": 875140,
+      "invalid_steps": 0,
+      "time_per_question_s": 11.14,
+      "time_per_step_s": 2.8,
+      "stop_reasons": {
+        "teacher_accept": 1,
+        "budget_forced_finish": 99
+      }
+    },
+    {
+      "arm": "base_teacher",
+      "seed": 37,
+      "n": 100,
+      "em": 0.11,
+      "f1": 0.1807,
+      "cover": 0.47,
+      "doc_recall": 0.75,
+      "judge_correct": 0.31,
+      "steps": 3.99,
+      "voluntary_finish": 0.01,
+      "elapsed_s": 55.2777,
+      "tokens_total": 17697.7,
+      "wall_time_s": 1117.1,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 889155,
+      "teacher_tokens": 880615,
+      "invalid_steps": 3,
+      "time_per_question_s": 11.17,
+      "time_per_step_s": 2.8,
+      "stop_reasons": {
+        "budget_forced_finish": 99,
+        "teacher_accept": 1
+      }
+    },
+    {
+      "arm": "base_teacher",
+      "seed": 53,
+      "n": 100,
+      "em": 0.1,
+      "f1": 0.1777,
+      "cover": 0.49,
+      "doc_recall": 0.77,
+      "judge_correct": 0.3,
+      "steps": 4.0,
+      "voluntary_finish": 0.0,
+      "elapsed_s": 55.5594,
+      "tokens_total": 17981.08,
+      "wall_time_s": 1122.3,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 919421,
+      "teacher_tokens": 878687,
+      "invalid_steps": 2,
+      "time_per_question_s": 11.22,
+      "time_per_step_s": 2.81,
+      "stop_reasons": {
+        "budget_forced_finish": 100
+      }
+    },
+    {
+      "arm": "base_teacher",
+      "seed": 71,
+      "n": 100,
+      "em": 0.09,
+      "f1": 0.1888,
+      "cover": 0.49,
+      "doc_recall": 0.75,
+      "judge_correct": 0.4,
+      "steps": 4.0,
+      "voluntary_finish": 0.0,
+      "elapsed_s": 55.0817,
+      "tokens_total": 17624.53,
+      "wall_time_s": 1123.7,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 878464,
+      "teacher_tokens": 883989,
+      "invalid_steps": 1,
+      "time_per_question_s": 11.24,
+      "time_per_step_s": 2.81,
+      "stop_reasons": {
+        "budget_forced_finish": 100
+      }
+    },
+    {
+      "arm": "m1",
+      "seed": 11,
+      "n": 100,
+      "em": 0.24,
+      "f1": 0.3436,
+      "cover": 0.69,
+      "doc_recall": 0.775,
+      "judge_correct": 0.65,
+      "steps": 3.84,
+      "voluntary_finish": 0.16,
+      "elapsed_s": 20.9316,
+      "tokens_total": 7695.52,
+      "wall_time_s": 138.0,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 769552,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.38,
+      "time_per_step_s": 0.36,
+      "stop_reasons": {
+        "finish": 16,
+        "budget_forced_finish": 82,
+        "budget_forced_finish_no_finish": 2
+      }
+    },
+    {
+      "arm": "m1",
+      "seed": 23,
+      "n": 100,
+      "em": 0.18,
+      "f1": 0.2796,
+      "cover": 0.61,
+      "doc_recall": 0.77,
+      "judge_correct": 0.6,
+      "steps": 3.74,
+      "voluntary_finish": 0.19,
+      "elapsed_s": 21.2625,
+      "tokens_total": 7533.99,
+      "wall_time_s": 137.5,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 753399,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.38,
+      "time_per_step_s": 0.37,
+      "stop_reasons": {
+        "finish": 19,
+        "budget_forced_finish": 80,
+        "budget_forced_finish_no_finish": 1
+      }
+    },
+    {
+      "arm": "m1",
+      "seed": 37,
+      "n": 100,
+      "em": 0.2,
+      "f1": 0.2885,
+      "cover": 0.63,
+      "doc_recall": 0.765,
+      "judge_correct": 0.58,
+      "steps": 3.71,
+      "voluntary_finish": 0.19,
+      "elapsed_s": 19.8496,
+      "tokens_total": 7320.32,
+      "wall_time_s": 130.2,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 732032,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.3,
+      "time_per_step_s": 0.35,
+      "stop_reasons": {
+        "budget_forced_finish": 79,
+        "budget_forced_finish_no_finish": 2,
+        "finish": 19
+      }
+    },
+    {
+      "arm": "m1",
+      "seed": 53,
+      "n": 100,
+      "em": 0.21,
+      "f1": 0.3205,
+      "cover": 0.64,
+      "doc_recall": 0.79,
+      "judge_correct": 0.58,
+      "steps": 3.8,
+      "voluntary_finish": 0.15,
+      "elapsed_s": 20.7284,
+      "tokens_total": 7578.88,
+      "wall_time_s": 135.0,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 757888,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.35,
+      "time_per_step_s": 0.36,
+      "stop_reasons": {
+        "budget_forced_finish": 83,
+        "budget_forced_finish_no_finish": 2,
+        "finish": 15
+      }
+    },
+    {
+      "arm": "m1",
+      "seed": 71,
+      "n": 100,
+      "em": 0.17,
+      "f1": 0.2887,
+      "cover": 0.67,
+      "doc_recall": 0.78,
+      "judge_correct": 0.6,
+      "steps": 3.82,
+      "voluntary_finish": 0.16,
+      "elapsed_s": 20.8657,
+      "tokens_total": 7647.95,
+      "wall_time_s": 138.2,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 764795,
+      "teacher_tokens": 0,
+      "invalid_steps": 0,
+      "time_per_question_s": 1.38,
+      "time_per_step_s": 0.36,
+      "stop_reasons": {
+        "budget_forced_finish": 83,
+        "budget_forced_finish_no_finish": 1,
+        "finish": 16
+      }
+    },
+    {
+      "arm": "m1_teacher",
+      "seed": 11,
+      "n": 100,
+      "em": 0.24,
+      "f1": 0.3513,
+      "cover": 0.73,
+      "doc_recall": 0.835,
+      "judge_correct": 0.73,
+      "steps": 3.83,
+      "voluntary_finish": 0.14,
+      "elapsed_s": 51.1216,
+      "tokens_total": 15941.96,
+      "wall_time_s": 1047.0,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 712772,
+      "teacher_tokens": 881424,
+      "invalid_steps": 0,
+      "time_per_question_s": 10.47,
+      "time_per_step_s": 2.73,
+      "stop_reasons": {
+        "budget_forced_finish": 86,
+        "teacher_accept": 14
+      }
+    },
+    {
+      "arm": "m1_teacher",
+      "seed": 23,
+      "n": 100,
+      "em": 0.26,
+      "f1": 0.354,
+      "cover": 0.68,
+      "doc_recall": 0.835,
+      "judge_correct": 0.64,
+      "steps": 3.83,
+      "voluntary_finish": 0.14,
+      "elapsed_s": 51.7562,
+      "tokens_total": 16075.58,
+      "wall_time_s": 1067.7,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 721723,
+      "teacher_tokens": 885835,
+      "invalid_steps": 0,
+      "time_per_question_s": 10.68,
+      "time_per_step_s": 2.79,
+      "stop_reasons": {
+        "teacher_accept": 14,
+        "budget_forced_finish": 86
+      }
+    },
+    {
+      "arm": "m1_teacher",
+      "seed": 37,
+      "n": 100,
+      "em": 0.26,
+      "f1": 0.3754,
+      "cover": 0.75,
+      "doc_recall": 0.83,
+      "judge_correct": 0.65,
+      "steps": 3.89,
+      "voluntary_finish": 0.09,
+      "elapsed_s": 52.2287,
+      "tokens_total": 16334.89,
+      "wall_time_s": 1061.6,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 727542,
+      "teacher_tokens": 905947,
+      "invalid_steps": 0,
+      "time_per_question_s": 10.62,
+      "time_per_step_s": 2.73,
+      "stop_reasons": {
+        "budget_forced_finish": 91,
+        "teacher_accept": 9
+      }
+    },
+    {
+      "arm": "m1_teacher",
+      "seed": 53,
+      "n": 100,
+      "em": 0.2,
+      "f1": 0.3378,
+      "cover": 0.76,
+      "doc_recall": 0.835,
+      "judge_correct": 0.72,
+      "steps": 3.86,
+      "voluntary_finish": 0.12,
+      "elapsed_s": 51.8053,
+      "tokens_total": 16124.31,
+      "wall_time_s": 1054.8,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 726032,
+      "teacher_tokens": 886399,
+      "invalid_steps": 0,
+      "time_per_question_s": 10.55,
+      "time_per_step_s": 2.73,
+      "stop_reasons": {
+        "teacher_accept": 12,
+        "budget_forced_finish": 88
+      }
+    },
+    {
+      "arm": "m1_teacher",
+      "seed": 71,
+      "n": 100,
+      "em": 0.2,
+      "f1": 0.3304,
+      "cover": 0.73,
+      "doc_recall": 0.825,
+      "judge_correct": 0.74,
+      "steps": 3.84,
+      "voluntary_finish": 0.13,
+      "elapsed_s": 51.0861,
+      "tokens_total": 16115.7,
+      "wall_time_s": 1044.5,
+      "gpu_peak_mem_gb": null,
+      "student_tokens": 729881,
+      "teacher_tokens": 881689,
+      "invalid_steps": 0,
+      "time_per_question_s": 10.45,
+      "time_per_step_s": 2.72,
+      "stop_reasons": {
+        "teacher_accept": 13,
+        "budget_forced_finish": 87
+      }
+    }
+  ],
+  "per_arm": {
+    "base": {
+      "n_reps": 5,
+      "em": {
+        "mean": 0.004,
+        "sd": 0.0055,
+        "var": 3e-05,
+        "min": 0.0,
+        "max": 0.01,
+        "ci95": 0.0068,
+        "values": [
+          0.01,
+          0.0,
+          0.0,
+          0.0,
+          0.01
+        ]
+      },
+      "f1": {
+        "mean": 0.0146,
+        "sd": 0.0079,
+        "var": 6.3e-05,
+        "min": 0.0046,
+        "max": 0.0218,
+        "ci95": 0.0098,
+        "values": [
+          0.0193,
+          0.0197,
+          0.0075,
+          0.0046,
+          0.0218
+        ]
+      },
+      "cover": {
+        "mean": 0.036,
+        "sd": 0.0152,
+        "var": 0.00023,
+        "min": 0.02,
+        "max": 0.06,
+        "ci95": 0.0188,
+        "values": [
+          0.03,
+          0.06,
+          0.03,
+          0.02,
+          0.04
+        ]
+      },
+      "doc_recall": {
+        "mean": 0.76,
+        "sd": 0.0215,
+        "var": 0.000463,
+        "min": 0.73,
+        "max": 0.78,
+        "ci95": 0.0267,
+        "values": [
+          0.73,
+          0.775,
+          0.78,
+          0.745,
+          0.77
+        ]
+      },
+      "judge_correct": {
+        "mean": 0.03,
+        "sd": 0.0158,
+        "var": 0.00025,
+        "min": 0.01,
+        "max": 0.05,
+        "ci95": 0.0196,
+        "values": [
+          0.02,
+          0.05,
+          0.03,
+          0.01,
+          0.04
+        ]
+      },
+      "steps": {
+        "mean": 3.988,
+        "sd": 0.013,
+        "var": 0.00017,
+        "min": 3.97,
+        "max": 4.0,
+        "ci95": 0.0162,
+        "values": [
+          3.98,
+          4.0,
+          3.99,
+          4.0,
+          3.97
+        ]
+      },
+      "voluntary_finish": {
+        "mean": 0.008,
+        "sd": 0.0084,
+        "var": 7e-05,
+        "min": 0.0,
+        "max": 0.02,
+        "ci95": 0.0104,
+        "values": [
+          0.01,
+          0.0,
+          0.01,
+          0.0,
+          0.02
+        ]
+      },
+      "elapsed_s": {
+        "mean": 26.4332,
+        "sd": 0.6781,
+        "var": 0.459857,
+        "min": 25.6993,
+        "max": 27.2077,
+        "ci95": 0.842,
+        "values": [
+          25.6993,
+          26.0793,
+          26.0767,
+          27.2077,
+          27.103
+        ]
+      },
+      "tokens_total": {
+        "mean": 8372.88,
+        "sd": 168.1202,
+        "var": 28264.41185,
+        "min": 8103.33,
+        "max": 8568.83,
+        "ci95": 208.7488,
+        "values": [
+          8103.33,
+          8406.9,
+          8387.04,
+          8398.3,
+          8568.83
+        ]
+      },
+      "wall_time_s": {
+        "mean": 173.52,
+        "sd": 4.6138,
+        "var": 21.287,
+        "min": 169.5,
+        "max": 178.8,
+        "ci95": 5.7288,
+        "values": [
+          169.5,
+          170.6,
+          170.4,
+          178.3,
+          178.8
+        ]
+      },
+      "student_tokens": {
+        "mean": 837288.0,
+        "sd": 16812.023,
+        "var": 282644118.5,
+        "min": 810333,
+        "max": 856883,
+        "ci95": 20874.8837,
+        "values": [
+          810333,
+          840690,
+          838704,
+          839830,
+          856883
+        ]
+      },
+      "teacher_tokens": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "var": 0.0,
+        "min": 0,
+        "max": 0,
+        "ci95": 0.0,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "time_per_question_s": {
+        "mean": 1.736,
+        "sd": 0.0451,
+        "var": 0.00203,
+        "min": 1.7,
+        "max": 1.79,
+        "ci95": 0.0559,
+        "values": [
+          1.7,
+          1.71,
+          1.7,
+          1.78,
+          1.79
+        ]
+      },
+      "time_per_step_s": {
+        "mean": 0.438,
+        "sd": 0.011,
+        "var": 0.00012,
+        "min": 0.43,
+        "max": 0.45,
+        "ci95": 0.0136,
+        "values": [
+          0.43,
+          0.43,
+          0.43,
+          0.45,
+          0.45
+        ]
+      },
+      "invalid_steps": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "var": 0.0,
+        "min": 0,
+        "max": 0,
+        "ci95": 0.0,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "base_teacher": {
+      "n_reps": 5,
+      "em": {
+        "mean": 0.106,
+        "sd": 0.0152,
+        "var": 0.00023,
+        "min": 0.09,
+        "max": 0.13,
+        "ci95": 0.0188,
+        "values": [
+          0.13,
+          0.1,
+          0.11,
+          0.1,
+          0.09
+        ]
+      },
+      "f1": {
+        "mean": 0.1881,
+        "sd": 0.0145,
+        "var": 0.00021,
+        "min": 0.1777,
+        "max": 0.213,
+        "ci95": 0.018,
+        "values": [
+          0.213,
+          0.1805,
+          0.1807,
+          0.1777,
+          0.1888
+        ]
+      },
+      "cover": {
+        "mean": 0.47,
+        "sd": 0.0212,
+        "var": 0.00045,
+        "min": 0.44,
+        "max": 0.49,
+        "ci95": 0.0263,
+        "values": [
+          0.46,
+          0.44,
+          0.47,
+          0.49,
+          0.49
+        ]
+      },
+      "doc_recall": {
+        "mean": 0.765,
+        "sd": 0.0187,
+        "var": 0.00035,
+        "min": 0.75,
+        "max": 0.795,
+        "ci95": 0.0232,
+        "values": [
+          0.795,
+          0.76,
+          0.75,
+          0.77,
+          0.75
+        ]
+      },
+      "judge_correct": {
+        "mean": 0.326,
+        "sd": 0.0416,
+        "var": 0.00173,
+        "min": 0.3,
+        "max": 0.4,
+        "ci95": 0.0516,
+        "values": [
+          0.31,
+          0.31,
+          0.31,
+          0.3,
+          0.4
+        ]
+      },
+      "steps": {
+        "mean": 3.994,
+        "sd": 0.0089,
+        "var": 8e-05,
+        "min": 3.98,
+        "max": 4.0,
+        "ci95": 0.0111,
+        "values": [
+          4.0,
+          3.98,
+          3.99,
+          4.0,
+          4.0
+        ]
+      },
+      "voluntary_finish": {
+        "mean": 0.004,
+        "sd": 0.0055,
+        "var": 3e-05,
+        "min": 0.0,
+        "max": 0.01,
+        "ci95": 0.0068,
+        "values": [
+          0.0,
+          0.01,
+          0.01,
+          0.0,
+          0.0
+        ]
+      },
+      "elapsed_s": {
+        "mean": 55.2983,
+        "sd": 0.1721,
+        "var": 0.029623,
+        "min": 55.0817,
+        "max": 55.5594,
+        "ci95": 0.2137,
+        "values": [
+          55.2497,
+          55.3231,
+          55.2777,
+          55.5594,
+          55.0817
+        ]
+      },
+      "tokens_total": {
+        "mean": 17720.248,
+        "sd": 151.037,
+        "var": 22812.18587,
+        "min": 17607.84,
+        "max": 17981.08,
+        "ci95": 187.5372,
+        "values": [
+          17690.09,
+          17607.84,
+          17697.7,
+          17981.08,
+          17624.53
+        ]
+      },
+      "wall_time_s": {
+        "mean": 1120.38,
+        "sd": 4.7463,
+        "var": 22.527,
+        "min": 1113.8,
+        "max": 1125.0,
+        "ci95": 5.8933,
+        "values": [
+          1125.0,
+          1113.8,
+          1117.1,
+          1122.3,
+          1123.7
+        ]
+      },
+      "student_tokens": {
+        "mean": 891463.4,
+        "sd": 16097.0517,
+        "var": 259115072.3,
+        "min": 878464,
+        "max": 919421,
+        "ci95": 19987.1295,
+        "values": [
+          884633,
+          885644,
+          889155,
+          919421,
+          878464
+        ]
+      },
+      "teacher_tokens": {
+        "mean": 880561.4,
+        "sd": 3847.3186,
+        "var": 14801860.3,
+        "min": 875140,
+        "max": 884376,
+        "ci95": 4777.077,
+        "values": [
+          884376,
+          875140,
+          880615,
+          878687,
+          883989
+        ]
+      },
+      "time_per_question_s": {
+        "mean": 11.204,
+        "sd": 0.0472,
+        "var": 0.00223,
+        "min": 11.14,
+        "max": 11.25,
+        "ci95": 0.0586,
+        "values": [
+          11.25,
+          11.14,
+          11.17,
+          11.22,
+          11.24
+        ]
+      },
+      "time_per_step_s": {
+        "mean": 2.806,
+        "sd": 0.0055,
+        "var": 3e-05,
+        "min": 2.8,
+        "max": 2.81,
+        "ci95": 0.0068,
+        "values": [
+          2.81,
+          2.8,
+          2.8,
+          2.81,
+          2.81
+        ]
+      },
+      "invalid_steps": {
+        "mean": 1.6,
+        "sd": 1.1402,
+        "var": 1.3,
+        "min": 0,
+        "max": 3,
+        "ci95": 1.4157,
+        "values": [
+          2,
+          0,
+          3,
+          2,
+          1
+        ]
+      }
+    },
+    "m1": {
+      "n_reps": 5,
+      "em": {
+        "mean": 0.2,
+        "sd": 0.0274,
+        "var": 0.00075,
+        "min": 0.17,
+        "max": 0.24,
+        "ci95": 0.034,
+        "values": [
+          0.24,
+          0.18,
+          0.2,
+          0.21,
+          0.17
+        ]
+      },
+      "f1": {
+        "mean": 0.3042,
+        "sd": 0.027,
+        "var": 0.000727,
+        "min": 0.2796,
+        "max": 0.3436,
+        "ci95": 0.0335,
+        "values": [
+          0.3436,
+          0.2796,
+          0.2885,
+          0.3205,
+          0.2887
+        ]
+      },
+      "cover": {
+        "mean": 0.648,
+        "sd": 0.0319,
+        "var": 0.00102,
+        "min": 0.61,
+        "max": 0.69,
+        "ci95": 0.0397,
+        "values": [
+          0.69,
+          0.61,
+          0.63,
+          0.64,
+          0.67
+        ]
+      },
+      "doc_recall": {
+        "mean": 0.776,
+        "sd": 0.0096,
+        "var": 9.3e-05,
+        "min": 0.765,
+        "max": 0.79,
+        "ci95": 0.0119,
+        "values": [
+          0.775,
+          0.77,
+          0.765,
+          0.79,
+          0.78
+        ]
+      },
+      "judge_correct": {
+        "mean": 0.602,
+        "sd": 0.0286,
+        "var": 0.00082,
+        "min": 0.58,
+        "max": 0.65,
+        "ci95": 0.0356,
+        "values": [
+          0.65,
+          0.6,
+          0.58,
+          0.58,
+          0.6
+        ]
+      },
+      "steps": {
+        "mean": 3.782,
+        "sd": 0.055,
+        "var": 0.00302,
+        "min": 3.71,
+        "max": 3.84,
+        "ci95": 0.0682,
+        "values": [
+          3.84,
+          3.74,
+          3.71,
+          3.8,
+          3.82
+        ]
+      },
+      "voluntary_finish": {
+        "mean": 0.17,
+        "sd": 0.0187,
+        "var": 0.00035,
+        "min": 0.15,
+        "max": 0.19,
+        "ci95": 0.0232,
+        "values": [
+          0.16,
+          0.19,
+          0.19,
+          0.15,
+          0.16
+        ]
+      },
+      "elapsed_s": {
+        "mean": 20.7276,
+        "sd": 0.5286,
+        "var": 0.279423,
+        "min": 19.8496,
+        "max": 21.2625,
+        "ci95": 0.6563,
+        "values": [
+          20.9316,
+          21.2625,
+          19.8496,
+          20.7284,
+          20.8657
+        ]
+      },
+      "tokens_total": {
+        "mean": 7555.332,
+        "sd": 145.3198,
+        "var": 21117.84967,
+        "min": 7320.32,
+        "max": 7695.52,
+        "ci95": 180.4384,
+        "values": [
+          7695.52,
+          7533.99,
+          7320.32,
+          7578.88,
+          7647.95
+        ]
+      },
+      "wall_time_s": {
+        "mean": 135.78,
+        "sd": 3.3722,
+        "var": 11.372,
+        "min": 130.2,
+        "max": 138.2,
+        "ci95": 4.1872,
+        "values": [
+          138.0,
+          137.5,
+          130.2,
+          135.0,
+          138.2
+        ]
+      },
+      "student_tokens": {
+        "mean": 755533.2,
+        "sd": 14531.9819,
+        "var": 211178496.7,
+        "min": 732032,
+        "max": 769552,
+        "ci95": 18043.8387,
+        "values": [
+          769552,
+          753399,
+          732032,
+          757888,
+          764795
+        ]
+      },
+      "teacher_tokens": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "var": 0.0,
+        "min": 0,
+        "max": 0,
+        "ci95": 0.0,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "time_per_question_s": {
+        "mean": 1.358,
+        "sd": 0.0349,
+        "var": 0.00122,
+        "min": 1.3,
+        "max": 1.38,
+        "ci95": 0.0434,
+        "values": [
+          1.38,
+          1.38,
+          1.3,
+          1.35,
+          1.38
+        ]
+      },
+      "time_per_step_s": {
+        "mean": 0.36,
+        "sd": 0.0071,
+        "var": 5e-05,
+        "min": 0.35,
+        "max": 0.37,
+        "ci95": 0.0088,
+        "values": [
+          0.36,
+          0.37,
+          0.35,
+          0.36,
+          0.36
+        ]
+      },
+      "invalid_steps": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "var": 0.0,
+        "min": 0,
+        "max": 0,
+        "ci95": 0.0,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "m1_teacher": {
+      "n_reps": 5,
+      "em": {
+        "mean": 0.232,
+        "sd": 0.0303,
+        "var": 0.00092,
+        "min": 0.2,
+        "max": 0.26,
+        "ci95": 0.0377,
+        "values": [
+          0.24,
+          0.26,
+          0.26,
+          0.2,
+          0.2
+        ]
+      },
+      "f1": {
+        "mean": 0.3498,
+        "sd": 0.0173,
+        "var": 0.000299,
+        "min": 0.3304,
+        "max": 0.3754,
+        "ci95": 0.0215,
+        "values": [
+          0.3513,
+          0.354,
+          0.3754,
+          0.3378,
+          0.3304
+        ]
+      },
+      "cover": {
+        "mean": 0.73,
+        "sd": 0.0308,
+        "var": 0.00095,
+        "min": 0.68,
+        "max": 0.76,
+        "ci95": 0.0383,
+        "values": [
+          0.73,
+          0.68,
+          0.75,
+          0.76,
+          0.73
+        ]
+      },
+      "doc_recall": {
+        "mean": 0.832,
+        "sd": 0.0045,
+        "var": 2e-05,
+        "min": 0.825,
+        "max": 0.835,
+        "ci95": 0.0056,
+        "values": [
+          0.835,
+          0.835,
+          0.83,
+          0.835,
+          0.825
+        ]
+      },
+      "judge_correct": {
+        "mean": 0.696,
+        "sd": 0.0472,
+        "var": 0.00223,
+        "min": 0.64,
+        "max": 0.74,
+        "ci95": 0.0586,
+        "values": [
+          0.73,
+          0.64,
+          0.65,
+          0.72,
+          0.74
+        ]
+      },
+      "steps": {
+        "mean": 3.85,
+        "sd": 0.0255,
+        "var": 0.00065,
+        "min": 3.83,
+        "max": 3.89,
+        "ci95": 0.0317,
+        "values": [
+          3.83,
+          3.83,
+          3.89,
+          3.86,
+          3.84
+        ]
+      },
+      "voluntary_finish": {
+        "mean": 0.124,
+        "sd": 0.0207,
+        "var": 0.00043,
+        "min": 0.09,
+        "max": 0.14,
+        "ci95": 0.0257,
+        "values": [
+          0.14,
+          0.14,
+          0.09,
+          0.12,
+          0.13
+        ]
+      },
+      "elapsed_s": {
+        "mean": 51.5996,
+        "sd": 0.4886,
+        "var": 0.238692,
+        "min": 51.0861,
+        "max": 52.2287,
+        "ci95": 0.6066,
+        "values": [
+          51.1216,
+          51.7562,
+          52.2287,
+          51.8053,
+          51.0861
+        ]
+      },
+      "tokens_total": {
+        "mean": 16118.488,
+        "sd": 141.3106,
+        "var": 19968.68137,
+        "min": 15941.96,
+        "max": 16334.89,
+        "ci95": 175.4603,
+        "values": [
+          15941.96,
+          16075.58,
+          16334.89,
+          16124.31,
+          16115.7
+        ]
+      },
+      "wall_time_s": {
+        "mean": 1055.12,
+        "sd": 9.7348,
+        "var": 94.767,
+        "min": 1044.5,
+        "max": 1067.7,
+        "ci95": 12.0874,
+        "values": [
+          1047.0,
+          1067.7,
+          1061.6,
+          1054.8,
+          1044.5
+        ]
+      },
+      "student_tokens": {
+        "mean": 723590.0,
+        "sd": 6739.3093,
+        "var": 45418290.5,
+        "min": 712772,
+        "max": 729881,
+        "ci95": 8367.9578,
+        "values": [
+          712772,
+          721723,
+          727542,
+          726032,
+          729881
+        ]
+      },
+      "teacher_tokens": {
+        "mean": 888258.8,
+        "sd": 10149.9119,
+        "var": 103020711.2,
+        "min": 881424,
+        "max": 905947,
+        "ci95": 12602.7802,
+        "values": [
+          881424,
+          885835,
+          905947,
+          886399,
+          881689
+        ]
+      },
+      "time_per_question_s": {
+        "mean": 10.554,
+        "sd": 0.0976,
+        "var": 0.00953,
+        "min": 10.45,
+        "max": 10.68,
+        "ci95": 0.1212,
+        "values": [
+          10.47,
+          10.68,
+          10.62,
+          10.55,
+          10.45
+        ]
+      },
+      "time_per_step_s": {
+        "mean": 2.74,
+        "sd": 0.0283,
+        "var": 0.0008,
+        "min": 2.72,
+        "max": 2.79,
+        "ci95": 0.0351,
+        "values": [
+          2.73,
+          2.79,
+          2.73,
+          2.73,
+          2.72
+        ]
+      },
+      "invalid_steps": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "var": 0.0,
+        "min": 0,
+        "max": 0,
+        "ci95": 0.0,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  },
+  "tests": [
+    {
+      "metric": "f1",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.2896,
+      "paired_t": {
+        "t": 9.433,
+        "p": 1.88e-15,
+        "p_holm": 9.42e-15
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 3.72e-16
+      },
+      "cohens_d_paired": 0.943,
+      "welch_reps": {
+        "t": 23.038,
+        "p": 5.32e-06
+      }
+    },
+    {
+      "metric": "f1",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.1736,
+      "paired_t": {
+        "t": 6.575,
+        "p": 2.31e-09,
+        "p_holm": 9.23e-09
+      },
+      "wilcoxon": {
+        "W": 92.0,
+        "p": 5.4e-13
+      },
+      "cohens_d_paired": 0.657,
+      "welch_reps": {
+        "t": 23.494,
+        "p": 2.77e-07
+      }
+    },
+    {
+      "metric": "f1",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.116,
+      "paired_t": {
+        "t": 3.035,
+        "p": 0.0031,
+        "p_holm": 0.0062
+      },
+      "wilcoxon": {
+        "W": 1185.0,
+        "p": 0.000203
+      },
+      "cohens_d_paired": 0.303,
+      "welch_reps": {
+        "t": 8.473,
+        "p": 0.000131
+      }
+    },
+    {
+      "metric": "f1",
+      "pair": "m1_teacher vs m1",
+      "n_questions": 100,
+      "mean_diff": 0.0456,
+      "paired_t": {
+        "t": 2.279,
+        "p": 0.0248,
+        "p_holm": 0.0248
+      },
+      "wilcoxon": {
+        "W": 1278.0,
+        "p": 0.0503
+      },
+      "cohens_d_paired": 0.228,
+      "welch_reps": {
+        "t": 3.183,
+        "p": 0.016
+      }
+    },
+    {
+      "metric": "f1",
+      "pair": "m1_teacher vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.1616,
+      "paired_t": {
+        "t": 3.975,
+        "p": 0.000134,
+        "p_holm": 0.000402
+      },
+      "wilcoxon": {
+        "W": 1042.0,
+        "p": 1.18e-05
+      },
+      "cohens_d_paired": 0.397,
+      "welch_reps": {
+        "t": 16.017,
+        "p": 3.16e-07
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.612,
+      "paired_t": {
+        "t": 16.145,
+        "p": 1.73e-29,
+        "p_holm": 8.67e-29
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 2.57e-15
+      },
+      "cohens_d_paired": 1.614,
+      "welch_reps": {
+        "t": 38.706,
+        "p": 3.87e-08
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.434,
+      "paired_t": {
+        "t": 10.848,
+        "p": 1.56e-18,
+        "p_holm": 6.22e-18
+      },
+      "wilcoxon": {
+        "W": 30.0,
+        "p": 6.39e-13
+      },
+      "cohens_d_paired": 1.085,
+      "welch_reps": {
+        "t": 37.215,
+        "p": 1.54e-09
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.178,
+      "paired_t": {
+        "t": 4.906,
+        "p": 3.65e-06,
+        "p_holm": 7.3e-06
+      },
+      "wilcoxon": {
+        "W": 420.0,
+        "p": 5.26e-05
+      },
+      "cohens_d_paired": 0.491,
+      "welch_reps": {
+        "t": 10.381,
+        "p": 1.75e-05
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "m1_teacher vs m1",
+      "n_questions": 100,
+      "mean_diff": 0.082,
+      "paired_t": {
+        "t": 2.974,
+        "p": 0.0037,
+        "p_holm": 0.0037
+      },
+      "wilcoxon": {
+        "W": 197.5,
+        "p": 0.0024
+      },
+      "cohens_d_paired": 0.297,
+      "welch_reps": {
+        "t": 4.131,
+        "p": 0.0033
+      }
+    },
+    {
+      "metric": "cover",
+      "pair": "m1_teacher vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.26,
+      "paired_t": {
+        "t": 6.274,
+        "p": 9.3e-09,
+        "p_holm": 2.79e-08
+      },
+      "wilcoxon": {
+        "W": 396.0,
+        "p": 2.27e-07
+      },
+      "cohens_d_paired": 0.627,
+      "welch_reps": {
+        "t": 15.538,
+        "p": 9.71e-07
+      }
+    },
+    {
+      "metric": "em",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.196,
+      "paired_t": {
+        "t": 6.167,
+        "p": 1.52e-08,
+        "p_holm": 7.59e-08
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 2.15e-07
+      },
+      "cohens_d_paired": 0.617,
+      "welch_reps": {
+        "t": 15.693,
+        "p": 5.66e-05
+      }
+    },
+    {
+      "metric": "em",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.102,
+      "paired_t": {
+        "t": 3.951,
+        "p": 0.000146,
+        "p_holm": 0.000585
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 0.000179
+      },
+      "cohens_d_paired": 0.395,
+      "welch_reps": {
+        "t": 14.145,
+        "p": 3.06e-05
+      }
+    },
+    {
+      "metric": "em",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.094,
+      "paired_t": {
+        "t": 2.435,
+        "p": 0.0167,
+        "p_holm": 0.0334
+      },
+      "wilcoxon": {
+        "W": 293.0,
+        "p": 0.0178
+      },
+      "cohens_d_paired": 0.243,
+      "welch_reps": {
+        "t": 6.714,
+        "p": 0.000449
+      }
+    },
+    {
+      "metric": "em",
+      "pair": "m1_teacher vs m1",
+      "n_questions": 100,
+      "mean_diff": 0.032,
+      "paired_t": {
+        "t": 1.536,
+        "p": 0.1278,
+        "p_holm": 0.1278
+      },
+      "wilcoxon": {
+        "W": 144.5,
+        "p": 0.112
+      },
+      "cohens_d_paired": 0.154,
+      "welch_reps": {
+        "t": 1.751,
+        "p": 0.1184
+      }
+    },
+    {
+      "metric": "em",
+      "pair": "m1_teacher vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.126,
+      "paired_t": {
+        "t": 2.977,
+        "p": 0.0037,
+        "p_holm": 0.011
+      },
+      "wilcoxon": {
+        "W": 248.0,
+        "p": 0.0063
+      },
+      "cohens_d_paired": 0.298,
+      "welch_reps": {
+        "t": 8.308,
+        "p": 0.000183
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.572,
+      "paired_t": {
+        "t": 15.808,
+        "p": 7.83e-29,
+        "p_holm": 3.92e-28
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 1.61e-15
+      },
+      "cohens_d_paired": 1.581,
+      "welch_reps": {
+        "t": 39.101,
+        "p": 1.09e-08
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.296,
+      "paired_t": {
+        "t": 8.603,
+        "p": 1.2e-13,
+        "p_holm": 3.61e-13
+      },
+      "wilcoxon": {
+        "W": 44.0,
+        "p": 4.58e-11
+      },
+      "cohens_d_paired": 0.86,
+      "welch_reps": {
+        "t": 14.875,
+        "p": 2.04e-05
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.276,
+      "paired_t": {
+        "t": 6.957,
+        "p": 3.8e-10,
+        "p_holm": 7.61e-10
+      },
+      "wilcoxon": {
+        "W": 317.0,
+        "p": 3.28e-08
+      },
+      "cohens_d_paired": 0.696,
+      "welch_reps": {
+        "t": 12.221,
+        "p": 5.04e-06
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "m1_teacher vs m1",
+      "n_questions": 100,
+      "mean_diff": 0.094,
+      "paired_t": {
+        "t": 3.064,
+        "p": 0.0028,
+        "p_holm": 0.0028
+      },
+      "wilcoxon": {
+        "W": 390.5,
+        "p": 0.0014
+      },
+      "cohens_d_paired": 0.306,
+      "welch_reps": {
+        "t": 3.806,
+        "p": 0.0075
+      }
+    },
+    {
+      "metric": "judge_correct",
+      "pair": "m1_teacher vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.37,
+      "paired_t": {
+        "t": 8.768,
+        "p": 5.29e-14,
+        "p_holm": 2.12e-13
+      },
+      "wilcoxon": {
+        "W": 229.5,
+        "p": 5.68e-11
+      },
+      "cohens_d_paired": 0.877,
+      "welch_reps": {
+        "t": 13.147,
+        "p": 1.23e-06
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": 0.016,
+      "paired_t": {
+        "t": 0.799,
+        "p": 0.4265,
+        "p_holm": 1.0
+      },
+      "wilcoxon": {
+        "W": 1023.0,
+        "p": 0.2637
+      },
+      "cohens_d_paired": 0.08,
+      "welch_reps": {
+        "t": 1.519,
+        "p": 0.1837
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 0.005,
+      "paired_t": {
+        "t": 0.343,
+        "p": 0.7326,
+        "p_holm": 0.7326
+      },
+      "wilcoxon": {
+        "W": 849.5,
+        "p": 0.7849
+      },
+      "cohens_d_paired": 0.034,
+      "welch_reps": {
+        "t": 0.392,
+        "p": 0.7053
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.011,
+      "paired_t": {
+        "t": 0.592,
+        "p": 0.5552,
+        "p_holm": 1.0
+      },
+      "wilcoxon": {
+        "W": 1008.0,
+        "p": 0.4099
+      },
+      "cohens_d_paired": 0.059,
+      "welch_reps": {
+        "t": 1.169,
+        "p": 0.2868
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "m1_teacher vs m1",
+      "n_questions": 100,
+      "mean_diff": 0.056,
+      "paired_t": {
+        "t": 3.622,
+        "p": 0.000463,
+        "p_holm": 0.0019
+      },
+      "wilcoxon": {
+        "W": 279.0,
+        "p": 0.0013
+      },
+      "cohens_d_paired": 0.362,
+      "welch_reps": {
+        "t": 11.806,
+        "p": 3.39e-05
+      }
+    },
+    {
+      "metric": "doc_recall",
+      "pair": "m1_teacher vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": 0.067,
+      "paired_t": {
+        "t": 3.969,
+        "p": 0.000137,
+        "p_holm": 0.000684
+      },
+      "wilcoxon": {
+        "W": 565.0,
+        "p": 0.000177
+      },
+      "cohens_d_paired": 0.397,
+      "welch_reps": {
+        "t": 7.789,
+        "p": 0.000931
+      }
+    },
+    {
+      "metric": "tokens_total",
+      "pair": "m1 vs base",
+      "n_questions": 100,
+      "mean_diff": -817.548,
+      "paired_t": {
+        "t": -7.987,
+        "p": 2.56e-12,
+        "p_holm": 5.13e-12
+      },
+      "wilcoxon": {
+        "W": 567.0,
+        "p": 1.67e-11
+      },
+      "cohens_d_paired": -0.799,
+      "welch_reps": {
+        "t": -8.226,
+        "p": 4.03e-05
+      }
+    },
+    {
+      "metric": "tokens_total",
+      "pair": "base_teacher vs base",
+      "n_questions": 100,
+      "mean_diff": 9347.368,
+      "paired_t": {
+        "t": 82.808,
+        "p": 3.11e-93,
+        "p_holm": 1.56e-92
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 3.9e-18
+      },
+      "cohens_d_paired": 8.281,
+      "welch_reps": {
+        "t": 92.483,
+        "p": 2.75e-13
+      }
+    },
+    {
+      "metric": "tokens_total",
+      "pair": "m1 vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": -10164.916,
+      "paired_t": {
+        "t": -72.998,
+        "p": 6.72e-88,
+        "p_holm": 2.69e-87
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 3.9e-18
+      },
+      "cohens_d_paired": -7.3,
+      "welch_reps": {
+        "t": -108.445,
+        "p": 6.07e-14
+      }
+    },
+    {
+      "metric": "tokens_total",
+      "pair": "m1_teacher vs m1",
+      "n_questions": 100,
+      "mean_diff": 8563.156,
+      "paired_t": {
+        "t": 69.888,
+        "p": 4.62e-86,
+        "p_holm": 1.38e-85
+      },
+      "wilcoxon": {
+        "W": 0.0,
+        "p": 3.9e-18
+      },
+      "cohens_d_paired": 6.989,
+      "welch_reps": {
+        "t": 94.465,
+        "p": 1.79e-13
+      }
+    },
+    {
+      "metric": "tokens_total",
+      "pair": "m1_teacher vs base_teacher",
+      "n_questions": 100,
+      "mean_diff": -1601.76,
+      "paired_t": {
+        "t": -7.762,
+        "p": 7.73e-12,
+        "p_holm": 7.73e-12
+      },
+      "wilcoxon": {
+        "W": 511.0,
+        "p": 4.37e-12
+      },
+      "cohens_d_paired": -0.776,
+      "welch_reps": {
+        "t": -17.316,
+        "p": 1.32e-07
+      }
+    }
+  ],
+  "config": {
+    "gpus": "1,2,5,6,7",
+    "seeds": "11,23,37,53,71",
+    "budget": 4,
+    "student_temperature": 0.2,
+    "student_batch": 16,
+    "teacher_concurrency": 5,
+    "judge_concurrency": 10,
+    "adapter": "/root/DeKIS/teacher-guidence/training_methods/m1_sft/runs/20260712T022817Z_train4gpu/adapter",
+    "model": "Qwen/Qwen3.5-0.8B",
+    "limit": null,
+    "out_base": "/root/DeKIS/teacher-guidence/training_methods/exp_unseen100/runs",
+    "backend": "vllm",
+    "vllm_base_port": 8300,
+    "vllm_mem_util": 0.85,
+    "served_adapter_name": "m1",
+    "merged_model": "training_methods/m1_sft/runs/20260712T152029Z_qwen05b/merged",
+    "clients_per_server": 4,
+    "smoke": false,
+    "arms": "base,base_teacher,m1,m1_teacher",
+    "exp_tag": "exp_qwen05b",
+    "exp_dir": null,
+    "n_questions": 100
+  },
+  "written_at_utc": "2026-07-12T17:03:10.371148+00:00"
+}
