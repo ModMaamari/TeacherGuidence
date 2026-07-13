@@ -8,12 +8,14 @@ emits. On top of that base builder this adds, for this run:
 
   * the G-2 empty-category strip (``decision.category == ""`` is rejected by the action
     schema at eval and zeroes every action; the harness stores an omitted category as "");
-  * the §6 / G-4 leak gate on the model-*generated* text (the step ``thought`` and the
-    plan) -- rejects a turn only if it states the gold answer without the gold already
-    being in the question or the student-visible context, catching parametric-knowledge
-    guesses. It deliberately does NOT gate the ``finish`` answer itself: that answer is the
-    point of a correct episode, and word-boundary containment would over-reject grounded
-    answers that phrase the gold slightly differently than the retrieved text;
+  * the §6 / G-4 leak gate on the model-*generated* text -- rejects a NON-finish step
+    thought (or a plan) that states the gold answer without the gold already being in the
+    question or the student-visible context, catching premature/parametric-knowledge
+    answer statements. It deliberately does NOT gate the ``finish`` step: emitting the
+    answer is the finish step's whole purpose, its correctness is already enforced by the
+    judge filter, and word-boundary containment would otherwise over-reject grounded
+    finishes that phrase the gold slightly differently than the retrieved text
+    (e.g. "October 20, 1937" vs the doc's date format);
   * a qid-hash 3% dev split mirroring ``episode_lib.qid_split`` (never splits a question).
 
 Prompts are kept VERBATIM from collection (hidden budget, "This is step N"), exactly how
@@ -48,7 +50,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from training_methods.common.tm_logging import setup_logger, write_json  # noqa: E402
 from training_methods.common.episode_lib import leak_gate_ok, qid_split  # noqa: E402
 from agentsim.teacher_guidance.sft_export import DEFAULT_SYSTEM  # noqa: E402
-from agentsim.teacher_guidance.json_utils import parse_student_action, parse_student_plan  # noqa: E402
+from agentsim.teacher_guidance.json_utils import parse_student_plan, validate_student_action  # noqa: E402
 
 DEFAULT_QUESTIONS = (REPO_ROOT / "data" / "datasets" / "hotpot_teacher_guidance_train3000"
                      / "hotpot_distractor_train_questions.jsonl")
@@ -111,30 +113,40 @@ def episode_to_examples(ep: Dict[str, Any], stats: collections.Counter) -> List[
             else:
                 stats["plan_gated_out"] += 1
 
-    # One example per structurally-valid tool step.
+    # One example per step. Use the harness's stored student_action (the canonical action
+    # that actually executed), NOT a re-parse of student_raw: on the forced-finish step the
+    # raw is the model's pre-finish attempt while student_action is the resolved finish, so
+    # re-parsing raw would silently drop ~1/3 of the finish demonstrations. This mirrors the
+    # guidance-recipe builder (episode_lib.build_step_example).
     for i, s in enumerate(ep.get("steps") or []):
-        if not s.get("action_valid"):
-            stats["step_action_invalid"] += 1
+        action = s.get("student_action") or {}
+        tool = (action.get("action") or {}).get("tool")
+        if not tool:
+            stats["step_no_tool"] += 1
             continue
-        action, info = parse_student_action(s.get("student_raw") or "")
-        if not info.get("action_valid"):
-            stats["step_reparse_invalid"] += 1
-            continue
-        raw_action = action.to_dict()
-        if (raw_action.get("decision") or {}).get("category") == "":
+        if (action.get("decision") or {}).get("category") == "":
             stats["empty_category_stripped"] += 1
-        target = _strip_empty_category(raw_action)
+        target = _strip_empty_category(action)
+        # Schema-validate the target so we never train on a degenerate/malformed action.
+        ok, _errs = validate_student_action(target)
+        if not ok:
+            stats["step_target_invalid"] += 1
+            continue
         thought = str(target.get("thought") or "")
         if (target.get("decision") or {}).get("parametric_knowledge_used"):
             stats["parametric_knowledge_used_steps"] += 1
-        # Gate the model-generated thought: reject only if it states the gold answer
-        # without the gold being in the question or the context visible when it was
-        # written (the state through the previous step).
-        ctx = _visible_context(ep, i - 1)
-        if not leak_gate_ok(thought, gold, question, ctx):
-            stats["step_thought_gated_out"] += 1
-            continue
-        tool = (target.get("action") or {}).get("tool")
+        # Leak gate on the model-generated thought, but ONLY for non-finish steps.
+        # Emitting the answer is the finish step's whole purpose, and its correctness is
+        # already enforced by the judge filter; word-boundary containment would otherwise
+        # over-reject grounded finishes that merely phrase the gold differently than the
+        # retrieved text (e.g. "October 20, 1937" vs the doc's date format). For non-finish
+        # steps a stated answer IS premature knowledge (a real leak), so it is gated
+        # against the context visible when the thought was written (through the prior step).
+        if tool != "finish":
+            ctx = _visible_context(ep, i - 1)
+            if not leak_gate_ok(thought, gold, question, ctx):
+                stats["step_thought_gated_out"] += 1
+                continue
         rows.append(_example(s["student_prompt"], target,
                              {"qid": qid, "kind": "action", "step": s.get("t", i + 1),
                               "tool": tool, "source": "teacher_only"}))
@@ -206,8 +218,8 @@ def main() -> None:
         "empty_category_stripped": int(stats["empty_category_stripped"]),
         "step_thought_gated_out": int(stats["step_thought_gated_out"]),
         "plan_gated_out": int(stats["plan_gated_out"]),
-        "step_action_invalid": int(stats["step_action_invalid"]),
-        "step_reparse_invalid": int(stats["step_reparse_invalid"]),
+        "step_no_tool": int(stats["step_no_tool"]),
+        "step_target_invalid": int(stats["step_target_invalid"]),
         "parametric_knowledge_used_steps": int(stats["parametric_knowledge_used_steps"]),
         "dup_qid_skipped": int(stats["dup_qid_skipped"]),
         "kinds": dict(kinds),
