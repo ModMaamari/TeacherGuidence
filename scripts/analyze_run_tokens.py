@@ -148,18 +148,81 @@ def fig_html(fig) -> str:
     return pio.to_html(fig, full_html=False, include_plotlyjs=False, config={"displaylogo": False})
 
 
-IN_COLOR = "#2563eb"   # blue = input
-OUT_COLOR = "#ea580c"  # orange = output
+IN_COLOR = "#3b82f6"   # blue = input
+OUT_COLOR = "#f59e0b"  # amber = output
+_FONT = dict(family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+             color="#334155", size=12)
+
+
+def _style(fig, title, height=380):
+    fig.update_layout(title=dict(text=title, font=dict(size=14, color="#0f172a")),
+                      template="plotly_white", height=height, font=_FONT,
+                      paper_bgcolor="#ffffff", plot_bgcolor="#ffffff",
+                      margin=dict(t=58, b=44, l=56, r=24),
+                      legend=dict(orientation="h", y=1.12, x=0))
+    fig.update_xaxes(gridcolor="#eef2f7", zeroline=False)
+    fig.update_yaxes(gridcolor="#eef2f7", zeroline=False)
+    return fig
 
 
 def hist_in_out(inv, outv, title):
     fig = go.Figure()
-    fig.add_trace(go.Histogram(x=inv, name="input tokens", marker_color=IN_COLOR, opacity=0.65, nbinsx=60))
-    fig.add_trace(go.Histogram(x=outv, name="output tokens", marker_color=OUT_COLOR, opacity=0.65, nbinsx=60))
-    fig.update_layout(barmode="overlay", title=title, xaxis_title="tokens per episode",
-                      yaxis_title="episodes", template="plotly_white", height=380,
-                      legend=dict(orientation="h", y=1.1), margin=dict(t=60, b=40))
+    fig.add_trace(go.Histogram(x=inv, name="input tokens", marker_color=IN_COLOR, opacity=0.62, nbinsx=60))
+    fig.add_trace(go.Histogram(x=outv, name="output tokens", marker_color=OUT_COLOR, opacity=0.62, nbinsx=60))
+    _style(fig, title)
+    fig.update_layout(barmode="overlay", xaxis_title="tokens per episode", yaxis_title="episodes")
     return fig
+
+
+_REPORT_CSS = """
+:root{
+  --ground:#eef1f6;--surface:#ffffff;--ink:#131a2b;--muted:#5b6678;--hair:#dfe4ec;--chip:#eef3f9;
+  --chart:#ffffff;
+  --in:#3b82f6;--out:#f59e0b;--billed:#ef4444;--good:#16a34a;--student:#0d9488;--teacher:#7c3aed;
+  --mono:ui-monospace,SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ground:#0b0f17;--surface:#141b26;--ink:#e7edf6;--muted:#8b96a9;--hair:#232c3a;--chip:#1a2330;
+}}
+:root[data-theme="light"]{--ground:#eef1f6;--surface:#fff;--ink:#131a2b;--muted:#5b6678;--hair:#dfe4ec;--chip:#eef3f9;}
+:root[data-theme="dark"]{--ground:#0b0f17;--surface:#141b26;--ink:#e7edf6;--muted:#8b96a9;--hair:#232c3a;--chip:#1a2330;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding:34px 22px 60px}
+.eyebrow{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{font-size:27px;font-weight:700;letter-spacing:-.015em;margin:7px 0 8px;text-wrap:balance}
+.meta{color:var(--muted);font-size:13px;margin-bottom:26px}
+.meta b{color:var(--ink);font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:24px}
+@media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:15px 16px}
+.kpi .v{font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .k{font-size:12.5px;color:var(--ink);margin-top:4px}
+.kpi .note{font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+section{background:var(--surface);border:1px solid var(--hair);border-radius:16px;padding:20px;margin:16px 0}
+h2{font-size:15px;font-weight:650;margin:0 0 4px;letter-spacing:-.01em}
+.hint{font-size:12.5px;color:var(--muted);margin:2px 0 13px}
+.hint i{color:var(--ink);font-style:italic}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:middle;margin:0 3px 0 6px}
+.chartbox{background:var(--chart);border:1px solid var(--hair);border-radius:12px;padding:6px 6px 2px;overflow:hidden;margin-top:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+.grid2 .chartbox{margin-top:0}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+ul.ins{margin:8px 0 0;padding-left:18px;line-height:1.65}
+ul.ins li{margin-bottom:11px}
+ul.ins b{color:var(--ink)}
+code{font-family:var(--mono);font-size:.86em;background:var(--chip);padding:1px 6px;border-radius:5px}
+.tablewrap{overflow-x:auto;border:1px solid var(--hair);border-radius:11px;margin-top:4px}
+table.stats{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+table.stats th,table.stats td{border-bottom:1px solid var(--hair);padding:8px 11px;text-align:right;white-space:nowrap}
+table.stats tbody tr:last-child td{border-bottom:none}
+table.stats th{font-family:var(--sans);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--chip)}
+table.stats th:first-child,table.stats td.m{text-align:left;font-family:var(--sans);font-weight:500}
+table.stats tr.r-in td.m{border-left:3px solid var(--in)}
+table.stats tr.r-out td.m{border-left:3px solid var(--out)}
+.foot{color:var(--muted);font-size:12px;margin-top:26px;line-height:1.6}
+"""
 
 
 def build_report(data: Dict[str, Any], run: str, out: str) -> None:
@@ -269,77 +332,95 @@ def build_report(data: Dict[str, Any], run: str, out: str) -> None:
         f"{n} episodes (some steps needed a repair retry, each re-sending the prompt).",
     ]
 
-    # ---- HTML ----
+    # ---- HTML (theme-aware; also emits a body-only file for the Claude Artifact host) ----
     import plotly.offline as _po
     plotlyjs = _po.get_plotlyjs()
+
     def stat_table():
-        head = "".join(f"<th>{h}</th>" for h in ["metric", "mean", "median", "sd", "min", "p5", "p25", "p75", "p95", "max", "total"])
+        head = "".join(f"<th>{h}</th>" for h in
+                       ["metric", "mean", "median", "sd", "min", "p5", "p25", "p75", "p95", "max", "total"])
         rows = ""
         for label, d in stat_rows:
-            rows += "<tr><td class='m'>" + label + "</td>" + "".join(
-                f"<td>{d[k]:,.0f}</td>" for k in ["mean", "median", "sd", "min", "p5", "p25", "p75", "p95", "max", "sum"]) + "</tr>"
-        return f"<table class='stats'><thead><tr>{head}</tr></thead><tbody>{rows}</tbody></table>"
+            role = "in" if "input" in label else "out"
+            rows += f"<tr class='r-{role}'><td class='m'>{label}</td>" + "".join(
+                f"<td>{d[k]:,.0f}</td>" for k in
+                ["mean", "median", "sd", "min", "p5", "p25", "p75", "p95", "max", "sum"]) + "</tr>"
+        return (f"<div class='tablewrap'><table class='stats'><thead><tr>{head}</tr></thead>"
+                f"<tbody>{rows}</tbody></table></div>")
 
     cards = [
-        ("episodes", f"{n:,}"),
-        ("LLM calls", f"{reps_student+reps_teacher:,}"),
-        ("total input tokens", f"{tot_in:,.0f}"),
-        ("total visible output tokens", f"{tot_out:,.0f}"),
-        ("teacher reasoning overhead", f"{reasoning_overhead:.1f}×"),
-        ("teacher share of tokens", f"{100*(tot_teacher_in+tot_teacher_out)/max(tot_in+tot_out,1):.0f}%"),
-        ("mean tokens / episode", f"{(tot_in+tot_out)/max(n,1):,.0f}"),
-        ("mean steps / episode", f"{n_steps_mean:.1f}"),
+        ("episodes", f"{n:,}", ""),
+        ("LLM calls", f"{reps_student+reps_teacher:,}", "incl. repair retries"),
+        ("input tokens", f"{tot_in/1e6:.1f}M", "tokenized"),
+        ("visible output", f"{tot_out/1e6:.1f}M", "tokenized"),
+        ("reasoning overhead", f"{reasoning_overhead:.1f}×", "teacher billed / visible out"),
+        ("teacher token share", f"{teacher_share_billed:.0%}", "of billed total"),
+        ("tokens / episode", f"{(tot_in+tot_out)/max(n,1):,.0f}", "mean, visible"),
+        ("steps / episode", f"{n_steps_mean:.1f}", "mean"),
     ]
-    card_html = "".join(f"<div class='card'><div class='v'>{v}</div><div class='k'>{k}</div></div>" for k, v in cards)
-    figs_html = ""
-    for title, fig in figs:
-        figs_html += f"<section><h2>{title}</h2>{fig_html(fig)}</section>"
+    kpi_html = ""
+    for k, v, note in cards:
+        note_html = f"<div class='note'>{note}</div>" if note else ""
+        kpi_html += f"<div class='kpi'><div class='v'>{v}</div><div class='k'>{k}</div>{note_html}</div>"
+
+    def chartbox(fig):
+        return f"<div class='chartbox'>{fig_html(fig)}</div>"
+
+    hist = figs[:3]           # student, teacher, overall
+    rest = figs[3:]           # per-step, share, correctness, scatter
+    hist_section = (
+        "<section><h2>Input vs output tokens per episode</h2>"
+        f"<p class='hint'>Distribution across {n:,} episodes of tokens summed per episode "
+        "(<span class='sw' style='background:var(--in)'></span>input, "
+        "<span class='sw' style='background:var(--out)'></span>output). Teacher counts are the "
+        "<i>visible</i> output; hidden reasoning is billed on top (see the overhead card).</p>"
+        f"<div class='grid2'>{chartbox(hist[0][1])}{chartbox(hist[1][1])}</div>"
+        f"{chartbox(hist[2][1])}</section>"
+    )
+    rest_html = "".join(
+        f"<section><h2>{title}</h2>{chartbox(fig)}</section>" for title, fig in rest)
     ins_html = "".join(f"<li>{x}</li>" for x in insights)
 
-    html = f"""<!doctype html><html><head><meta charset="utf-8">
-<title>Token analysis — {Path(run).name}</title>
-<script>{plotlyjs}</script>
-<style>
- body{{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#f8fafc;color:#0f172a}}
- .wrap{{max-width:1100px;margin:0 auto;padding:28px}}
- h1{{font-size:26px;margin:0 0 4px}} .sub{{color:#64748b;margin-bottom:20px}}
- .cards{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0 26px}}
- .card{{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px}}
- .card .v{{font-size:22px;font-weight:700}} .card .k{{color:#64748b;font-size:12px;margin-top:2px}}
- section{{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:16px 0}}
- h2{{font-size:16px;margin:0 0 10px}}
- table.stats{{border-collapse:collapse;width:100%;font-size:12.5px}}
- table.stats th,table.stats td{{border-bottom:1px solid #eef2f7;padding:6px 8px;text-align:right}}
- table.stats th:first-child,table.stats td.m{{text-align:left}}
- table.stats thead th{{background:#f1f5f9;position:sticky;top:0}}
- ul.ins{{line-height:1.7}} ul.ins li{{margin-bottom:8px}}
- .legend{{font-size:12px;color:#64748b}}
-</style></head><body><div class="wrap">
+    body = f"""
+<div class="eyebrow">Trace-run token economics</div>
 <h1>Token analysis — {Path(run).name}</h1>
-<div class="sub">student = <b>{data['student_model']}</b> · teacher = <b>{data['teacher_model']}</b> ·
- {n:,} episodes · budget {eps[0]['budget'] if eps else '?'} ·
- tokenizers: <b>granite</b> (student) + <b>o200k_base</b> (teacher), counted on the actual text — no approximation.</div>
-<div class="cards">{card_html}</div>
-<section><h2>Key insights</h2><ul class="ins">{ins_html}</ul></section>
+<div class="meta">student <b>{data['student_model']}</b> &nbsp;&middot;&nbsp; teacher <b>{data['teacher_model']}</b>
+ &nbsp;&middot;&nbsp; {n:,} episodes &nbsp;&middot;&nbsp; budget {eps[0]['budget'] if eps else '?'}
+ &nbsp;&middot;&nbsp; counted with real tokenizers (<b>granite</b> student, <b>o200k_base</b> teacher) &mdash; no approximation</div>
+<div class="kpis">{kpi_html}</div>
+<section><h2>What the numbers say</h2><ul class="ins">{ins_html}</ul></section>
+{hist_section}
+{rest_html}
 <section><h2>Per-episode token statistics</h2>
- <div class="legend">Distribution across {n:,} episodes of tokens summed per episode. "Teacher (visible)" excludes hidden reasoning; see the reasoning-overhead card.</div>
+ <p class="hint">Distribution across {n:,} episodes of tokens summed per episode. Teacher rows are visible output only.</p>
  {stat_table()}</section>
-{figs_html}
-<div class="sub" style="margin-top:24px">Generated by scripts/analyze_run_tokens.py · tokens counted with real tokenizers (granite + tiktoken o200k_base).</div>
-</div></body></html>"""
-    Path(out).parent.mkdir(parents=True, exist_ok=True)
-    Path(out).write_text(html)
+<div class="foot">Generated by <code>scripts/analyze_run_tokens.py</code> &middot; every LLM call re-tokenized with granite (student) + tiktoken o200k_base (teacher). Provider <code>usage</code> is used only to expose the teacher's hidden-reasoning tokens.</div>
+"""
 
-    # also dump machine-readable stats
+    title = f"Token analysis — {Path(run).name}"
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    standalone = (f"<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+                  f"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                  f"<title>{title}</title><style>{_REPORT_CSS}</style><script>{plotlyjs}</script></head>"
+                  f"<body><div class='wrap'>{body}</div></body></html>")
+    Path(out).write_text(standalone)
+
+    # body-only file for the Artifact host (it wraps in <!doctype><head><body>)
+    art_path = Path(str(out).replace(".html", ".artifact.html"))
+    artifact = (f"<title>{title}</title>\n<style>{_REPORT_CSS}</style>\n"
+                f"<script>{plotlyjs}</script>\n<div class='wrap'>{body}</div>")
+    art_path.write_text(artifact)
+
     Path(out).with_suffix(".json").write_text(json.dumps({
         "run": run, "n_episodes": n, "student_model": data["student_model"], "teacher_model": data["teacher_model"],
         "totals": {"input": tot_in, "visible_output": tot_out, "student_in": tot_student_in,
                    "student_out": tot_student_out, "teacher_in": tot_teacher_in, "teacher_out_visible": tot_teacher_out,
                    "teacher_out_billed": tot_teacher_out_stored, "teacher_in_billed": tot_teacher_in_stored},
-        "reasoning_overhead": reasoning_overhead,
+        "reasoning_overhead": reasoning_overhead, "teacher_share_billed": teacher_share_billed,
         "per_episode_stats": {label: d for label, d in stat_rows},
     }, indent=2))
     print(f"wrote {out}  ({Path(out).stat().st_size/1e6:.1f} MB)")
+    print(f"wrote {art_path}  (body-only, for Artifact)")
     print(f"wrote {Path(out).with_suffix('.json')}")
 
 
