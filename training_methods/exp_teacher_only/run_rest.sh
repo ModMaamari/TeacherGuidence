@@ -34,25 +34,35 @@ source "$MANIFEST"
 echo "[rest] train+merge done: $MANIFEST"
 sleep 20   # let training free its GPU memory before vLLM profiles free memory
 
-# ---- adaptive GPU + vLLM memory-fraction selection ----
-read -r GPUS MEM < <(nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits | "$PY" -c '
+# ---- GPU selection: explicit override ($1) or the 4 highest-free-memory GPUs (>40GB) ----
+if [ "${1:-}" != "" ]; then
+  GPUS="$1"
+else
+  GPUS="$(nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits | "$PY" -c '
 import sys
 rows=[(int(i),int(f)) for i,f in (l.split(",") for l in sys.stdin if l.strip())]
-rows=[r for r in rows if r[1] > 40960]           # >40GB free
+rows=[r for r in rows if r[1] > 40960]
 rows.sort(key=lambda x:-x[1])
-sel=rows[:4]
-gpus=",".join(str(i) for i,_ in sel)
-minfree=min((f for _,f in sel), default=0)
-mem=max(0.30, min(0.85, round(0.9*minfree/81920, 2)))
-print(gpus, mem)
-')
-echo "[rest] eval gpus=$GPUS vllm-mem-util=$MEM"
+print(",".join(str(i) for i,_ in rows[:4]))')"
+fi
+echo "[rest] eval gpus=$GPUS"
+
+# vLLM memory fraction sized to the CURRENT tightest chosen GPU, recomputed before EACH eval
+# (the earlier bug: a single stale value OOM'd the merged twin once granite's servers + a
+# co-located job had consumed memory). For merged mode the base+twin sum to this fraction.
+compute_mem () {
+  nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits | \
+    awk -F',' -v g="$GPUS" 'BEGIN{n=split(g,a,",");for(i=1;i<=n;i++)want[a[i]]=1}
+      {gsub(/ /,"");if($1 in want){if(min==""||$2<min)min=$2}}
+      END{m=0.85*min/81920; if(m>0.85)m=0.85; if(m<0.30)m=0.30; printf "%.2f", m}'
+}
 
 eval_one () {  # tag, run_experiment args...
   local tag="$1"; shift
-  echo "[rest] === EVAL $tag ($(date -u +%H:%M:%S)) ==="
+  local mem; mem="$(compute_mem)"
+  echo "[rest] === EVAL $tag gpus=$GPUS vllm-mem-util=$mem ($(date -u +%H:%M:%S)) ==="
   "$PY" training_methods/exp_unseen100/run_experiment.py \
-    --backend vllm --gpus "$GPUS" --vllm-mem-util "$MEM" --clients-per-server 4 \
+    --backend vllm --gpus "$GPUS" --vllm-mem-util "$mem" --clients-per-server 4 \
     --exp-tag "exp_teacheronly_$tag" "$@" || echo "[rest] eval $tag returned rc=$?"
 }
 
