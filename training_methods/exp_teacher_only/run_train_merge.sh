@@ -10,9 +10,14 @@
 # Usage: bash training_methods/exp_teacher_only/run_train_merge.sh "1,2,3,5"
 set -euo pipefail
 
-GPUS="${1:-1,2,3,5}"
+GPUS="${1:-1,2,3,4}"
 REPO=/root/DeKIS/teacher-guidence
 cd "$REPO"
+# Co-location safety: these GPUs may be shared with other jobs (>40GB free each). Reduce
+# memory fragmentation; each training below keeps the guidance-m1 EFFECTIVE batch of 16
+# (micro-batch x grad-accum x 4 GPUs) but uses a smaller micro-batch than guidance-m1 so the
+# per-GPU peak (~20-25GB) leaves comfortable headroom under a co-located job.
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 PY="$REPO/.venv_train/bin"
 DATA="training_methods/exp_teacher_only/data"
 RUNS="training_methods/exp_teacher_only/runs"
@@ -49,15 +54,17 @@ merge_one () {
     --base "$base" --adapter "$rundir/adapter" --out "$rundir/merged"
 }
 
+# effective batch = micro-batch x grad-accum x 4 GPUs = 16 (matches guidance-m1);
+# micro-batch halved vs guidance-m1 for co-location memory headroom.
 # 1. granite-3B (LoRA served directly at eval)
-train_one "ibm-granite/granite-4.1-3b" "granite" 2 2 29701
+train_one "ibm-granite/granite-4.1-3b" "granite" 1 4 29701
 
 # 2. Qwen3.5-0.8B (+ composite merge)
-train_one "Qwen/Qwen3.5-0.8B" "qwen05b" 4 1 29702
+train_one "Qwen/Qwen3.5-0.8B" "qwen05b" 2 2 29702
 merge_one "Qwen/Qwen3.5-0.8B" "qwen05b"
 
 # 3. Qwen3.5-2B (+ composite merge)
-train_one "Qwen/Qwen3.5-2B" "qwen2b" 4 1 29703
+train_one "Qwen/Qwen3.5-2B" "qwen2b" 2 2 29703
 merge_one "Qwen/Qwen3.5-2B" "qwen2b"
 
 {
