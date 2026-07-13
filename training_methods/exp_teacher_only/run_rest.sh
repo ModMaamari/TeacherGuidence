@@ -57,12 +57,28 @@ compute_mem () {
       END{m=0.85*min/81920; if(m>0.85)m=0.85; if(m<0.30)m=0.30; printf "%.2f", m}'
 }
 
+kill_eval_servers () {
+  # run_experiment's teardown misses the real vLLM PID (serve_vllm.sh does
+  # `exec vllm ... | tee`, so the pipeline detaches it), leaving servers that hold GPU
+  # memory + ports and break the NEXT model's eval. Kill our vLLM processes explicitly for
+  # a clean slate. Matches only .venv_vllm processes (ours), never other jobs.
+  local pids
+  pids=$(ps -eo pid,args | grep -E "\.venv_vllm/bin/vllm serve|VLLM::EngineCore" \
+         | grep -v grep | grep -v "bin/bash" | awk '{print $1}')
+  [ -n "$pids" ] && kill -9 $pids 2>/dev/null
+  sleep 5
+}
+
 eval_one () {  # tag, run_experiment args...
   local tag="$1"; shift
+  kill_eval_servers                      # clean slate: no leftover servers from prior model
   local mem; mem="$(compute_mem)"
   echo "[rest] === EVAL $tag gpus=$GPUS vllm-mem-util=$mem ($(date -u +%H:%M:%S)) ==="
+  # teacher-concurrency 3 (was 5): fewer concurrent 120b calls -> fewer hard timeouts that
+  # trip the router circuit breaker and shorten teacher-arm seeds (G-9).
   "$PY" training_methods/exp_unseen100/run_experiment.py \
     --backend vllm --gpus "$GPUS" --vllm-mem-util "$mem" --clients-per-server 4 \
+    --teacher-concurrency 3 \
     --exp-tag "exp_teacheronly_$tag" "$@" || echo "[rest] eval $tag returned rc=$?"
 }
 
@@ -70,10 +86,11 @@ eval_one granite --model ibm-granite/granite-4.1-3b \
   --adapter "$GRANITE_RUN/adapter" --served-adapter-name m1
 eval_one qwen05b --model Qwen/Qwen3.5-0.8B --merged-model "$QWEN05B_RUN/merged"
 eval_one qwen2b  --model Qwen/Qwen3.5-2B   --merged-model "$QWEN2B_RUN/merged"
+kill_eval_servers   # free the GPUs; analysis + comparison are CPU/API only
 
-G_EXP="$(ls -dt "$EXPRUNS"/*_exp_teacheronly_granite 2>/dev/null | head -1)"
-Q05_EXP="$(ls -dt "$EXPRUNS"/*_exp_teacheronly_qwen05b 2>/dev/null | head -1)"
-Q2_EXP="$(ls -dt "$EXPRUNS"/*_exp_teacheronly_qwen2b 2>/dev/null | head -1)"
+G_EXP="$(ls -dt "$EXPRUNS"/*_exp_teacheronly_granite 2>/dev/null | grep -v FAILED | head -1)"
+Q05_EXP="$(ls -dt "$EXPRUNS"/*_exp_teacheronly_qwen05b 2>/dev/null | grep -v FAILED | head -1)"
+Q2_EXP="$(ls -dt "$EXPRUNS"/*_exp_teacheronly_qwen2b 2>/dev/null | grep -v FAILED | head -1)"
 echo "[rest] exp dirs: granite=$G_EXP qwen05b=$Q05_EXP qwen2b=$Q2_EXP"
 
 for e in "$G_EXP" "$Q05_EXP" "$Q2_EXP"; do
