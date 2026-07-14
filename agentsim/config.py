@@ -52,6 +52,15 @@ class Config:
     EDENAI_LLM_ENDPOINT: str = os.getenv("EDENAI_LLM_ENDPOINT", "https://api.edenai.run/v2/llm")
     EDENAI_API_KEY: Optional[str] = os.getenv("EDENAI_API_KEY")
 
+    # Local vLLM OpenAI-compatible server (student serving). Used instead of Ollama when a
+    # small student needs high-throughput continuous batching on a big GPU: one server per
+    # GPU serves many concurrent episodes. Address models as ``vllm/<served-model-name>``
+    # (serve_vllm.sh serves the student under the name "student" -> ``vllm/student``).
+    # The endpoint has no /v1 suffix (the client appends /v1/chat/completions); each worker
+    # process points at its own GPU's server via the VLLM_ENDPOINT env var, exactly as the
+    # Ollama path uses OLLAMA_ENDPOINT.
+    VLLM_ENDPOINT: str = os.getenv("VLLM_ENDPOINT", "http://127.0.0.1:8300")
+
     # Ollama
     OLLAMA_ENDPOINT: str = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
     OLLAMA_ENABLED: bool = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
@@ -137,6 +146,8 @@ class Config:
             return "fau"
         elif model_id.startswith("edenai/"):
             return "edenai"
+        elif model_id.startswith("vllm/"):
+            return "vllm"
         elif any(x in model_lower for x in ["gpt", "openai", "o1", "davinci", "turbo"]):
             return "openai"
         elif any(x in model_lower for x in ["claude", "anthropic"]):
@@ -171,6 +182,8 @@ class Config:
             return bool(cls.EDENAI_LLM_ENDPOINT and cls.EDENAI_API_KEY)
         if provider == "custom":
             return bool(cls.CUSTOM_LLM_ENDPOINT and cls.CUSTOM_LLM_API_KEY)
+        if provider == "vllm":
+            return bool(cls.VLLM_ENDPOINT)
         if provider == "ollama":
             return bool(cls.OLLAMA_ENDPOINT)
         # Hosted providers (openai/anthropic/google/...): callable iff their key is set.
@@ -189,6 +202,7 @@ class Config:
             "custom": cls.CUSTOM_LLM_API_KEY,
             "fau": cls.FAU_LLM_API_KEY,
             "edenai": cls.EDENAI_API_KEY,
+            "vllm": None,  # local server, no API key
             "ollama": None,  # Ollama doesn't require API key by default
         }
         return provider_keys.get(provider.lower())
@@ -222,6 +236,9 @@ class Config:
             "edenai": {
                 "api_key": cls.EDENAI_API_KEY,
                 "endpoint": cls.EDENAI_LLM_ENDPOINT,
+            },
+            "vllm": {
+                "endpoint": cls.VLLM_ENDPOINT,
             },
             "ollama": {
                 "endpoint": cls.OLLAMA_ENDPOINT,

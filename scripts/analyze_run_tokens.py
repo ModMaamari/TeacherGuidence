@@ -42,7 +42,9 @@ O200K = tiktoken.get_encoding("o200k_base")
 
 def _role(model: str) -> str:
     m = (model or "").lower()
-    if "granite" in m or "ollama" in m:
+    # Locally-served students: ollama/<model> or vllm/<served-name> (serve_vllm.sh serves
+    # the student under the literal name "student", so the model id carries no family).
+    if "granite" in m or "ollama" in m or m.startswith("vllm/"):
         return "student"
     if "gpt-oss" in m or "gpt_oss" in m:
         return "teacher"

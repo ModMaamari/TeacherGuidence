@@ -508,7 +508,8 @@ def _initialize_clients(template):
     for model in teacher_models:
         provider = config.get_provider_from_model_id(model)
         api_key = config.get_api_key_for_provider(provider)
-        if provider not in ["ollama"] and not api_key:
+        # Locally-served providers need no API key.
+        if provider not in ["ollama", "vllm"] and not api_key:
             missing_keys.append(f"{provider.upper()}_API_KEY")
     
     if missing_keys:

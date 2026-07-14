@@ -76,9 +76,9 @@ class LLMClient:
 
         provider = config.get_provider_from_model_id(model)
 
-        if return_raw and provider not in ("custom", "ollama", "fau", "edenai"):
+        if return_raw and provider not in ("custom", "ollama", "fau", "edenai", "vllm"):
             raise ValueError(f"return_raw is not supported for provider '{provider}'")
-        if response_schema and provider not in ("custom", "ollama", "fau", "edenai"):
+        if response_schema and provider not in ("custom", "ollama", "fau", "edenai", "vllm"):
             raise ValueError(f"response_schema is not supported for provider '{provider}'")
 
         if provider == "openai":
@@ -102,6 +102,10 @@ class LLMClient:
             result = await self._edenai_completion(
                 prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw,
                 response_schema, max_retries,
+            )
+        elif provider == "vllm":
+            result = await self._vllm_completion(
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw, response_schema
             )
         elif provider == "ollama":
             result = await self._ollama_completion(
@@ -595,6 +599,69 @@ class LLMClient:
                 result["raw_response"] = data
             return result
         return text
+
+    async def _vllm_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
+        """Local vLLM OpenAI-compatible server completion (student serving).
+
+        The high-throughput alternative to ``_ollama_completion`` for the student: one
+        vLLM server per GPU continuously batches many concurrent episodes, so per-episode
+        latency barely grows with concurrency. Uses /v1/chat/completions so the server
+        applies the model's own chat template (the same contract as Ollama's /api/chat).
+
+        ``response_schema`` is enforced with vLLM's structured output
+        (``response_format: json_schema``), which grammar-constrains decoding just like
+        Ollama's ``format`` -- the model physically cannot emit invalid JSON. Keeping this
+        parity matters: the student templates set ``student_use_response_schema: true``.
+
+        Unlike Ollama, vLLM reports real OpenAI-style token ``usage``, so student token
+        counts are no longer zero in the traces.
+        """
+        endpoint = config.VLLM_ENDPOINT
+        if not endpoint:
+            raise ValueError("VLLM_ENDPOINT not configured")
+
+        # Remove vllm/ prefix -> the server's --served-model-name (e.g. "student").
+        model_name = model.replace("vllm/", "", 1)
+
+        payload: Dict[str, Any] = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
+        }
+        if response_schema:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "response", "schema": response_schema},
+            }
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{endpoint.rstrip('/')}/v1/chat/completions",
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+            # A truncated generation can leave content null -> coerce to "" so the
+            # caller's parse/repair path handles it.
+            text = data["choices"][0]["message"].get("content") or ""
+
+            if return_usage:
+                usage = data.get("usage", {}) or {}
+                result = {
+                    "text": text,
+                    "usage": {
+                        "prompt_tokens": usage.get("prompt_tokens", 0),
+                        "completion_tokens": usage.get("completion_tokens", 0),
+                        "total_tokens": usage.get("total_tokens", 0),
+                        # Local server: no billing.
+                        "cost": None,
+                    },
+                }
+                if return_raw:
+                    result["raw_response"] = data
+                return result
+            return text
 
     async def _ollama_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None) -> str | Dict[str, Any]:
         """Ollama local completion"""
