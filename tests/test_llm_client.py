@@ -1,6 +1,7 @@
 """Tests for LLMClient.get_completion's return_raw support (custom/ollama providers)."""
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -446,10 +447,11 @@ def test_router_uses_paid_last_and_raises_if_all_fail(all_providers_available):
     assert order[2][1] is None
 
 
-def test_router_falls_through_on_hard_timeout_and_trips_provider(all_providers_available):
+def test_router_falls_through_on_hard_timeout_without_demoting_provider(all_providers_available):
     # A hung FAU endpoint surfaces as TimeoutError (from the asyncio.wait_for hard cap).
-    # The router must fall through to the next provider AND remember that FAU is dead so
-    # later calls this run don't pay the full timeout again.
+    # The router must fall through to the next provider -- but a SINGLE timeout must not
+    # demote FAU: under load an isolated stall is normal, and permanently skipping the
+    # free primary would push the whole run onto the paid fallbacks.
     client = LLMClient()
     seen = []
 
@@ -463,14 +465,15 @@ def test_router_falls_through_on_hard_timeout_and_trips_provider(all_providers_a
     result, used = asyncio.run(client.get_completion_with_fallback(ROUTER, prompt="hi"))
     assert used == "custom/openai/gpt-oss-120b:free"  # free tier, not paid
     assert seen == ["fau/gpt-oss-120b", "custom/openai/gpt-oss-120b:free"]
-    assert "fau" in client._tripped_providers
+    assert not client._breaker_open("fau")          # forgiven, still eligible
+    assert client._provider_timeouts["fau"] == 1    # but the stall is remembered
 
 
-def test_router_skips_tripped_provider_on_subsequent_call(all_providers_available):
-    # Once FAU has tripped, a later call never attempts it again -- it goes straight to
-    # the free tier, so one dead endpoint doesn't cost a timeout on every step.
+def test_router_skips_provider_while_breaker_open(all_providers_available):
+    # Once FAU's breaker has opened (repeated hard timeouts), later calls skip it while
+    # the cooldown lasts, so a genuinely dead endpoint doesn't cost a timeout every step.
     client = LLMClient()
-    client._tripped_providers.add("fau")
+    client._provider_tripped_until["fau"] = time.monotonic() + 120
     seen = []
 
     async def fake_get_completion(*, prompt, model, **kw):
@@ -521,3 +524,61 @@ def test_custom_completion_raises_on_hard_timeout(monkeypatch):
     monkeypatch.setattr(_httpx.AsyncClient, "post", slow_post)
     with pytest.raises(TimeoutError, match="hard timeout"):
         asyncio.run(client.get_completion(prompt="hi", model="custom/openai/gpt-oss-120b"))
+
+
+# --- provider circuit breaker -------------------------------------------------------
+# Regression guard: the breaker used to trip a provider PERMANENTLY on a single hard
+# timeout, which silently demoted the free primary for the rest of the process and pushed
+# a whole run onto its paid fallbacks. It must now forgive an isolated stall, trip only on
+# consecutive timeouts, and recover after the cooldown.
+
+def _breaker_client(monkeypatch, fau_hangs):
+    """LLMClient whose fau/ calls hang (per ``fau_hangs``) and whose custom/ calls succeed."""
+    calls = {"fau": 0, "custom": 0}
+
+    async def fake_get_completion(self, prompt, model=None, **kw):
+        provider = "fau" if str(model).startswith("fau/") else "custom"
+        calls[provider] += 1
+        if provider == "fau" and fau_hangs():
+            raise TimeoutError("FAU hard timeout")
+        return {"text": "ok"}
+
+    monkeypatch.setattr(LLMClient, "get_completion", fake_get_completion)
+    return LLMClient(), calls
+
+
+CHAIN = ["fau/m3", "custom/m3"]
+
+
+def test_breaker_forgives_isolated_timeout(monkeypatch):
+    client, calls = _breaker_client(monkeypatch, lambda: True)
+    for _ in range(2):
+        asyncio.run(client.get_completion_with_fallback(CHAIN, prompt="x"))
+    # Still attempted on the second call: one stall must not demote the provider.
+    assert calls["fau"] == 2
+
+
+def test_breaker_opens_after_consecutive_timeouts(monkeypatch):
+    from agentsim.clients.llm_client import _BREAKER_CONSECUTIVE_TIMEOUTS
+
+    client, calls = _breaker_client(monkeypatch, lambda: True)
+    for _ in range(_BREAKER_CONSECUTIVE_TIMEOUTS + 3):
+        asyncio.run(client.get_completion_with_fallback(CHAIN, prompt="x"))
+    # Attempts stop once the breaker opens; the rest fall straight to the fallback.
+    assert calls["fau"] == _BREAKER_CONSECUTIVE_TIMEOUTS
+
+
+def test_breaker_recovers_after_cooldown_and_success_resets(monkeypatch):
+    from agentsim.clients.llm_client import _BREAKER_CONSECUTIVE_TIMEOUTS
+
+    hangs = [True]
+    client, calls = _breaker_client(monkeypatch, lambda: hangs[0])
+    for _ in range(_BREAKER_CONSECUTIVE_TIMEOUTS):
+        asyncio.run(client.get_completion_with_fallback(CHAIN, prompt="x"))
+    assert client._breaker_open("fau")
+
+    client._provider_tripped_until["fau"] = time.monotonic() - 1  # cooldown elapsed
+    hangs[0] = False
+    _result, used = asyncio.run(client.get_completion_with_fallback(CHAIN, prompt="x"))
+    assert used == "fau/m3"                       # primary is used again
+    assert client._provider_timeouts.get("fau") == 0  # success reset the counter

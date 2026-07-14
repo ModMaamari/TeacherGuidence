@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+import time
 
 import httpx
 from typing import Optional, Dict, Any
@@ -18,6 +19,16 @@ _BACKOFF_MAX_S = 30.0      # cap for computed exponential backoff
 _BACKOFF_JITTER_S = 0.5    # added uniform(0, jitter) to avoid thundering herd
 _RETRY_AFTER_MAX_S = 120.0  # honor an explicit Retry-After header up to this cap
 
+# Provider circuit breaker (see LLMClient.get_completion_with_fallback). A provider is
+# skipped only after this many CONSECUTIVE hard timeouts, and only for a cooldown, after
+# which it is re-probed. Rationale: a single slow call under high concurrency is not a dead
+# endpoint. Tripping permanently on one timeout silently demotes the free primary for the
+# rest of the process and shifts an entire run onto paid fallbacks (observed: one 45s
+# timeout per worker sent ~95% of a 3000-episode run to a paid fallback, which then hit its
+# spend cap and failed the remaining episodes outright).
+_BREAKER_CONSECUTIVE_TIMEOUTS = 3
+_BREAKER_COOLDOWN_S = 120.0
+
 
 class LLMClient:
     """Unified client for multiple LLM providers"""
@@ -28,10 +39,14 @@ class LLMClient:
         self.default_model = default_model or config.TEACHER_MODELS[0] if config.TEACHER_MODELS else "gpt-4o"
         self._embedding_model: Optional[SentenceTransformer] = None
         self._embedding_model_name: Optional[str] = None
-        # Providers that hard-timed-out this process; skipped by the fallback router for
-        # the rest of the run so one dead endpoint doesn't cost a full timeout on every
-        # subsequent call. Cleared only by restarting the process.
-        self._tripped_providers: set[str] = set()
+        # Circuit breaker state, per provider: consecutive hard timeouts, and (while
+        # tripped) the monotonic deadline until which the fallback router skips it. A
+        # provider trips only after _BREAKER_CONSECUTIVE_TIMEOUTS in a row and recovers
+        # automatically after _BREAKER_COOLDOWN_S, so a genuinely dead endpoint still
+        # stops costing a full timeout per call while a transient stall does not
+        # permanently demote a healthy provider.
+        self._provider_timeouts: Dict[str, int] = {}
+        self._provider_tripped_until: Dict[str, float] = {}
     
     async def get_completion(
         self,
@@ -369,6 +384,28 @@ class LLMClient:
             await asyncio.sleep(delay)
             attempt += 1
 
+    # -- provider circuit breaker -------------------------------------------------
+    def _breaker_open(self, provider: str) -> bool:
+        """True while ``provider`` is in its post-trip cooldown (router skips it)."""
+        return time.monotonic() < self._provider_tripped_until.get(provider, 0.0)
+
+    def _breaker_remaining(self, model: str) -> float:
+        provider = config.get_provider_from_model_id(model)
+        return max(0.0, self._provider_tripped_until.get(provider, 0.0) - time.monotonic())
+
+    def _note_timeout(self, provider: str) -> None:
+        """Record a hard timeout; open the breaker once they are consecutive enough."""
+        n = self._provider_timeouts.get(provider, 0) + 1
+        self._provider_timeouts[provider] = n
+        if n >= _BREAKER_CONSECUTIVE_TIMEOUTS:
+            self._provider_tripped_until[provider] = time.monotonic() + _BREAKER_COOLDOWN_S
+            self._provider_timeouts[provider] = 0
+            logger.warning(
+                f"[router] provider '{provider}' circuit breaker OPEN for "
+                f"{_BREAKER_COOLDOWN_S:.0f}s after {_BREAKER_CONSECUTIVE_TIMEOUTS} "
+                "consecutive hard timeouts"
+            )
+
     async def get_completion_with_fallback(self, models, *, prompt: str, **kwargs):
         """Try each model in ``models`` in order, returning ``(result, used_model)`` from
         the first that succeeds.
@@ -387,6 +424,11 @@ class LLMClient:
         * Every model but the last configured one is called fail-fast (``max_retries=0``)
           so falling through is quick; the last keeps normal retry behaviour as the final
           fallback.
+        * **A provider is only demoted for repeated hard timeouts, and only temporarily.**
+          The breaker opens after ``_BREAKER_CONSECUTIVE_TIMEOUTS`` in a row and closes
+          again after ``_BREAKER_COOLDOWN_S``; any success resets the count. This keeps a
+          hung endpoint from costing a full timeout per call without letting one slow call
+          under load permanently push a run onto its paid fallbacks.
 
         Used to route teacher calls FAU -> OpenRouter-free -> OpenRouter-paid: FAU (free
         academic gateway) first, then OpenRouter's free tier, then the paid model last for
@@ -402,10 +444,11 @@ class LLMClient:
                     f"[router] skipping '{m}' -- provider not configured "
                     "(missing API key/endpoint)"
                 )
-            elif config.get_provider_from_model_id(m) in self._tripped_providers:
+            elif self._breaker_open(config.get_provider_from_model_id(m)):
                 logger.info(
-                    f"[router] skipping '{m}' -- provider tripped earlier this run "
-                    "(hard timeout); will not retry until restart"
+                    f"[router] skipping '{m}' -- provider circuit breaker open after "
+                    f"{_BREAKER_CONSECUTIVE_TIMEOUTS} consecutive hard timeouts; "
+                    f"re-probing in {self._breaker_remaining(m):.0f}s"
                 )
             else:
                 available.append(m)
@@ -421,16 +464,18 @@ class LLMClient:
             call_kwargs = dict(kwargs)
             if not is_last:
                 call_kwargs["max_retries"] = 0  # fail fast, fall through on any error
+            provider = config.get_provider_from_model_id(model)
             try:
                 result = await self.get_completion(prompt=prompt, model=model, **call_kwargs)
+                self._provider_timeouts[provider] = 0  # healthy again
                 return result, model
             except Exception as exc:  # noqa: BLE001 -- resilience: fall through on anything
                 last_exc = exc
-                # A hard timeout means the endpoint is hung, not merely throttled: trip its
-                # provider so later calls this run skip it immediately instead of eating the
-                # full timeout every time.
+                # Repeated hard timeouts mean the endpoint is hung rather than merely slow:
+                # open the breaker so later calls skip it (for a cooldown) instead of
+                # eating the full timeout every time. A single stall is forgiven.
                 if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
-                    self._tripped_providers.add(config.get_provider_from_model_id(model))
+                    self._note_timeout(provider)
                 logger.warning(
                     f"[router] teacher model '{model}' failed "
                     f"({type(exc).__name__}: {str(exc)[:150]}); "

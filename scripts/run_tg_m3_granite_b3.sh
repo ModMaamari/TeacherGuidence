@@ -18,6 +18,10 @@
 # The GPUs are not the bottleneck (a 3B student on an 80GB A100 leaves nearly all memory
 # to the KV cache); the remote reasoning teacher is. --workers-per-gpu therefore sets the
 # teacher concurrency that actually drives wall time.
+#
+# Concurrency is deliberately 8/GPU (24 episodes), not higher: the FAU gateway is shared
+# and queues under load. At 36 it stalled past the hard timeout constantly, and every
+# stalled call falls to the paid OpenRouter fallback. 24 keeps the FREE primary serving.
 set -uo pipefail
 cd /root/DeKIS/teacher-guidence
 
@@ -26,7 +30,7 @@ echo "=== TG MiniMax-M3 / Granite b3 | $(date -u +%FT%TZ) ==="
 .venv/bin/python scripts/run_tg_vllm.py \
   --num-samples 3000 \
   --num-gpus 3 \
-  --workers-per-gpu 12 \
+  --workers-per-gpu 8 \
   --student-model ibm-granite/granite-4.1-3b \
   --budget 3 \
   --planning-steps 3 \
