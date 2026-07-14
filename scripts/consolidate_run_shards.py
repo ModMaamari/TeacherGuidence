@@ -38,11 +38,33 @@ def find_sample_dirs(shard_root: Path, exclude_name: str) -> List[Path]:
     return sorted(dirs, key=lambda p: str(p))
 
 
-def plan_moves(sample_dirs: List[Path], dest_hotpot: Path) -> List[Tuple[Path, Path]]:
-    """Map each source sample dir to sample_0001.. under the destination, deterministically."""
+_SAMPLE_DIR_RE = re.compile(r"^sample_(\d+)$")
+
+
+def next_sample_index(dest_hotpot: Path) -> int:
+    """First free ``sample_NNNN`` index in the destination run.
+
+    Numbering must continue past whatever is already consolidated: a resumed run
+    consolidates again into the same destination, and reusing an existing name would make
+    ``shutil.move`` nest the new shard *inside* the old sample dir instead of adding a
+    sibling. Returns 1 for an empty/absent destination.
+    """
+    if not dest_hotpot.exists():
+        return 1
+    highest = 0
+    for child in dest_hotpot.iterdir():
+        m = _SAMPLE_DIR_RE.match(child.name) if child.is_dir() else None
+        if m:
+            highest = max(highest, int(m.group(1)))
+    return highest + 1
+
+
+def plan_moves(sample_dirs: List[Path], dest_hotpot: Path, start: int = 1) -> List[Tuple[Path, Path]]:
+    """Map each source sample dir to sample_NNNN.. under the destination, deterministically,
+    starting at ``start`` so previously consolidated samples are never overwritten."""
     return [
         (src, dest_hotpot / f"sample_{i:04d}")
-        for i, src in enumerate(sample_dirs, start=1)
+        for i, src in enumerate(sample_dirs, start=start)
     ]
 
 
@@ -66,8 +88,9 @@ def consolidate(shard_root: Path, run_name: str) -> Tuple[int, List[str]]:
     sample_dirs = find_sample_dirs(shard_root, run_name)
     if not sample_dirs:
         return 0, []
+    start = next_sample_index(dest_hotpot)
     dest_hotpot.mkdir(parents=True, exist_ok=True)
-    for src, dest in plan_moves(sample_dirs, dest_hotpot):
+    for src, dest in plan_moves(sample_dirs, dest_hotpot, start=start):
         shutil.move(str(src), str(dest))
     return len(sample_dirs), _remove_empty_worker_dirs(shard_root, run_name)
 
