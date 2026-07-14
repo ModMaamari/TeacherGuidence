@@ -67,9 +67,11 @@ class TeacherGuidanceEpisodeExporter:
         The configured ``teacher_model`` is only the first choice; the fallback router
         (``get_completion_with_fallback``) may serve a call from a later provider in
         ``teacher_router`` and records the real one under each call's ``"model"``. We walk
-        every teacher LLM call -- per-step teacher evals plus the plan-review calls
-        (initial plan, per-round review + revision) -- so the stored provenance reflects
-        which teacher(s) genuinely produced the guidance, not just what was requested.
+        only the genuinely teacher-served calls -- per-step teacher evals and the
+        plan-review ``review_calls`` -- so the stored provenance reflects which teacher(s)
+        produced the guidance. Note: plan-review ``initial_plan_calls`` and
+        ``revision_calls`` are the STUDENT writing/revising its own plan (planner=student),
+        so they are deliberately excluded here.
         """
         used: List[str] = []
         seen = set()
@@ -84,10 +86,8 @@ class TeacherGuidanceEpisodeExporter:
         for s in steps:
             _add_from(s.get("teacher_calls"))
         pr = context.metadata.get("plan_review") or {}
-        _add_from(pr.get("initial_plan_calls"))
         for rnd in pr.get("rounds", []) or []:
             _add_from(rnd.get("review_calls"))
-            _add_from(rnd.get("revision_calls"))
         return used
 
     # ------------------------------------------------------------------
