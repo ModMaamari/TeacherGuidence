@@ -60,6 +60,36 @@ class TeacherGuidanceEpisodeExporter:
             )
         return episode
 
+    @staticmethod
+    def _collect_used_teacher_models(context: Any, steps: List[Dict[str, Any]]) -> List[str]:
+        """Distinct teacher models that ACTUALLY served a call this episode.
+
+        The configured ``teacher_model`` is only the first choice; the fallback router
+        (``get_completion_with_fallback``) may serve a call from a later provider in
+        ``teacher_router`` and records the real one under each call's ``"model"``. We walk
+        every teacher LLM call -- per-step teacher evals plus the plan-review calls
+        (initial plan, per-round review + revision) -- so the stored provenance reflects
+        which teacher(s) genuinely produced the guidance, not just what was requested.
+        """
+        used: List[str] = []
+        seen = set()
+
+        def _add_from(calls: Any) -> None:
+            for c in calls or []:
+                m = (c or {}).get("model")
+                if m and m not in seen:
+                    seen.add(m)
+                    used.append(m)
+
+        for s in steps:
+            _add_from(s.get("teacher_calls"))
+        pr = context.metadata.get("plan_review") or {}
+        _add_from(pr.get("initial_plan_calls"))
+        for rnd in pr.get("rounds", []) or []:
+            _add_from(rnd.get("review_calls"))
+            _add_from(rnd.get("revision_calls"))
+        return used
+
     # ------------------------------------------------------------------
     def _build_episode_record(self, context: Any) -> Dict[str, Any]:
         md = context.metadata
@@ -106,6 +136,10 @@ class TeacherGuidanceEpisodeExporter:
                 "teacher_raw": s.get("teacher_raw", ""),
                 "teacher_calls": s.get("teacher_calls"),
                 "teacher_call_ms": s.get("teacher_call_ms"),
+                # The model(s) that actually served this step's teacher call(s).
+                "teacher_models_used": [
+                    c.get("model") for c in (s.get("teacher_calls") or []) if (c or {}).get("model")
+                ],
                 "teacher_skipped": s.get("teacher_skipped", False),
                 "teacher_private_diagnosis": (s.get("teacher_full", {}) or {}).get("private_diagnosis", {}),
                 "student_visible_guidance": s.get("student_visible_guidance"),
@@ -133,7 +167,13 @@ class TeacherGuidanceEpisodeExporter:
             "used_steps": len(steps),
             "guidance_level": int(guidance.get("level", 0)) if isinstance(guidance, dict) else 0,
             "student_model": md.get("student_model", ""),
+            # teacher_model = the configured first-choice teacher; teacher_router = the
+            # full fallback chain; teacher_models_used = the model(s) that ACTUALLY served
+            # this episode's teacher calls (the router may fall through to a fallback), so
+            # the used teacher is captured on the stored data, not just the request.
             "teacher_model": md.get("teacher_model", ""),
+            "teacher_router": md.get("teacher_router") or [],
+            "teacher_models_used": self._collect_used_teacher_models(context, steps),
             "plan_review": plan_review,
             "steps": step_records,
             "final_answer": final_answer,
@@ -191,6 +231,11 @@ class TeacherGuidanceEpisodeExporter:
                         "step": s.get("t"),
                         "guidance_level": episode["guidance_level"],
                         "gold_answer_visible_to_teacher": True,
+                        # Which teacher(s) actually produced this demonstration.
+                        "teacher_model": episode.get("teacher_model", ""),
+                        "teacher_models_used": [
+                            c.get("model") for c in (s.get("teacher_calls") or []) if (c or {}).get("model")
+                        ],
                     },
                 },
             )
