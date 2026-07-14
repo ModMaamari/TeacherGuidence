@@ -41,6 +41,17 @@ class Config:
     FAU_LLM_ENDPOINT: str = os.getenv("FAU_LLM_ENDPOINT", "https://hub.nhr.fau.de/api/llmgw/v1")
     FAU_LLM_API_KEY: Optional[str] = os.getenv("FAU_LLM_API_KEY") or os.getenv("LLMAPI_KEY")
 
+    # EdenAI aggregator, OpenAI-compatible gateway. The base URL already ends in the
+    # ``/v1``-equivalent segment ``/v2/llm`` (the client appends only /chat/completions).
+    # Used as a teacher fallback provider (e.g. a MiniMax model) behind FAU. Its models
+    # are addressed as ``edenai/<provider>/<model>`` (e.g.
+    # ``edenai/lilac/minimaxai/minimax-m3``); the ``edenai/`` prefix is stripped before the
+    # request. Response is OpenAI-style (choices[].message.content + usage, plus a per-call
+    # ``cost``), and reasoning models return chain-of-thought in ``reasoning_content`` that
+    # counts against max_tokens -- give teacher calls a generous budget.
+    EDENAI_LLM_ENDPOINT: str = os.getenv("EDENAI_LLM_ENDPOINT", "https://api.edenai.run/v2/llm")
+    EDENAI_API_KEY: Optional[str] = os.getenv("EDENAI_API_KEY")
+
     # Ollama
     OLLAMA_ENDPOINT: str = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
     OLLAMA_ENABLED: bool = os.getenv("OLLAMA_ENABLED", "false").lower() == "true"
@@ -107,6 +118,9 @@ class Config:
     # minutes with the API healthy again). Generous default because a reasoning
     # teacher's long generation is legitimate.
     CUSTOM_TIMEOUT: int = int(os.getenv("CUSTOM_TIMEOUT", "180"))
+    # Same wall-clock cap for a single EdenAI request (a reasoning teacher such as
+    # MiniMax-M3 can legitimately generate for a while), matching CUSTOM_TIMEOUT.
+    EDENAI_TIMEOUT: int = int(os.getenv("EDENAI_TIMEOUT", "180"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "4096"))
     
     @classmethod
@@ -121,6 +135,8 @@ class Config:
             return "ollama"
         elif model_id.startswith("fau/"):
             return "fau"
+        elif model_id.startswith("edenai/"):
+            return "edenai"
         elif any(x in model_lower for x in ["gpt", "openai", "o1", "davinci", "turbo"]):
             return "openai"
         elif any(x in model_lower for x in ["claude", "anthropic"]):
@@ -151,6 +167,8 @@ class Config:
         provider = cls.get_provider_from_model_id(model_id)
         if provider == "fau":
             return bool(cls.FAU_LLM_ENDPOINT and cls.FAU_LLM_API_KEY)
+        if provider == "edenai":
+            return bool(cls.EDENAI_LLM_ENDPOINT and cls.EDENAI_API_KEY)
         if provider == "custom":
             return bool(cls.CUSTOM_LLM_ENDPOINT and cls.CUSTOM_LLM_API_KEY)
         if provider == "ollama":
@@ -170,6 +188,7 @@ class Config:
             "together": cls.TOGETHER_API_KEY,
             "custom": cls.CUSTOM_LLM_API_KEY,
             "fau": cls.FAU_LLM_API_KEY,
+            "edenai": cls.EDENAI_API_KEY,
             "ollama": None,  # Ollama doesn't require API key by default
         }
         return provider_keys.get(provider.lower())
@@ -199,6 +218,10 @@ class Config:
             "fau": {
                 "api_key": cls.FAU_LLM_API_KEY,
                 "endpoint": cls.FAU_LLM_ENDPOINT,
+            },
+            "edenai": {
+                "api_key": cls.EDENAI_API_KEY,
+                "endpoint": cls.EDENAI_LLM_ENDPOINT,
             },
             "ollama": {
                 "endpoint": cls.OLLAMA_ENDPOINT,

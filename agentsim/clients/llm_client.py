@@ -76,9 +76,9 @@ class LLMClient:
 
         provider = config.get_provider_from_model_id(model)
 
-        if return_raw and provider not in ("custom", "ollama", "fau"):
+        if return_raw and provider not in ("custom", "ollama", "fau", "edenai"):
             raise ValueError(f"return_raw is not supported for provider '{provider}'")
-        if response_schema and provider not in ("custom", "ollama", "fau"):
+        if response_schema and provider not in ("custom", "ollama", "fau", "edenai"):
             raise ValueError(f"response_schema is not supported for provider '{provider}'")
 
         if provider == "openai":
@@ -95,6 +95,11 @@ class LLMClient:
             )
         elif provider == "fau":
             result = await self._fau_completion(
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw,
+                response_schema, max_retries,
+            )
+        elif provider == "edenai":
+            result = await self._edenai_completion(
                 prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw,
                 response_schema, max_retries,
             )
@@ -505,6 +510,85 @@ class LLMClient:
                     "total_tokens": usage.get("total_tokens", 0),
                     # Academic gateway: no per-call billing is returned.
                     "cost": usage.get("cost"),
+                },
+            }
+            if return_raw:
+                result["raw_response"] = data
+            return result
+        return text
+
+    async def _edenai_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None, max_retries: Optional[int] = None) -> str | Dict[str, Any]:
+        """EdenAI aggregator completion (OpenAI-compatible ``/v2/llm/chat/completions``).
+
+        The configured base URL already ends in ``/v2/llm``, so we append only
+        ``/chat/completions``. The model id is passed through verbatim after stripping the
+        ``edenai/`` prefix -- EdenAI addresses models as ``<provider>/<model>`` (e.g.
+        ``lilac/minimaxai/minimax-m3``), so the remaining slashes are meaningful and MUST
+        NOT be collapsed. Retries transient 429/503 with backoff like FAU; a
+        ``max_retries=0`` from the fallback router makes it fail fast so the chain falls
+        through quickly.
+
+        Like FAU's gpt-oss-120b, EdenAI's MiniMax models are reasoning models: they emit
+        chain-of-thought in ``message.reasoning_content`` (counted against ``max_tokens``)
+        and the final answer in ``message.content`` -- give a generous ``max_tokens`` or
+        the answer truncates to empty (``content`` may be ``None``; coerced to ""). As with
+        FAU, ``response_schema`` is accepted for API symmetry but NOT forwarded as a
+        ``response_format`` request, to avoid corrupting a reasoning model's JSON output.
+        The gateway returns OpenAI-style ``usage`` plus a per-call ``cost`` (USD).
+        """
+        endpoint = config.EDENAI_LLM_ENDPOINT
+        api_key = config.EDENAI_API_KEY
+
+        if not endpoint:
+            raise ValueError("EDENAI_LLM_ENDPOINT not configured")
+        if not api_key:
+            raise ValueError("EDENAI_API_KEY not configured")
+
+        # Strip only the leading edenai/ marker; keep the provider/model path intact.
+        model_name = model.replace("edenai/", "", 1)
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        }
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
+        }
+
+        async def _send() -> Dict[str, Any]:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await self._post_json_with_backoff(
+                    client, f"{endpoint.rstrip('/')}/chat/completions", headers, payload,
+                    provider_label="edenai", max_retries=max_retries,
+                )
+                response.raise_for_status()
+                return response.json()
+
+        # Hard wall-clock cap, same rationale as _fau_completion/_custom_completion: httpx's
+        # read timeout only measures the gap between bytes, so a half-dead connection hangs
+        # forever. asyncio.wait_for turns that into an error the router falls through on.
+        try:
+            data = await asyncio.wait_for(_send(), timeout=config.EDENAI_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"EdenAI request exceeded hard timeout of {config.EDENAI_TIMEOUT}s "
+                f"(model={model_name}); falling through"
+            ) from exc
+        text = data["choices"][0]["message"].get("content") or ""
+
+        if return_usage:
+            usage = data.get("usage", {}) or {}
+            result = {
+                "text": text,
+                "usage": {
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                    # EdenAI reports real per-call USD cost at the top level of the body.
+                    "cost": data.get("cost", usage.get("cost")),
                 },
             }
             if return_raw:
