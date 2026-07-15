@@ -566,24 +566,51 @@ class LLMClient:
             return result
         return text
 
+    @staticmethod
+    def _edenai_answer_text(data: Dict[str, Any]) -> str:
+        """Extract the assistant answer from an EdenAI Responses ``output`` array.
+
+        MUST filter by item type rather than indexing: for a reasoning model such as
+        MiniMax-M3 the chain-of-thought arrives as its own ``{"type": "reasoning"}`` item
+        BEFORE the answer, so ``output[0]`` is usually the reasoning, not the answer. The
+        reasoning item is not always present either (it vanishes on very short outputs), so
+        position-based access breaks intermittently -- the worst failure mode.
+        """
+        for item in data.get("output", []) or []:
+            if (item or {}).get("type") == "message":
+                return "".join(
+                    part.get("text", "")
+                    for part in item.get("content", []) or []
+                    if (part or {}).get("type") == "output_text"
+                )
+        return ""
+
     async def _edenai_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, response_schema: Optional[Dict[str, Any]] = None, max_retries: Optional[int] = None) -> str | Dict[str, Any]:
-        """EdenAI aggregator completion (OpenAI-compatible ``/v2/llm/chat/completions``).
+        """EdenAI completion via the Responses API (``POST /v3/responses``).
 
-        The configured base URL already ends in ``/v2/llm``, so we append only
-        ``/chat/completions``. The model id is passed through verbatim after stripping the
-        ``edenai/`` prefix -- EdenAI addresses models as ``<provider>/<model>`` (e.g.
-        ``lilac/minimaxai/minimax-m3``), so the remaining slashes are meaningful and MUST
-        NOT be collapsed. Retries transient 429/503 with backoff like FAU; a
-        ``max_retries=0`` from the fallback router makes it fail fast so the chain falls
-        through quickly.
+        This is NOT an OpenAI chat-completions endpoint -- do not copy patterns from
+        ``_fau_completion``/``_custom_completion`` here (see
+        /root/DeKIS/hpc_fau/edenai_docs.md). Three shape differences matter:
 
-        Like FAU's gpt-oss-120b, EdenAI's MiniMax models are reasoning models: they emit
-        chain-of-thought in ``message.reasoning_content`` (counted against ``max_tokens``)
-        and the final answer in ``message.content`` -- give a generous ``max_tokens`` or
-        the answer truncates to empty (``content`` may be ``None``; coerced to ""). As with
-        FAU, ``response_schema`` is accepted for API symmetry but NOT forwarded as a
-        ``response_format`` request, to avoid corrupting a reasoning model's JSON output.
-        The gateway returns OpenAI-style ``usage`` plus a per-call ``cost`` (USD).
+        * **Request**: ``input`` is a list of message objects and each message's
+          ``content`` is itself a list of typed parts (``input_text`` for user turns). A
+          bare string does not work. The completion cap is ``max_output_tokens``.
+        * **Response**: the answer lives in the ``output`` array, which for a reasoning
+          model also contains a separate ``reasoning`` item -- see ``_edenai_answer_text``.
+        * **Usage**: fields are ``input_tokens``/``output_tokens`` (not
+          ``prompt_tokens``/``completion_tokens``), with hidden reasoning counted under
+          ``output_tokens_details.reasoning_tokens``. Every call bills, and the real USD
+          ``cost`` is returned per call.
+
+        The model id keeps its ``<provider>/<model>`` path after the ``edenai/`` marker is
+        stripped, so its slashes are meaningful and must not be collapsed.
+
+        Truncation is NOT an HTTP error: it returns 200 with ``status: "incomplete"`` and
+        whatever text was produced. A truncated teacher verdict is unusable JSON, so we
+        raise and let the router fall through to the next provider rather than feed the
+        parse/repair layer a guaranteed-broken body. ``response_schema`` is accepted for
+        API symmetry but not forwarded (same rationale as FAU: it corrupts reasoning-model
+        output).
         """
         endpoint = config.EDENAI_LLM_ENDPOINT
         api_key = config.EDENAI_API_KEY
@@ -602,15 +629,22 @@ class LLMClient:
         }
         payload = {
             "model": model_name,
-            "messages": [{"role": "user", "content": prompt}],
+            "input": [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": prompt}],
+                }
+            ],
             "temperature": temperature,
-            "max_tokens": max_tokens or config.LLM_MAX_TOKENS,
+            "max_output_tokens": max_tokens or config.LLM_MAX_TOKENS,
+            "stream": False,
         }
 
         async def _send() -> Dict[str, Any]:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await self._post_json_with_backoff(
-                    client, f"{endpoint.rstrip('/')}/chat/completions", headers, payload,
+                    client, endpoint, headers, payload,
                     provider_label="edenai", max_retries=max_retries,
                 )
                 response.raise_for_status()
@@ -626,18 +660,29 @@ class LLMClient:
                 f"EdenAI request exceeded hard timeout of {config.EDENAI_TIMEOUT}s "
                 f"(model={model_name}); falling through"
             ) from exc
-        text = data["choices"][0]["message"].get("content") or ""
+
+        status = data.get("status")
+        if status != "completed":
+            raise RuntimeError(
+                f"EdenAI response not completed (status={status!r}, "
+                f"incomplete_details={data.get('incomplete_details')!r}, model={model_name})"
+            )
+        text = self._edenai_answer_text(data)
 
         if return_usage:
             usage = data.get("usage", {}) or {}
+            input_tokens = usage.get("input_tokens", 0)
+            output_tokens = usage.get("output_tokens", 0)
             result = {
                 "text": text,
                 "usage": {
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
-                    "total_tokens": usage.get("total_tokens", 0),
-                    # EdenAI reports real per-call USD cost at the top level of the body.
+                    "prompt_tokens": input_tokens,
+                    "completion_tokens": output_tokens,
+                    "total_tokens": usage.get("total_tokens", input_tokens + output_tokens),
+                    # Real per-call USD billing (top level, mirrored under usage).
                     "cost": data.get("cost", usage.get("cost")),
+                    # Hidden chain-of-thought billed inside output_tokens.
+                    "reasoning_tokens": (usage.get("output_tokens_details") or {}).get("reasoning_tokens"),
                 },
             }
             if return_raw:

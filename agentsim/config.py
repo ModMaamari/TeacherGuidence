@@ -41,21 +41,22 @@ class Config:
     FAU_LLM_ENDPOINT: str = os.getenv("FAU_LLM_ENDPOINT", "https://hub.nhr.fau.de/api/llmgw/v1")
     FAU_LLM_API_KEY: Optional[str] = os.getenv("FAU_LLM_API_KEY") or os.getenv("LLMAPI_KEY")
 
-    # EdenAI aggregator, OpenAI-compatible gateway. The base URL already ends in the
-    # ``/v1``-equivalent segment ``/v2/llm`` (the client appends only /chat/completions).
-    # Used as a teacher fallback provider (e.g. a MiniMax model) behind FAU. Its models
-    # are addressed as ``edenai/<provider>/<model>`` (e.g.
-    # ``edenai/lilac/minimaxai/minimax-m3``); the ``edenai/`` prefix is stripped before the
-    # request. Response is OpenAI-style (choices[].message.content + usage, plus a per-call
-    # ``cost``), and reasoning models return chain-of-thought in ``reasoning_content`` that
-    # counts against max_tokens -- give teacher calls a generous budget.
-    EDENAI_LLM_ENDPOINT: str = os.getenv("EDENAI_LLM_ENDPOINT", "https://api.edenai.run/v2/llm")
+    # EdenAI aggregator. NOTE: this is a *Responses*-style API, NOT OpenAI
+    # chat-completions -- the request/response shapes are not interchangeable with the FAU
+    # gateway (see /root/DeKIS/hpc_fau/edenai_docs.md). The full endpoint URL is configured
+    # here (not a base), because the API exposes the single /v3/responses route. Models are
+    # addressed as ``edenai/<provider>/<model>`` (e.g. ``edenai/lilac/minimaxai/minimax-m3``,
+    # where ``lilac`` is the upstream provider EdenAI routes to); the ``edenai/`` prefix is
+    # stripped before the request. Commercial: every call bills real money and returns a
+    # ``cost`` field.
+    EDENAI_LLM_ENDPOINT: str = os.getenv("EDENAI_LLM_ENDPOINT", "https://api.edenai.run/v3/responses")
     EDENAI_API_KEY: Optional[str] = os.getenv("EDENAI_API_KEY")
 
     # Local vLLM OpenAI-compatible server (student serving). Used instead of Ollama when a
     # small student needs high-throughput continuous batching on a big GPU: one server per
-    # GPU serves many concurrent episodes. Address models as ``vllm/<served-model-name>``
-    # (serve_vllm.sh serves the student under the name "student" -> ``vllm/student``).
+    # GPU serves many concurrent episodes. Address models as ``vllm/<served-model-name>``;
+    # serve the model under its real HF id (``vllm/ibm-granite/granite-4.1-3b``) rather
+    # than a placeholder, so traces record which student actually ran.
     # The endpoint has no /v1 suffix (the client appends /v1/chat/completions); each worker
     # process points at its own GPU's server via the VLLM_ENDPOINT env var, exactly as the
     # Ollama path uses OLLAMA_ENDPOINT.
