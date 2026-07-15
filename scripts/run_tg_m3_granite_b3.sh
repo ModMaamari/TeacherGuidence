@@ -1,46 +1,47 @@
 #!/usr/bin/env bash
 # Teacher-Guidance run: MiniMax-M3 teacher + Granite-4.1-3B student (vLLM-served).
 #
-#   teacher : fau/MiniMaxAI/MiniMax-M3-MXFP8 -> edenai lilac/minimaxai/minimax-m3
-#             -> openrouter minimax/minimax-m3   (router falls through on failure)
-#   student : ibm-granite/granite-4.1-3b served by vLLM (one server per GPU)
+#   teacher : edenai/lilac/minimaxai/minimax-m3  (primary, EdenAI Responses API, billed)
+#             -> fau/MiniMaxAI/MiniMax-M3-MXFP8  (fallback, free NHR@FAU gateway)
+#             OpenRouter is deliberately NOT in the chain: its key limit is exhausted.
+#   student : ibm-granite/granite-4.1-3b served by vLLM (one server per GPU, served under
+#             its real HF id so every trace records the actual student model)
 #   budgets : 3 planning rounds + 3 running steps, budget HIDDEN from the student
 #   scope   : 3000 questions (hotpot_teacher_guidance_train3000)
+#
+# The teacher is prompted to treat the budget as a ceiling, not a quota: a sound plan that
+# solves the question in fewer steps is accepted rather than padded out.
 #
 # RESUMABLE: re-running this exact script continues from wherever it stopped -- the
 # episodes on disk decide what is still unanswered, so nothing is redone. Monitor anytime:
 #
 #   .venv/bin/python scripts/tg_run_status.py \
-#     --out-root data/simulation_output/tg_m3_granite_b3 \
+#     --out-root data/simulation_output/tg_m3_granite_b3_eden \
 #     --questions data/datasets/hotpot_teacher_guidance_train3000/hotpot_distractor_train_questions.jsonl \
 #     --num-samples 3000
 #
 # The GPUs are not the bottleneck (a 3B student on an 80GB A100 leaves nearly all memory
 # to the KV cache); the remote reasoning teacher is. --workers-per-gpu therefore sets the
 # teacher concurrency that actually drives wall time.
-#
-# Concurrency is deliberately 8/GPU (24 episodes), not higher: the FAU gateway is shared
-# and queues under load. At 36 it stalled past the hard timeout constantly, and every
-# stalled call falls to the paid OpenRouter fallback. 24 keeps the FREE primary serving.
 set -uo pipefail
 cd /root/DeKIS/teacher-guidence
 
-echo "=== TG MiniMax-M3 / Granite b3 | $(date -u +%FT%TZ) ==="
+echo "=== TG MiniMax-M3 (EdenAI->FAU) / Granite b3 | $(date -u +%FT%TZ) ==="
 
 .venv/bin/python scripts/run_tg_vllm.py \
   --num-samples 3000 \
-  --num-gpus 3 \
-  --workers-per-gpu 8 \
+  --num-gpus 4 \
+  --workers-per-gpu 6 \
   --student-model ibm-granite/granite-4.1-3b \
   --budget 3 \
   --planning-steps 3 \
   --hidden-budget \
   --mem-util 0.90 \
   --max-num-seqs 256 \
-  --teacher-model "fau/MiniMaxAI/MiniMax-M3-MXFP8" \
-  --teacher-router "fau/MiniMaxAI/MiniMax-M3-MXFP8,edenai/lilac/minimaxai/minimax-m3,custom/minimax/minimax-m3" \
-  --out-root data/simulation_output/tg_m3_granite_b3 \
+  --teacher-model "edenai/lilac/minimaxai/minimax-m3" \
+  --teacher-router "edenai/lilac/minimaxai/minimax-m3,fau/MiniMaxAI/MiniMax-M3-MXFP8" \
+  --out-root data/simulation_output/tg_m3_granite_b3_eden \
   --run-name run \
-  --tag tgm3b3
+  --tag tgm3eden
 
-echo "TG_M3_GRANITE_B3_DONE_RC=$?"
+echo "TG_M3_GRANITE_B3_EDEN_DONE_RC=$?"

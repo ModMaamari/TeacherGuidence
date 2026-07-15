@@ -7,7 +7,8 @@ is served by vLLM instead of Ollama, and the run is RESUMABLE:
   * vLLM per GPU: one OpenAI-compatible server per GPU, continuously batching every
     episode assigned to that GPU. A 3B student on an 80GB A100 leaves almost all memory to
     the KV cache, so --max-num-seqs can be large and student latency barely grows with
-    concurrency. Workers address it as `vllm/student` via a per-worker VLLM_ENDPOINT.
+    concurrency. The model is served under its real HF id, so workers address it as
+    `vllm/<hf-id>` via a per-worker VLLM_ENDPOINT and traces record the real student.
   * Resume: the episodes already on disk are the source of truth (see tg_run_status). Each
     launch re-derives the UNANSWERED qids and shards only those, so re-running the same
     command after any interruption continues where it stopped and never redoes work.
@@ -71,7 +72,10 @@ def _start_vllm(gpu_id: str, port: int, model: str, mem_util: float, max_num_seq
     env["PATH"] = f"{REPO_ROOT}/.venv_vllm/bin:{env.get('PATH','')}"
     cmd = [
         str(REPO_ROOT / ".venv_vllm/bin/vllm"), "serve", model,
-        "--served-model-name", "student",
+        # Serve under the REAL model id, not a placeholder like "student": the served name
+        # is what episodes record as student_model (as `vllm/<served-name>`), and a trace
+        # that says "vllm/student" has lost the one fact that matters -- which model it was.
+        "--served-model-name", model,
         "--host", "127.0.0.1", "--port", str(port),
         "--dtype", "bfloat16",
         "--max-model-len", str(max_model_len),
@@ -122,17 +126,17 @@ def main() -> None:
     ap.add_argument("--gpu-ids", default=None, help="comma-separated GPU ids (overrides --num-gpus)")
     ap.add_argument("--workers-per-gpu", type=int, default=12)
     ap.add_argument("--student-model", default="ibm-granite/granite-4.1-3b",
-                    help="HF id served by vLLM (workers address it as vllm/student)")
+                    help="HF id served by vLLM; also the served model name, so workers "
+                         "address it as vllm/<hf-id> and traces record the real model")
     ap.add_argument("--budget", type=int, default=3, help="running-step budget")
     ap.add_argument("--planning-steps", type=int, default=3, help="plan-review rounds")
     ap.add_argument("--max-plan-steps", type=int, default=6)
     ap.add_argument("--hidden-budget", action="store_true",
                     help="do NOT disclose the remaining budget to the student")
-    ap.add_argument("--teacher-model", default="fau/MiniMaxAI/MiniMax-M3-MXFP8")
+    ap.add_argument("--teacher-model", default="edenai/lilac/minimaxai/minimax-m3")
     ap.add_argument("--teacher-router",
-                    default="fau/MiniMaxAI/MiniMax-M3-MXFP8,"
-                            "edenai/lilac/minimaxai/minimax-m3,"
-                            "custom/minimax/minimax-m3")
+                    default="edenai/lilac/minimaxai/minimax-m3,"
+                            "fau/MiniMaxAI/MiniMax-M3-MXFP8")
     ap.add_argument("--base-port", type=int, default=8400)
     ap.add_argument("--mem-util", type=float, default=0.90)
     ap.add_argument("--max-num-seqs", type=int, default=256)
@@ -203,7 +207,7 @@ def main() -> None:
             template_id = f"{args.tag}_w{w}"
             template = build_fau_smoke_template(
                 template_id=template_id,
-                student_model="vllm/student",
+                student_model=f"vllm/{args.student_model}",
                 teacher_model=args.teacher_model,
                 teacher_router=teacher_router,
                 num_samples=len(shard),
