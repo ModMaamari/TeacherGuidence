@@ -328,6 +328,17 @@ def build_teacher_prompt(
     parts.append("Gold metadata (PRIVATE — never reveal hidden gold values to the student):")
     parts.append(_json(gold))
     parts.append(f"Current step {state.get('step')} of budget {state.get('budget')}.")
+    # Remaining steps are a ceiling, not a quota: we want the shortest trajectory that
+    # actually solves the question. Crucially this is NOT licence to accept a confident
+    # guess -- an answer is only 'done' when the retrieved evidence supports it.
+    parts.append(
+        "The budget is a CEILING, not a quota — the goal is to solve the question in the "
+        "minimum number of steps. If the student can already answer correctly from the "
+        "evidence retrieved so far, prefer 'accept_finish' over pushing it to spend the "
+        "remaining steps; do not penalize a step merely for finishing early. This is NOT a "
+        "reason to accept an unsupported answer: if the answer is not backed by the "
+        "retrieved evidence, still reject it and say what evidence is missing."
+    )
     if student_action_valid or not student_raw:
         parts.append("Student action: " + _json(student_action))
     else:
@@ -498,10 +509,26 @@ def build_plan_review_prompt(
     parts.append(_json(initial_plan))
     budget = int(state.get("budget") or 0)
     if budget > 0:
+        # The budget is a CEILING, never a quota. Without this the teacher reads the budget
+        # as a target and sends back sound-but-short plans "to use the remaining steps",
+        # which pads trajectories with useless tool calls. We want the shortest plan that
+        # actually works, so brevity must never by itself be a reason to revise.
         parts.append(
-            f"The student has a budget of {budget} tool-use steps. A plan that needs more "
-            f"than {budget} steps cannot be fully executed — if so, ask the student to "
-            "tighten it to fit the budget."
+            f"The student has a budget of {budget} tool-use steps. This budget is a CEILING, "
+            "not a quota or a target: a plan that reaches a correct, evidence-backed answer "
+            f"in FEWER than {budget} steps is BETTER, not worse. The goal is to solve the "
+            "question in the minimum number of steps.\n"
+            "- Do NOT ask the student to add, split, or pad steps merely to use more of the "
+            f"budget. If a 1-step plan would genuinely work under a {budget}-step budget, "
+            "accept it.\n"
+            "- Never treat 'uses fewer steps than the budget' or 'does not cover every "
+            "capability' as a flaw on its own. Judge only whether the plan would actually "
+            "produce a correct, evidence-backed answer.\n"
+            f"- Only ask the student to tighten a plan if it needs MORE than {budget} steps, "
+            "since it could not then be fully executed.\n"
+            "- Do still ask for changes when the plan genuinely would NOT work — e.g. it "
+            "answers from memory without retrieving evidence, or it omits evidence the "
+            "question actually requires."
         )
     allowed = []
     if plan_review_config.allow_teacher_to_suggest_tools:
