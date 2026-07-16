@@ -115,7 +115,9 @@ def load_judge(evals_dir: Path) -> dict:
         r = json.loads(l)
         v = r.get("verdict") or {}
         if v.get("correct") is not None:
-            verdicts[(str(r.get("qid")), str(r.get("source", "")))] = int(v["correct"])
+            # normalize: the judge stores whatever path form it was invoked with
+            src = str(Path(r.get("source", "")).resolve())
+            verdicts[(str(r.get("qid")), src)] = int(v["correct"])
     return verdicts
 
 
