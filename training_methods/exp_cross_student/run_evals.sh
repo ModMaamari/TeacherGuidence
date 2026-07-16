@@ -110,8 +110,12 @@ run_model_jobs () {  # model
 }
 
 T0=$(date +%s)
-for m in "${MODELS[@]}"; do run_model_jobs "$m" & done
-wait
+# Wait ONLY for the per-model job runners: a bare `wait` would also wait on the GPU
+# sampler (infinite loop) and the vLLM servers, hanging the script forever after the
+# real jobs finish.
+RUNNER_PIDS=()
+for m in "${MODELS[@]}"; do run_model_jobs "$m" & RUNNER_PIDS+=($!); done
+for p in "${RUNNER_PIDS[@]}"; do wait "$p" || true; done
 echo "=== all eval jobs done in $(( ($(date +%s) - T0) / 60 )) min ==="
 
 # ---- post-hoc judge over every run (free FAU gpt-oss router) --------------------
