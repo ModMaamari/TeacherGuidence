@@ -90,16 +90,33 @@ a deterministic lexical fallback). **Any distractor-style multi-hop dataset fits
 
 ### 2.3 Gaps that must be closed *before* mass generation
 
-| # | Gap | Severity | Fix |
+| # | Gap | Severity | Status |
 |---|---|---|---|
-| G1 | `dataset` is **hardcoded** to `"hotpotqa"` in 3 places (`schemas.py:265`, `hotpot_converter.py:108`, `episode_exporter.py:164`) | **Blocking** — every trace would be mislabeled | Thread a `dataset` field through `mode_config` → metadata → exporter |
-| G2 | No `schema_version` on episodes | **Blocking** — cannot version a public release | Add `schema_version: "1.0"` + `framework_commit` to every episode |
-| G3 | No dataset-level validation CLI | High | `validate_release.py`: schema conformance, leakage audit, dedup, contamination, split disjointness |
-| G4 | Retriever untested on non-Hotpot context shapes (MuSiQue paragraph lists, 2Wiki evidence triples, StrategyQA) | High | Converter + retrieval parity tests per dataset |
-| G5 | No canonical config registry — configs live in ad-hoc YAML/shell | Medium | `resource_paper/configs/*.yaml`, one per matrix cell, hashed into the episode record |
-| G6 | Teacher license/redistribution not verified (MiniMax-M3) | Medium | License audit before including any teacher's outputs |
-| G7 | FAU gateway throttles above ~24-way concurrency (caused the circuit-breaker incident) | Medium | Global rate limiter + already-fixed recoverable breaker; stagger run-groups |
-| G8 | Pilot traces (31.6K) predate several fixes (student-name bug, budget-as-ceiling prompt) | Medium | Treat as **v0 pilot**, regenerate or exclude from v1 release |
+| G1 | `dataset` was **hardcoded** to `"hotpotqa"` in 3 places | **Blocking** | ✅ **Done** — threaded `dataset`/`split`/`gold_granularity`/`answer_type`/`num_hops`/`question_type` from the question row through `mode_config` → metadata → exporter |
+| G2 | No `schema_version` on episodes | **Blocking** | ✅ **Done** — `schema_version`, `framework_commit`, `config_hash`, `generated_at` on every episode (`teacher_guidance/provenance.py`) |
+| G3 | No dataset-level validation | High | ✅ **Done** — `converters/base.validate_example` runs on every converted example; `scripts/smoke_datasets.py` preflights a prepared dataset; `scripts/build_release.py` audits + credential-scans the release |
+| G4 | Retriever untested on non-Hotpot context shapes | High | ✅ **Done** — retrieval-parity test per dataset runs the real `HotpotLocalRetriever`; verified on 50 real questions each from HotpotQA / 2Wiki / MuSiQue |
+| G5 | No canonical config registry | Medium | ⏳ **Partial** — `config_hash` now stamps each episode with its generation config; the `resource_paper/configs/*.yaml` registry is still to write |
+| G6 | Teacher license/redistribution not verified (MiniMax-M3) | Medium | ⏳ **Open** — license audit before including any teacher's outputs |
+| G7 | FAU gateway throttles above ~24-way concurrency | Medium | ⏳ **Partial** — recoverable circuit breaker shipped; a global rate limiter is still to add |
+| G8 | Pilot traces (31.6K) predate several fixes | Medium | ⏳ **Open** — they also predate provenance stamping (`build_release.py` flags them as `unversioned`). Regenerate or ship separately as v0 |
+
+**Also delivered beyond the original gap list**
+
+* **Canonical multi-dataset converter package** (`agentsim/teacher_guidance/converters/`) —
+  HotpotQA, 2WikiMultihopQA, MuSiQue, StrategyQA all emit one row schema; `hotpot_converter`
+  now delegates so HotpotQA can never drift from the others.
+* **Gold granularity is represented, not faked.** Sentence-level sources keep
+  `supporting_facts`; paragraph-level sources (MuSiQue, StrategyQA) emit none and report
+  `supporting_fact_recall: null` instead of `0.0`, which would have read as "recalled
+  nothing" and silently depressed every cross-dataset average.
+* **StrategyQA candidate construction is disclosed** per question via
+  `constructed_candidates` (the source ships no distractors, so we build the candidate set).
+* **Release/raw boundary** (`scripts/build_release.py`) — raw traces keep full telemetry;
+  published records drop per-call USD cost, provider response bodies and the router chain,
+  and ship as `full` / `train_safe` views.
+* **`scripts/prepare_dataset.py`** — one CLI for every source, writing a manifest with
+  conversion stats, licence, content hashes and framework commit.
 
 ---
 
@@ -323,18 +340,21 @@ E1, E3, E5, E6 are the new ones and are the strongest reviewer-facing results.
 
 ## 10. Engineering work plan
 
-### Phase 0 — Hardening (blocking; ~3–4 days)
-- [ ] **G1**: parameterize `dataset` end-to-end (mode_config → metadata → exporter)
-- [ ] **G2**: add `schema_version`, `framework_commit`, `config_hash` to every episode
+### Phase 0 — Hardening (blocking; ~3–4 days) — **essentially done**
+- [x] **G1**: parameterize `dataset` end-to-end (mode_config → metadata → exporter)
+- [x] **G2**: add `schema_version`, `framework_commit`, `config_hash`, `generated_at`
 - [ ] **G5**: config registry `resource_paper/configs/`, one YAML per matrix cell
 - [ ] **G7**: global teacher rate limiter; verify the recoverable circuit breaker under load
-- [ ] Publish the JSON Schema; add a schema-conformance test to CI
+- [x] Schema conformance enforced in code + CI (`validate_example`, 465 tests)
 
-### Phase 1 — Dataset converters (~1.5 weeks)
-- [ ] `converters/twowiki.py`, `converters/musique.py`, `converters/strategyqa.py`
-- [ ] Per-dataset retrieval parity tests (gold docs must be reachable; BM25 sane)
-- [ ] Golden-file unit tests per converter (dependency-free, like `hotpot_converter`)
-- [ ] Per-dataset difficulty/hop-count profiling report
+### Phase 1 — Dataset converters (~1.5 weeks) — **done for 4 sources**
+- [x] `converters/twowiki.py`, `converters/musique.py`, `converters/strategyqa.py`
+- [x] Per-dataset retrieval parity tests (gold docs reachable via the real retriever)
+- [x] Golden-file unit tests per converter (dependency-free)
+- [x] `scripts/prepare_dataset.py` (one CLI, manifest per dataset)
+- [x] `scripts/smoke_datasets.py` (offline preflight + online episode audit)
+- [ ] StrategyQA end-to-end run (needs the paragraph corpus downloaded)
+- [ ] Per-dataset difficulty/hop-count profiling report at full scale
 
 ### Phase 2 — Model onboarding (~4 days)
 - [ ] Teacher license audit; FAU catalogue check for the large peer
