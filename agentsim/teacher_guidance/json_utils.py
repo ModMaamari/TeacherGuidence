@@ -25,16 +25,56 @@ from agentsim.teacher_guidance.pydantic_schemas import (
 )
 
 
+# Chain-of-thought wrappers emitted inline in ``content`` by reasoning models. Several
+# providers do NOT split reasoning into a separate field: MiniMax-M3 on the FAU gateway
+# wraps it in ``<mm:think>``, others use ``<think>``/``<thinking>``/``<reasoning>``.
+_REASONING_TAGS = r"think|thinking|reasoning|mm:think"
+_PAIRED_REASONING = re.compile(
+    rf"<\s*({_REASONING_TAGS})\s*>.*?<\s*/\s*\1\s*>", re.IGNORECASE | re.DOTALL
+)
+# A closing tag with no opener: some gateways strip the opening tag but leave the close.
+_ORPHAN_CLOSE = re.compile(rf"<\s*/\s*({_REASONING_TAGS})\s*>", re.IGNORECASE)
+# An opener with no close: the model was truncated mid-thought, so everything after it is
+# unfinished reasoning, never an answer.
+_UNCLOSED_REASONING = re.compile(
+    rf"<\s*({_REASONING_TAGS})\s*>.*\Z", re.IGNORECASE | re.DOTALL
+)
+
+
+def strip_reasoning_blocks(text: str) -> str:
+    """Remove inline chain-of-thought so JSON is read from the ANSWER, not the draft.
+
+    This is a correctness fix, not cosmetic. A reasoning model routinely drafts candidate
+    JSON *inside* its thinking before committing to a different final answer, e.g.::
+
+        <mm:think>maybe {"score": 9}</mm:think>{"score": 0.2, "feedback": "weak"}
+
+    Extracting the *first* ``{...}`` from that yields the discarded draft and reports it as
+    valid -- silently recording a verdict the teacher never gave. Stripping the blocks
+    first makes the answer the only thing left to parse.
+    """
+    if not text or "<" not in text:
+        return text
+    out = _PAIRED_REASONING.sub(" ", text)
+    # Everything up to and including a stray closing tag is reasoning; keep what follows.
+    matches = list(_ORPHAN_CLOSE.finditer(out))
+    if matches:
+        out = out[matches[-1].end():]
+    out = _UNCLOSED_REASONING.sub(" ", out)
+    return out.strip()
+
+
 def extract_first_json_object(raw: str) -> Optional[str]:
     """Return the substring of the first top-level ``{...}`` JSON object, or None.
 
-    Tolerates code fences and surrounding prose. Respects strings/escapes so that
-    braces inside string literals do not break brace matching.
+    Tolerates code fences and surrounding prose, and ignores JSON drafted inside a
+    reasoning model's inline chain-of-thought. Respects strings/escapes so that braces
+    inside string literals do not break brace matching.
     """
     if not raw:
         return None
 
-    text = raw.strip()
+    text = strip_reasoning_blocks(raw).strip()
     # Strip a leading ```json / ``` fence if present.
     if text.startswith("```"):
         first_newline = text.find("\n")
@@ -110,10 +150,13 @@ def parse_json_object(raw: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         # reasoning model running out of tokens). extract_first_json_object requires a
         # closing brace, but json_repair can often complete an unbalanced structure
         # directly, so give it a shot before giving up entirely.
-        start = raw.find("{") if raw else -1
+        # Strip reasoning here too: this path feeds the raw text to json_repair, which
+        # would otherwise happily complete a half-written draft from inside a think block.
+        stripped = strip_reasoning_blocks(raw) if raw else ""
+        start = stripped.find("{") if stripped else -1
         if start != -1:
             try:
-                repaired_obj = json_repair.loads(raw[start:])
+                repaired_obj = json_repair.loads(stripped[start:])
             except Exception:
                 repaired_obj = None
             if isinstance(repaired_obj, dict) and repaired_obj:

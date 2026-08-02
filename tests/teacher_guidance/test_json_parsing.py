@@ -213,3 +213,48 @@ def test_plan_prompts_are_budget_aware():
     no_budget = build_initial_plan_prompt({"question": "q?", "budget": 0}, cfg)
     assert "at most 6 steps" in no_budget
     assert "budget of" not in no_budget
+
+
+# --- reasoning-model chain-of-thought stripping -------------------------------------
+# Regression guard for a silent data-corruption bug: reasoning models draft candidate
+# JSON inside their thinking before committing to a different final answer. Extracting
+# the FIRST {...} then records the discarded draft as the model's verdict, and marks it
+# valid. Several providers emit this inline in `content` rather than in a separate field
+# (MiniMax-M3 on the FAU gateway uses <mm:think>).
+
+import pytest
+
+from agentsim.teacher_guidance.json_utils import parse_json_object, strip_reasoning_blocks
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ('<think>maybe {"score": 9}</think>{"score": 0.2}', 0.2),
+    ('<mm:think>draft {"score": 9}</mm:think>{"score": 0.2}', 0.2),
+    ('<thinking>try {"score": 7}</thinking>\n{"score": 0.5}', 0.5),
+    ('<reasoning>{"score": 3}</reasoning> {"score": 0.1}', 0.1),
+    ('<think>\nmulti {"score": 5}\nline\n</think>\n\n{"score": 0.7}', 0.7),
+    # a gateway that strips the opening tag but leaves the close
+    ('thought {"score": 8} text</think>{"score": 0.3}', 0.3),
+])
+def test_answer_wins_over_json_drafted_inside_reasoning(raw, expected):
+    obj, info = parse_json_object(raw)
+    assert obj.get("score") == expected
+    assert info["json_valid"] is True
+
+
+def test_truncated_reasoning_yields_no_verdict():
+    """A model cut off mid-thought never committed to an answer -- recording its draft
+    would invent a teacher verdict that was never given."""
+    obj, info = parse_json_object('<think>I think {"score": 9} but wait')
+    assert obj == {}
+    assert info["json_valid"] is False
+
+
+def test_stripping_leaves_ordinary_text_untouched():
+    for text in ('{"score": 1.0}', 'prose then {"score": 1.0}', "", "no tags <at> all"):
+        assert strip_reasoning_blocks(text) == text.strip()
+
+
+def test_case_and_whitespace_insensitive_tags():
+    obj, _ = parse_json_object('<THINK >draft {"score": 9}< / think >{"score": 0.4}')
+    assert obj.get("score") == 0.4
