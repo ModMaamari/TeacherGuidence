@@ -8,6 +8,7 @@ from agentsim.workflow.executor import WorkflowExecutor
 from agentsim.config import config
 from agentsim.simulation.verifier import RealtimeVerifier
 from agentsim.simulation.schema import ModelConfig
+from agentsim.teacher_guidance.provenance import config_hash
 
 
 class StandardRunner:
@@ -77,6 +78,18 @@ class StandardRunner:
             initial_metadata.setdefault("sample_id", sample_id or dataset_sample.get("id"))
             initial_metadata.update({
                 "dataset_sample": dataset_sample,
+                # Dataset provenance: prefer the question row's own `source`/`split` (every
+                # converter stamps them) and let mode_config override. Without this the
+                # exporter cannot tell HotpotQA traces from MuSiQue ones.
+                "dataset": (mode_config.get("dataset")
+                            or dataset_sample.get("source")
+                            or "hotpotqa"),
+                "dataset_split": (mode_config.get("dataset_split")
+                                  or dataset_sample.get("split")
+                                  or ""),
+                # Sentence- vs paragraph-level gold differs by source and decides whether
+                # supporting_fact_recall is meaningful for this episode.
+                "gold_granularity": dataset_sample.get("gold_granularity", "sentence"),
                 "gold": dataset_sample.get("gold", {"answer": dataset_sample.get("answer")}),
                 "gold_answer": dataset_sample.get("answer"),
                 "retrieval_scope": dataset_sample.get("retrieval_scope", {}),
@@ -88,6 +101,8 @@ class StandardRunner:
                 "corpus_path": mode_config.get("corpus_path"),
                 "retrieval_backend": mode_config.get("retrieval_backend", "hotpot_local"),
                 "skip_teacher": mode_config.get("skip_teacher", False),
+                # Identifies the exact generation configuration this episode came from.
+                "config_hash": config_hash(mode_config),
             })
             # Optional per-call tuning (only injected when explicitly set, so existing
             # templates keep the component defaults). A reasoning-model teacher such as

@@ -143,3 +143,52 @@ def test_final_metrics_teacher_judgment_none_when_absent(tmp_path):
     fm = TeacherGuidanceEpisodeExporter().export_episode(_context(), str(tmp_path))["final_metrics"]
     assert fm["teacher_answer_correct"] is None
     assert fm["teacher_answer_score"] is None
+
+
+# --- provenance stamps (public-release requirements) -------------------------------
+def test_episode_carries_dataset_and_schema_provenance(tmp_path):
+    """Every episode must say which dataset/split it came from, and which schema and code
+    produced it -- otherwise traces collected weeks apart are silently incomparable."""
+    ctx = _context()
+    ctx.metadata.update({
+        "dataset": "musique",
+        "dataset_split": "train",
+        "gold_granularity": "paragraph",
+        "config_hash": "deadbeefdeadbeef",
+        "dataset_sample": {"answer_type": "span", "num_hops": 3, "type": "3hop1"},
+    })
+    episode = TeacherGuidanceEpisodeExporter().export_episode(ctx, str(tmp_path))
+
+    assert episode["dataset"] == "musique"
+    assert episode["split"] == "train"
+    assert episode["gold_granularity"] == "paragraph"
+    assert episode["answer_type"] == "span"
+    assert episode["num_hops"] == 3
+    assert episode["question_type"] == "3hop1"
+    assert episode["schema_version"]
+    assert episode["framework_commit"]
+    assert episode["config_hash"] == "deadbeefdeadbeef"
+    assert episode["generated_at"]
+
+
+def test_paragraph_level_dataset_reports_fact_recall_as_not_applicable(tmp_path):
+    """0.0 would read as 'recalled nothing' and would drag down cross-dataset averages;
+    paragraph-level sources have no sentence-level gold at all."""
+    ctx = _context()
+    ctx.metadata.update({"dataset": "musique", "gold_granularity": "paragraph"})
+    episode = TeacherGuidanceEpisodeExporter().export_episode(ctx, str(tmp_path))
+    assert episode["final_metrics"]["supporting_fact_recall"] is None
+
+
+def test_sentence_level_dataset_still_reports_fact_recall(tmp_path):
+    ctx = _context()
+    ctx.metadata.update({"dataset": "hotpotqa", "gold_granularity": "sentence"})
+    episode = TeacherGuidanceEpisodeExporter().export_episode(ctx, str(tmp_path))
+    assert isinstance(episode["final_metrics"]["supporting_fact_recall"], float)
+
+
+def test_dataset_defaults_are_backward_compatible(tmp_path):
+    """Older configs that set no dataset metadata must still export a valid episode."""
+    episode = TeacherGuidanceEpisodeExporter().export_episode(_context(), str(tmp_path))
+    assert episode["dataset"] == "hotpotqa"
+    assert episode["gold_granularity"] == "sentence"

@@ -18,11 +18,16 @@ private diagnosis.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
 from agentsim.teacher_guidance.metrics import compute_final_metrics
 from agentsim.teacher_guidance.optimality import compute_path_optimality
+from agentsim.teacher_guidance.provenance import (
+    EPISODE_SCHEMA_VERSION,
+    framework_commit,
+)
 
 
 def _append_jsonl(path: Path, row: Dict[str, Any]) -> None:
@@ -114,6 +119,14 @@ class TeacherGuidanceEpisodeExporter:
         final_metrics["teacher_answer_correct"] = judgment.get("correct")
         final_metrics["teacher_answer_score"] = judgment.get("score")
 
+        # Paragraph-level sources (MuSiQue, StrategyQA) annotate supporting *paragraphs*,
+        # never sentences, so there are no gold facts to recall. Report None rather than
+        # the 0.0 the metric returns for an empty fact list -- 0.0 would read as "the
+        # student recalled nothing" and would drag down any average taken over datasets.
+        gold_granularity = md.get("gold_granularity", "sentence")
+        if gold_granularity != "sentence":
+            final_metrics["supporting_fact_recall"] = None
+
         guidance = md.get("guidance", {}) or {}
         plan_review = md.get("plan_review", {"enabled": False})
 
@@ -156,13 +169,24 @@ class TeacherGuidanceEpisodeExporter:
             for s in steps
         ]
 
+        sample = md.get("dataset_sample") or {}
         return {
             "episode_id": f"{md.get('sample_id', context.task_id)}",
             "qid": gold.get("qid", md.get("retrieval_scope", {}).get("qid", context.task_id)),
             "query": context.query,
             "gold_answer": gold.get("answer", ""),
-            "dataset": "hotpotqa",
-            "split": md.get("split", "validation"),
+            # Provenance: which source dataset/split produced this question, which schema
+            # this record follows, which code produced it, and under which configuration.
+            "dataset": md.get("dataset", "hotpotqa"),
+            "split": md.get("dataset_split") or md.get("split", "validation"),
+            "gold_granularity": gold_granularity,
+            "answer_type": sample.get("answer_type", "span"),
+            "num_hops": sample.get("num_hops"),
+            "question_type": sample.get("type", ""),
+            "schema_version": EPISODE_SCHEMA_VERSION,
+            "framework_commit": framework_commit(),
+            "config_hash": md.get("config_hash", ""),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "budget": int(budget),
             "used_steps": len(steps),
             "guidance_level": int(guidance.get("level", 0)) if isinstance(guidance, dict) else 0,

@@ -262,8 +262,18 @@ class EpisodeRecord:
     qid: str = ""
     query: str = ""
     gold_answer: str = ""
+    # Source provenance -- set from the question row (every converter stamps them).
     dataset: str = "hotpotqa"
     split: str = "validation"
+    gold_granularity: str = "sentence"  # "sentence" | "paragraph"
+    answer_type: str = "span"           # "span" | "boolean"
+    num_hops: Optional[int] = None
+    question_type: str = ""
+    # Record provenance -- what schema, what code, what configuration produced this.
+    schema_version: str = ""
+    framework_commit: str = ""
+    config_hash: str = ""
+    generated_at: str = ""
     budget: int = 5
     guidance_level: int = 0
     student_model: str = ""

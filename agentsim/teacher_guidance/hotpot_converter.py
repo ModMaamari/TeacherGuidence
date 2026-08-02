@@ -1,134 +1,32 @@
-"""
-Convert HotpotQA examples into Teacher Guidance question + corpus rows.
+"""Backward-compatible shim for the HotpotQA converter.
 
-The core functions are dependency-free (no ``datasets`` import) so they can be unit
-tested offline. ``scripts/prepare_hotpot_teacher_guidance.py`` is responsible for
-loading examples (from the HF ``datasets`` library or a local raw JSON file) and
-streaming the results to JSONL.
+The implementation moved to :mod:`agentsim.teacher_guidance.converters.hotpot` when the
+converter package was generalized to several multi-hop QA datasets. This module stays so
+existing callers (``scripts/prepare_hotpot_teacher_guidance.py`` and its tests) keep
+working, and it *delegates* rather than duplicating -- one implementation, so HotpotQA rows
+can never drift from the rows every other dataset produces.
 
-Two HotpotQA shapes are supported:
+Rows now carry the canonical extra fields (``source``, ``split``, ``num_hops``,
+``answer_type``, ``gold_granularity``, ``gold.answer_aliases``); every previously emitted
+field is unchanged.
 
-* HF columnar (``hotpotqa/hotpot_qa``)::
-
-      context = {"title": [...], "sentences": [[...], ...]}
-      supporting_facts = {"title": [...], "sent_id": [...]}
-
-* Raw distractor JSON (official release)::
-
-      context = [[title, [sent, ...]], ...]
-      supporting_facts = [[title, sent_id], ...]
+New code should use :func:`agentsim.teacher_guidance.converters.convert_dataset`, which
+also validates every converted example against the canonical schema.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
+from agentsim.teacher_guidance.converters.hotpot import convert_example
+from agentsim.teacher_guidance.converters.hotpot import (  # noqa: F401 -- legacy re-export
+    normalize_context as _normalize_context,
+)
+from agentsim.teacher_guidance.converters.hotpot import (  # noqa: F401 -- legacy re-export
+    normalize_supporting_facts as _normalize_supporting_facts,
+)
 
-def _normalize_context(context: Any) -> List[Tuple[str, List[str]]]:
-    """Return ``[(title, [sentence, ...]), ...]`` for either HotpotQA shape."""
-    if isinstance(context, dict):
-        titles = context.get("title", [])
-        sentences = context.get("sentences", [])
-        return [
-            (str(titles[i]), [str(s) for s in (sentences[i] if i < len(sentences) else [])])
-            for i in range(len(titles))
-        ]
-    # Raw list shape: [[title, [sent, ...]], ...]
-    result: List[Tuple[str, List[str]]] = []
-    for entry in context or []:
-        if not entry:
-            continue
-        title = str(entry[0])
-        sents = [str(s) for s in (entry[1] if len(entry) > 1 and entry[1] else [])]
-        result.append((title, sents))
-    return result
-
-
-def _normalize_supporting_facts(supporting_facts: Any) -> List[Tuple[str, int]]:
-    """Return ``[(title, sent_id), ...]`` for either HotpotQA shape."""
-    if isinstance(supporting_facts, dict):
-        titles = supporting_facts.get("title", [])
-        sent_ids = supporting_facts.get("sent_id", [])
-        return [
-            (str(titles[i]), int(sent_ids[i]))
-            for i in range(min(len(titles), len(sent_ids)))
-        ]
-    result: List[Tuple[str, int]] = []
-    for entry in supporting_facts or []:
-        if not entry:
-            continue
-        title = str(entry[0])
-        sent_id = int(entry[1]) if len(entry) > 1 else 0
-        result.append((title, sent_id))
-    return result
-
-
-def convert_example(
-    example: Dict[str, Any], split: str = "validation"
-) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
-    """Convert one HotpotQA example into (question_row, corpus_rows)."""
-    qid = str(example.get("id") or example.get("_id") or "")
-    question = str(example.get("question", ""))
-    answer = str(example.get("answer", ""))
-    qtype = str(example.get("type", ""))
-    level = str(example.get("level", ""))
-
-    context = _normalize_context(example.get("context"))
-    facts = _normalize_supporting_facts(example.get("supporting_facts"))
-
-    # Map title -> set of supporting sentence ids.
-    gold_sent_by_title: Dict[str, List[int]] = {}
-    for title, sent_id in facts:
-        gold_sent_by_title.setdefault(title, [])
-        if sent_id not in gold_sent_by_title[title]:
-            gold_sent_by_title[title].append(sent_id)
-
-    supporting_titles = list(gold_sent_by_title.keys())
-
-    corpus_rows: List[Dict[str, Any]] = []
-    candidate_doc_ids: List[str] = []
-    gold_doc_ids: List[str] = []
-
-    for idx, (title, sentences) in enumerate(context):
-        doc_id = f"{qid}::doc{idx}"
-        candidate_doc_ids.append(doc_id)
-        is_gold = title in gold_sent_by_title
-        gold_sent_ids = sorted(gold_sent_by_title.get(title, []))
-        if is_gold:
-            gold_doc_ids.append(doc_id)
-        corpus_rows.append(
-            {
-                "doc_id": doc_id,
-                "qid": qid,
-                "title": title,
-                "text": " ".join(sentences),
-                "sentences": sentences,
-                "is_gold_doc": is_gold,
-                "gold_sent_ids": gold_sent_ids,
-                "source": "hotpotqa",
-                "split": split,
-            }
-        )
-
-    question_row = {
-        "id": qid,
-        "query": question,
-        "answer": answer,
-        "type": qtype,
-        "level": level,
-        "gold": {
-            "answer": answer,
-            "supporting_titles": supporting_titles,
-            "supporting_facts": [{"title": t, "sent_id": s} for t, s in facts],
-            "gold_doc_ids": gold_doc_ids,
-        },
-        "retrieval_scope": {
-            "backend": "hotpot_local",
-            "qid": qid,
-            "candidate_doc_ids": candidate_doc_ids,
-        },
-    }
-    return question_row, corpus_rows
+__all__ = ["convert_example", "convert_examples"]
 
 
 def convert_examples(

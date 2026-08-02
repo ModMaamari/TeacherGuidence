@@ -45,7 +45,13 @@ def main() -> None:
     ]
     f1 = [float(e["final_metrics"].get("f1", 0.0)) for e in episodes]
     doc_recall = [float(e["final_metrics"].get("supporting_doc_recall", 0.0)) for e in episodes]
-    fact_recall = [float(e["final_metrics"].get("supporting_fact_recall", 0.0)) for e in episodes]
+    # None on paragraph-level datasets (MuSiQue/StrategyQA annotate paragraphs, not
+    # sentences), where the metric is not applicable rather than zero -- skip those.
+    fact_recall = [
+        float(e["final_metrics"]["supporting_fact_recall"])
+        for e in episodes
+        if e["final_metrics"].get("supporting_fact_recall") is not None
+    ]
     steps = [len(e.get("steps", [])) for e in episodes]
 
     stop_reasons: Dict[str, int] = {}
