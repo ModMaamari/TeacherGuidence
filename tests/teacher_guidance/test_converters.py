@@ -143,7 +143,9 @@ def test_provenance_fields_are_stamped(name):
     assert q["source"] == spec.source
     assert q["split"]
     assert q["gold_granularity"] == spec.gold_granularity
-    assert q["answer_type"] == spec.answer_type
+    # Answer type is inferred per question (HotpotQA/2Wiki mix yes/no comparison answers
+    # with span bridge answers), so the spec records the set that can occur.
+    assert q["answer_type"] in spec.answer_types
     for doc in corpus:
         assert doc["source"] == spec.source
         assert doc["split"] == q["split"]
@@ -313,3 +315,13 @@ def test_registry_is_complete():
     for name in dataset_names():
         spec = get_spec(name)
         assert spec.license and spec.homepage and spec.notes
+        assert spec.answer_types and set(spec.answer_types) <= {"span", "boolean"}
+
+
+def test_boolean_comparison_answers_are_detected_per_question():
+    """Real HotpotQA/2Wiki comparison questions answer yes/no; the converter must label
+    those boolean even though the dataset also contains span answers."""
+    comparison = {**HOTPOT, "id": "hp2", "type": "comparison", "answer": "yes"}
+    questions, _, _ = convert_dataset("hotpotqa", [comparison], "validation", strict=True)
+    assert questions[0]["answer_type"] == "boolean"
+    assert questions[0]["answer"] == "yes"

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import collections
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 from agentsim.teacher_guidance.converters import hotpot, musique, strategyqa, twowiki
 from agentsim.teacher_guidance.converters.base import (
@@ -42,7 +42,10 @@ class DatasetSpec:
     source: str
     convert: Callable[..., Any]
     gold_granularity: str
-    answer_type: str
+    #: Answer types that occur in this source. Several datasets mix them: HotpotQA and
+    #: 2WikiMultihopQA comparison questions answer yes/no while bridge questions answer
+    #: with a span, so the type is inferred per question and this records the full set.
+    answer_types: Tuple[str, ...]
     license: str
     homepage: str
     #: Extra keyword arguments ``convert`` requires beyond ``(example, split)``.
@@ -56,7 +59,7 @@ CONVERTERS: Dict[str, DatasetSpec] = {
         source=hotpot.SOURCE,
         convert=hotpot.convert_example,
         gold_granularity="sentence",
-        answer_type="span",
+        answer_types=("span", "boolean"),
         license="CC BY-SA 4.0",
         homepage="https://hotpotqa.github.io/",
         notes="2-hop bridge/comparison; distractor setting ships 10 paragraphs per question.",
@@ -66,7 +69,7 @@ CONVERTERS: Dict[str, DatasetSpec] = {
         source=twowiki.SOURCE,
         convert=twowiki.convert_example,
         gold_granularity="sentence",
-        answer_type="span",
+        answer_types=("span", "boolean"),
         license="Apache-2.0",
         homepage="https://github.com/Alab-NII/2wikimultihop",
         notes="2-4 hop; adds symbolic evidence triples; bridge_comparison is 4-hop.",
@@ -76,7 +79,7 @@ CONVERTERS: Dict[str, DatasetSpec] = {
         source=musique.SOURCE,
         convert=musique.convert_example,
         gold_granularity="paragraph",
-        answer_type="span",
+        answer_types=("span",),
         license="CC BY 4.0",
         homepage="https://github.com/StonyBrookNLP/musique",
         notes="2-4 hop, shortcut-resistant; paragraph-level gold; ships answer aliases.",
@@ -86,7 +89,7 @@ CONVERTERS: Dict[str, DatasetSpec] = {
         source=strategyqa.SOURCE,
         convert=strategyqa.convert_example,
         gold_granularity="paragraph",
-        answer_type="boolean",
+        answer_types=("boolean",),
         license="MIT",
         homepage="https://allenai.org/data/strategyqa",
         requires=("paragraphs",),
