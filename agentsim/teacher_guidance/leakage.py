@@ -46,6 +46,21 @@ def _contains(haystack: str, needle: str) -> bool:
     return re.search(_boundary_pattern(needle), haystack, flags=re.IGNORECASE) is not None
 
 
+def asserts_gold_answer(text: str, gold_answer: str) -> bool:
+    """True when ``text`` states the gold answer, as opposed to merely naming its format.
+
+    For a boolean answer the value space is public -- the student can see it is a yes/no
+    question -- so the secret is *which* one, not the words themselves. A verdict saying
+    "you didn't answer the yes/no question" asserts nothing, and treating it as a leak
+    both inflates the reported leak rate and throws away sound training examples.
+    """
+    if not gold_answer or not gold_answer.strip():
+        return False
+    if gold_answer.strip().lower() in BOOLEAN_ANSWERS:
+        text = _YESNO_DISJUNCTION.sub(" ", text)
+    return _contains(text, gold_answer)
+
+
 def detect_leakage(
     text_or_obj: Any,
     gold_answer: str,
@@ -73,7 +88,7 @@ def detect_leakage(
     }
 
     answer_in_question = _contains(question, gold_answer)
-    if _contains(combined, gold_answer) and not answer_in_question:
+    if asserts_gold_answer(combined, gold_answer) and not answer_in_question:
         report["gold_answer_leaked"] = True
         matched.append(gold_answer)
     for doc_id in hidden_doc_ids or []:
@@ -92,15 +107,48 @@ def detect_leakage(
     return report
 
 
+#: Answers whose value space is public knowledge: the student can see the question is a
+#: yes/no one, so the word itself is not the secret -- only an assertion of which.
+BOOLEAN_ANSWERS = {"yes", "no", "true", "false"}
+
+#: "yes/no question", "yes or no" -- these name the answer FORMAT and say nothing about
+#: which one is correct. Redacting inside them is doubly wrong: it destroys legitimate
+#: feedback, and the surviving half ("[answer hidden]/no") gives the answer away by
+#: position. Observed live: a Kimi-K3 verdict "doesn't answer the yes/no comparison
+#: question" was rewritten to "the [answer hidden]/no comparison question".
+_YESNO_DISJUNCTION = re.compile(
+    r"(?<!\w)(?:yes|no|true|false)\s*(?:/|-|\s+or\s+|\s*/\s*)\s*(?:yes|no|true|false)(?!\w)",
+    flags=re.IGNORECASE,
+)
+_DISJUNCTION_GUARD = "\x00DISJ{}\x00"
+
+
 def _sanitize_string(
     text: str,
     replacements: List[Tuple[str, str]],
     applied: List[str],
 ) -> str:
     for needle, placeholder in replacements:
-        if needle and needle.strip() and _contains(text, needle):
-            text = re.sub(_boundary_pattern(needle), placeholder, text, flags=re.IGNORECASE)
-            applied.append(placeholder)
+        if not (needle and needle.strip() and _contains(text, needle)):
+            continue
+        # For a boolean answer, shield yes/no disjunctions from redaction first.
+        guarded: List[str] = []
+        if needle.strip().lower() in BOOLEAN_ANSWERS:
+            def _guard(match: "re.Match[str]") -> str:
+                guarded.append(match.group(0))
+                return _DISJUNCTION_GUARD.format(len(guarded) - 1)
+
+            text = _YESNO_DISJUNCTION.sub(_guard, text)
+            if not _contains(text, needle):
+                # Every mention was part of a disjunction -- nothing was ever asserted.
+                for i, original in enumerate(guarded):
+                    text = text.replace(_DISJUNCTION_GUARD.format(i), original)
+                continue
+
+        text = re.sub(_boundary_pattern(needle), placeholder, text, flags=re.IGNORECASE)
+        applied.append(placeholder)
+        for i, original in enumerate(guarded):
+            text = text.replace(_DISJUNCTION_GUARD.format(i), original)
     return text
 
 

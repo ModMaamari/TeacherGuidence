@@ -171,3 +171,77 @@ def test_permissive_policy_does_not_sanitize():
     )
     assert clean["feedback"] == "The answer is Delhi."
     assert report["gold_answer_leaked"] is True
+
+
+# --- boolean answers: format vs assertion -------------------------------------------
+# Regression guard found by the pre-collection matrix smoke: with gold answer "yes", a
+# Kimi-K3 verdict reading "doesn't answer the yes/no comparison question" was rewritten to
+# "the [answer hidden]/no comparison question". That corrupted legitimate feedback AND
+# gave the answer away by position -- the surviving "/no" reveals which half was redacted.
+# It matters at scale: boolean answers are ~20-45% of HotpotQA/2Wiki and 100% of StrategyQA.
+
+import pytest
+
+from agentsim.teacher_guidance.leakage import asserts_gold_answer, sanitize_rendered_guidance
+
+
+class _StrictCfg:
+    leak_policy = "strict"
+    expose_gold_answer_hint = False
+
+
+def _visibility(gold="yes", question="Were they the same nationality?"):
+    return {
+        "gold_answer": gold, "question": question,
+        "gold_titles": [], "gold_doc_ids": [],
+        "retrieved_titles": [], "retrieved_doc_ids": [], "hidden_spans": [],
+    }
+
+
+@pytest.mark.parametrize("text,gold", [
+    ("it doesn't answer the yes/no comparison question", "yes"),
+    ("this is a yes or no question", "yes"),
+    ("answer the no/yes question properly", "no"),
+    ("a true/false question", "true"),
+    ("a yes - no question", "no"),
+])
+def test_naming_the_answer_format_is_not_a_leak(text, gold):
+    assert asserts_gold_answer(text, gold) is False
+
+
+@pytest.mark.parametrize("text,gold", [
+    ("The correct answer is yes.", "yes"),
+    ("It's a yes/no question and the answer is yes.", "yes"),
+    ("No, the two were not contemporaries.", "no"),
+])
+def test_asserting_the_answer_is_still_a_leak(text, gold):
+    assert asserts_gold_answer(text, gold) is True
+
+
+@pytest.mark.parametrize("text,gold,expected", [
+    ("The answer is Delhi.", "Delhi", True),
+    ("Try searching for the headquarters.", "Delhi", False),
+])
+def test_span_answers_are_unaffected(text, gold, expected):
+    assert asserts_gold_answer(text, gold) is expected
+
+
+def test_disjunction_survives_sanitization_intact():
+    feedback = "You never addressed Ed Wood, so it doesn't answer the yes/no question."
+    clean, report = sanitize_rendered_guidance(
+        {"feedback": feedback}, _visibility(), _StrictCfg()
+    )
+    assert clean["feedback"] == feedback
+    assert report["gold_answer_leaked"] is False
+    assert report["sanitizations_applied"] == []
+
+
+def test_real_boolean_assertion_is_still_redacted():
+    clean, report = sanitize_rendered_guidance(
+        {"feedback": "It is a yes/no question and the answer is yes."},
+        _visibility(), _StrictCfg(),
+    )
+    assert "[answer hidden]" in clean["feedback"]
+    # the format phrase is preserved even while the assertion is removed
+    assert "yes/no question" in clean["feedback"]
+    assert report["gold_answer_leaked"] is True
