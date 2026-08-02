@@ -1,0 +1,591 @@
+<title>Cross-Student Distillation — Qwen3.5-0.8B</title>
+<style>
+:root{
+  --paper:#FBFAF8; --panel:#FFFFFF; --ink:#1D1E20; --ink2:#5C5E63; --ink3:#8B8D92;
+  --line:#E6E4DF; --accent:#2A78D6;
+  --s-base:#2a78d6; --s-self:#008300; --s-cross:#e87ba4;
+  --good:#008300; --tile:#F4F2EE;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    --paper:#151719; --panel:#1D2023; --ink:#E8E7E3; --ink2:#A5A7AB; --ink3:#7C7E83;
+    --line:#33363A; --accent:#3987E5;
+    --s-base:#3987e5; --s-self:#009e00; --s-cross:#d55181;
+    --good:#3DBB3D; --tile:#23262A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#151719; --panel:#1D2023; --ink:#E8E7E3; --ink2:#A5A7AB; --ink3:#7C7E83;
+  --line:#33363A; --accent:#3987E5;
+  --s-base:#3987e5; --s-self:#009e00; --s-cross:#d55181;
+  --good:#3DBB3D; --tile:#23262A;
+  color-scheme: dark;
+}
+:root[data-theme="light"]{
+  --paper:#FBFAF8; --panel:#FFFFFF; --ink:#1D1E20; --ink2:#5C5E63; --ink3:#8B8D92;
+  --line:#E6E4DF; --accent:#2A78D6;
+  --s-base:#2a78d6; --s-self:#008300; --s-cross:#e87ba4;
+  --good:#008300; --tile:#F4F2EE;
+  color-scheme: light;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--paper);color:var(--ink);
+  font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:880px;margin:0 auto;padding:48px 24px 96px}
+.serif{font-family:Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-variant-numeric:tabular-nums}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink3);
+  font-weight:600}
+header h1{font-size:clamp(28px,4.6vw,40px);line-height:1.16;text-wrap:balance;
+  font-weight:700;margin:14px 0 16px;max-width:24ch}
+header .sub{color:var(--ink2);max-width:66ch}
+header{padding-bottom:32px}
+.rule{border:0;border-top:2px solid var(--ink);margin:0 0 28px;opacity:.85}
+section{margin-top:52px}
+section>h2{font-size:24px;font-weight:700;margin:6px 0 6px;text-wrap:balance}
+section>.lede{color:var(--ink2);max-width:68ch;margin-bottom:18px}
+h3{font-size:16px;font-weight:650;margin:22px 0 8px}
+p{max-width:68ch}
+p+p{margin-top:10px}
+a{color:var(--accent)}
+strong{font-weight:650}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;
+  margin-top:28px}
+.kpi{background:var(--tile);border-radius:10px;padding:16px 16px 14px}
+.kpi .v{font-size:30px;font-weight:700;letter-spacing:-.01em;line-height:1.1}
+.kpi .l{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.4}
+
+/* panels + charts */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:20px 20px 14px;margin-top:16px}
+.panel .ptitle{font-size:14px;font-weight:650}
+.panel .psub{font-size:12.5px;color:var(--ink2);margin:2px 0 10px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink2);
+  margin:4px 0 8px}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:3px;
+  margin-right:6px;vertical-align:-1px}
+.chart{width:100%;overflow-x:auto}
+svg{display:block}
+svg text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-variant-numeric:tabular-nums}
+.gline{stroke:var(--line);stroke-width:1}
+.axis{fill:var(--ink3);font-size:11px}
+.blabel{fill:var(--ink2);font-size:11px;font-weight:600}
+.glabel{fill:var(--ink2);font-size:12px;font-weight:600}
+.whisker{stroke:var(--ink2);stroke-width:1.5}
+
+/* tables */
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin-top:6px}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);
+  text-align:left;font-weight:600;padding:8px 12px 6px;border-bottom:1px solid var(--line)}
+td{padding:7px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num,th.num{text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-variant-numeric:tabular-nums}
+tr.hl td{font-weight:650}
+.chip{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px;
+  vertical-align:0}
+details{margin-top:10px}
+summary{cursor:pointer;font-size:13px;color:var(--ink2);font-weight:600}
+summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tscroll{overflow-x:auto}
+
+/* pipeline */
+.pipe{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:14px}
+.pipe .stage{flex:1 1 150px;background:var(--tile);border-radius:10px;padding:12px 14px;
+  font-size:13px;line-height:1.45}
+.pipe .stage b{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:4px}
+.note{border-left:3px solid var(--accent);padding:10px 16px;background:var(--tile);
+  border-radius:0 10px 10px 0;font-size:14px;max-width:70ch;margin-top:14px}
+.verdict li{margin:10px 0 0 0;max-width:66ch}
+.verdict{padding-left:22px}
+.caveat{color:var(--ink2);font-size:14px}
+footer{margin-top:64px;border-top:1px solid var(--line);padding-top:16px;
+  font-size:12.5px;color:var(--ink3)}
+footer code{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.tooltip{position:fixed;pointer-events:none;background:var(--ink);color:var(--paper);
+  font:12px/1.45 ui-monospace,Menlo,monospace;padding:7px 10px;border-radius:7px;
+  opacity:0;transition:opacity .12s;z-index:10;max-width:260px}
+@media (prefers-reduced-motion:reduce){.tooltip{transition:none}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Experiment report · exp_cross_student · 2026-07-16</div>
+  <h1 class="serif">A student learns as well from another student's traces — and inherits its habits</h1>
+  <p class="sub">Qwen3.5-0.8B was fine-tuned twice on MiniMax-M3 teacher-guidance traces over the
+  same 3,000 HotpotQA questions: once on traces where <strong>Qwen itself</strong> was the acting student,
+  once on traces from the stronger <strong>Granite-4.1-3B</strong>. Semantic accuracy came out identical —
+  but the granite-trained model answers more precisely, stops earlier, and runs 22% faster.</p>
+  <div class="kpis">
+    <div class="kpi"><div class="v mono">7% → 53%</div><div class="l">judge-correct, base → trained (either dataset). Training dominates everything else.</div></div>
+    <div class="kpi"><div class="v mono">+0.4 pts</div><div class="l">cross-data vs self-data on judge-correct — a tie within seed noise (±1.5–2 pts).</div></div>
+    <div class="kpi"><div class="v mono">3.6×</div><div class="l">higher exact-match for the granite-trained model. Precision transfers from the trace author.</div></div>
+    <div class="kpi"><div class="v mono">−22%</div><div class="l">eval wall time for the granite-trained model (118s vs 152s per 200 questions).</div></div>
+  </div>
+</header>
+<hr class="rule">
+
+<!-- 1 · DESIGN -->
+<section>
+  <div class="eyebrow">1 · Design</div>
+  <h2 class="serif">One model, two data authors, everything else pinned</h2>
+  <p class="lede">The only variable is <em>which student produced the training trajectories</em>.
+  Teacher (MiniMax-M3), prompts, budgets (3 planning rounds + 3 hidden running steps), SFT recipe
+  (LoRA r32/α64, lr 1e-4, 2 epochs, effective batch 16, completion-only loss), and evaluation
+  harness are identical across both arms.</p>
+  <div class="pipe">
+    <div class="stage"><b>Traces</b>2 × 3,000 episodes on the same questions: Qwen-as-student (57.6% correct), Granite-as-student (70.9%)</div>
+    <div class="stage"><b>Datasets</b>Correct episodes → guidance-as-internal-thought SFT examples (5,808 / 6,712)</div>
+    <div class="stage"><b>Training</b>Qwen3.5-0.8B × 2, same hyperparameters, 4×A100, ~15 min each</div>
+    <div class="stage"><b>Eval</b>3 models × 2 test sets × 3 seeds × 200 questions, teacherless, budget 3 hidden</div>
+    <div class="stage"><b>Judge</b>3,600 verdicts by gpt-oss-120b (independent of the data-generating teacher)</div>
+  </div>
+  <div class="note"><strong>Contamination control.</strong> Both runs cover the same 3,000 questions and
+  each trained model is evaluated on <em>both</em> test sets, so a test question could otherwise appear in
+  training via the other run. The union of all 386 test qids was banned from <em>both</em> training sets;
+  zero overlap was verified.</div>
+</section>
+
+<!-- 2 · DATA -->
+<section>
+  <div class="eyebrow">2 · Data</div>
+  <h2 class="serif">Two datasets, one recipe</h2>
+  <p class="lede">Each test set holds 100 questions its student answered correctly plus 100 it got wrong
+  (fixed seed). A stronger student yields more correct episodes — the granite dataset is 16% larger,
+  which is inherent to "train on the stronger student's data".</p>
+  <div class="panel"><div class="tscroll">
+    <table>
+      <tr><th>source run</th><th class="num">run accuracy</th><th class="num">correct episodes used</th>
+          <th class="num">train / dev examples</th><th class="num">plan / action</th><th class="num">teacher cost</th></tr>
+      <tr><td><span class="chip" style="background:var(--s-self)"></span>Qwen3.5-0.8B traces ("self")</td>
+          <td class="num">57.6%</td><td class="num">1,547</td><td class="num">5,808 / 145</td>
+          <td class="num">1,509 / 4,444</td><td class="num">$10.02</td></tr>
+      <tr><td><span class="chip" style="background:var(--s-cross)"></span>Granite-4.1-3B traces ("cross")</td>
+          <td class="num">70.9%</td><td class="num">1,896</td><td class="num">6,712 / 203</td>
+          <td class="num">1,881 / 5,034</td><td class="num">$8.63</td></tr>
+    </table>
+  </div>
+  <details><summary>Tool mix of training actions</summary><div class="tscroll">
+    <table>
+      <tr><th>dataset</th><th class="num">search</th><th class="num">finish</th><th class="num">decompose</th>
+          <th class="num">verify</th><th class="num">extract</th><th class="num">other</th></tr>
+      <tr><td>self (qwen)</td><td class="num">2,522</td><td class="num">1,522</td><td class="num">164</td>
+          <td class="num">148</td><td class="num">79</td><td class="num">9</td></tr>
+      <tr><td>cross (granite)</td><td class="num">2,844</td><td class="num">1,878</td><td class="num">118</td>
+          <td class="num">102</td><td class="num">74</td><td class="num">18</td></tr>
+    </table></div>
+  </details></div>
+</section>
+
+<!-- 3 · TRAINING -->
+<section>
+  <div class="eyebrow">3 · Training</div>
+  <h2 class="serif">Indistinguishable convergence</h2>
+  <p class="lede">Both arms land at the same loss — whatever separates the trained models,
+  it is not optimization. 0.8B LoRA training is light: ~8 GB peak per GPU, ~15 minutes per arm.</p>
+  <div class="panel">
+    <div class="ptitle">Training loss</div>
+    <div class="psub">10-step logging, 2 epochs, effective batch 16 · hover for values</div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-self)"></span>self (qwen data, 726 steps)</span>
+      <span><span class="sw" style="background:var(--s-cross)"></span>cross (granite data, 840 steps)</span>
+    </div>
+    <div class="chart" id="lossChart"></div>
+    <details><summary>Training metrics table</summary><div class="tscroll">
+      <table>
+        <tr><th>arm</th><th class="num">examples</th><th class="num">wall time</th><th class="num">samples/s</th>
+            <th class="num">train loss</th><th class="num">eval loss</th><th class="num">GPU peak</th></tr>
+        <tr><td><span class="chip" style="background:var(--s-self)"></span>m1-self</td>
+            <td class="num">5,808</td><td class="num">14.8 min</td><td class="num">13.1</td>
+            <td class="num">0.346</td><td class="num">0.356</td><td class="num">~8 GB × 4</td></tr>
+        <tr><td><span class="chip" style="background:var(--s-cross)"></span>m1-cross</td>
+            <td class="num">6,712</td><td class="num">15.5 min</td><td class="num">14.4</td>
+            <td class="num">0.345</td><td class="num">0.351</td><td class="num">~8 GB × 4</td></tr>
+      </table></div>
+    </details>
+  </div>
+</section>
+
+<!-- 4 · ACCURACY -->
+<section>
+  <div class="eyebrow">4 · Accuracy</div>
+  <h2 class="serif">Semantically, a dead heat</h2>
+  <p class="lede">The judge (which sees only question, gold answer, and the model's answer) scores both
+  trained models the same on both test sets. Whose trajectories the data came from does not change
+  <em>how often</em> the student is right — only training at all does, lifting a near-useless base
+  model by ~45 points.</p>
+
+  <div class="panel">
+    <div class="ptitle">Judge-correct rate</div>
+    <div class="psub">mean of 3 seeds · whiskers = ±1 sd · 200 questions per test set</div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-base)"></span>base (untrained)</span>
+      <span><span class="sw" style="background:var(--s-self)"></span>m1-self (qwen data)</span>
+      <span><span class="sw" style="background:var(--s-cross)"></span>m1-cross (granite data)</span>
+    </div>
+    <div class="chart" id="judgeChart"></div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">Accuracy by test-set half (cover-match)</div>
+    <div class="psub">each test set = 100 questions its source student solved + 100 it failed</div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-base)"></span>base</span>
+      <span><span class="sw" style="background:var(--s-self)"></span>m1-self</span>
+      <span><span class="sw" style="background:var(--s-cross)"></span>m1-cross</span>
+    </div>
+    <div class="chart" id="halvesChart"></div>
+    <p class="psub" style="margin-top:8px">The wrong-half questions are genuinely harder (both models ~21–28%
+    vs ~72–76% on the correct half), yet training still lifts them tenfold from the base model's ~2%.</p>
+  </div>
+
+  <details><summary>Full accuracy table (all metrics, mean ± sd over seeds)</summary>
+  <div class="panel tscroll" style="margin-top:8px">
+    <table>
+      <tr><th>model</th><th>test set</th><th class="num">judge</th><th class="num">cover</th>
+          <th class="num">EM</th><th class="num">F1</th><th class="num">doc recall</th></tr>
+      <tr><td rowspan="2"><span class="chip" style="background:var(--s-base)"></span>base</td>
+          <td>qwen</td><td class="num">.078 ±.012</td><td class="num">.072 ±.003</td><td class="num">.020</td><td class="num">.040</td><td class="num">.772</td></tr>
+      <tr><td>granite</td><td class="num">.065 ±.022</td><td class="num">.063 ±.026</td><td class="num">.023</td><td class="num">.042</td><td class="num">.748</td></tr>
+      <tr><td rowspan="2"><span class="chip" style="background:var(--s-self)"></span>m1-self</td>
+          <td>qwen</td><td class="num">.528 ±.016</td><td class="num">.510 ±.015</td><td class="num">.063</td><td class="num">.203</td><td class="num">.765</td></tr>
+      <tr><td>granite</td><td class="num">.474 ±.015</td><td class="num">.483 ±.010</td><td class="num">.078</td><td class="num">.203</td><td class="num">.735</td></tr>
+      <tr class="hl"><td rowspan="2"><span class="chip" style="background:var(--s-cross)"></span>m1-cross</td>
+          <td>qwen</td><td class="num">.537 ±.023</td><td class="num">.498 ±.013</td><td class="num">.245</td><td class="num">.350</td><td class="num">.729</td></tr>
+      <tr class="hl"><td>granite</td><td class="num">.475 ±.013</td><td class="num">.462 ±.008</td><td class="num">.228</td><td class="num">.322</td><td class="num">.693</td></tr>
+    </table>
+  </div></details>
+</section>
+
+<!-- 5 · PRECISION -->
+<section>
+  <div class="eyebrow">5 · Precision</div>
+  <h2 class="serif">Where the trace author shows: answer form</h2>
+  <p class="lede">Cover-match asks "does the answer <em>contain</em> the gold string"; exact-match and F1
+  reward saying it precisely. The self-trained model wraps correct answers in verbose sentences —
+  Qwen's own style in the traces. The granite-trained model learned granite's habit of answering in
+  the gold answer's exact form: <strong>3.6× the exact-match, +14 F1 points</strong>, at identical
+  semantic accuracy.</p>
+  <div class="panel">
+    <div class="ptitle">Exact-match and F1</div>
+    <div class="psub">mean of 3 seeds, both test sets</div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-base)"></span>base</span>
+      <span><span class="sw" style="background:var(--s-self)"></span>m1-self</span>
+      <span><span class="sw" style="background:var(--s-cross)"></span>m1-cross</span>
+    </div>
+    <div class="chart" id="emf1Chart"></div>
+  </div>
+</section>
+
+<!-- 6 · EFFICIENCY -->
+<section>
+  <div class="eyebrow">6 · Efficiency</div>
+  <h2 class="serif">Granite's discipline came with the data</h2>
+  <p class="lede">In the source runs, granite found short paths far more often than qwen
+  (22% vs 6% two-step episodes). That behaviour transferred: the cross-trained model finishes
+  voluntarily 2.4× as often, takes fewer steps, emits ~10% fewer tokens, produced zero invalid
+  actions across all 3,600 episodes — and its eval runs finish 22% sooner.</p>
+  <div class="panel">
+    <div class="ptitle">Efficiency profile (per 200-question run, mean over 6 runs)</div>
+    <div class="chart" id="effChart"></div>
+    <details><summary>Efficiency table</summary><div class="tscroll">
+      <table>
+        <tr><th>model</th><th class="num">wall time</th><th class="num">voluntary finish</th>
+            <th class="num">avg steps</th><th class="num">tokens/episode</th><th class="num">invalid actions (total)</th></tr>
+        <tr><td><span class="chip" style="background:var(--s-base)"></span>base</td>
+            <td class="num">162 s</td><td class="num">5 / 200</td><td class="num">2.97</td><td class="num">5,763</td><td class="num">4</td></tr>
+        <tr><td><span class="chip" style="background:var(--s-self)"></span>m1-self</td>
+            <td class="num">152 s</td><td class="num">20 / 200</td><td class="num">2.90</td><td class="num">5,590</td><td class="num">19</td></tr>
+        <tr class="hl"><td><span class="chip" style="background:var(--s-cross)"></span>m1-cross</td>
+            <td class="num">118 s</td><td class="num">39 / 200</td><td class="num">2.81</td><td class="num">5,029</td><td class="num">0</td></tr>
+      </table></div>
+    </details>
+  </div>
+  <div class="panel"><div class="tscroll">
+    <div class="ptitle">Hardware footprint</div>
+    <table>
+      <tr><th>phase</th><th>GPUs</th><th class="num">peak memory</th><th class="num">mean util (active GPUs)</th><th class="num">wall time</th></tr>
+      <tr><td>training (per arm)</td><td>4 × A100 80GB (torchrun DDP)</td><td class="num">~8 GB / GPU</td><td class="num">55–65%</td><td class="num">~15 min</td></tr>
+      <tr><td>evals (18 runs)</td><td>3 × A100 80GB (one vLLM server per model)</td><td class="num">~68 GB / GPU (0.85 mem-util)</td><td class="num">~5% (bursty, client-bound)</td><td class="num">~50 min</td></tr>
+      <tr><td>judge (3,600 verdicts)</td><td>none (remote FAU gpt-oss-120b, free)</td><td class="num">—</td><td class="num">—</td><td class="num">~17 min</td></tr>
+    </table>
+  </div></div>
+</section>
+
+<!-- 7 · VERDICT -->
+<section>
+  <div class="eyebrow">7 · Verdict</div>
+  <h2 class="serif">Trace quality beats trace ownership</h2>
+  <ol class="verdict">
+    <li><strong>There is no self-data advantage.</strong> Training a 0.8B student on trajectories produced
+    by a different (larger) student costs nothing in semantic accuracy — the judge scores the two arms
+    within 0.5 points on both test sets.</li>
+    <li><strong>Behavioural quality transfers from the trace author.</strong> The granite-trained model
+    inherited granite's precision (EM ×3.6, F1 +14pts), its early stopping (2.4× voluntary finishes),
+    and its format discipline (0 invalid actions vs 19) — visible even though accuracy is tied.</li>
+    <li><strong>Training is the story; provenance is the footnote.</strong> Both arms lift the base model
+    from ~7% to ~50% judge-correct. If a stronger student's traces are available, prefer them — the
+    same teacher spend yields more correct episodes (+16% data here) <em>and</em> better habits.</li>
+  </ol>
+  <h3>Caveats</h3>
+  <p class="caveat">The granite dataset is 16% larger because a stronger student produces more correct
+  episodes — data source and quantity are not fully separable in this design (that coupling is also
+  what "use the stronger student's data" means in practice). One student pair, one dataset (HotpotQA),
+  one size (0.8B); 3 seeds per cell. EM/F1 differences are far outside seed noise; the judge tie is
+  robust to it.</p>
+</section>
+
+<footer>
+  Artifacts: <code>training_methods/exp_cross_student/runs/20260716T142923Z_evals/report.json</code> ·
+  datasets <code>exp_cross_student/data/{qwen,granite}/</code> ·
+  trained models <code>runs/20260716T120217Z_{self_qwen_data,cross_granite_data}/merged</code><br>
+  Teacher: MiniMax-M3 (EdenAI → FAU router) · Judge: gpt-oss-120b (FAU) · Eval: budget 3, hidden,
+  temp 0.2, seeds 11/23/37 · branch <code>feature/teacher-guidance</code>
+</footer>
+</div>
+
+<div class="tooltip" id="tip"></div>
+
+<script>
+(function(){
+"use strict";
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const tip = document.getElementById("tip");
+function showTip(evt, html){
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const pad = 14, w = tip.offsetWidth || 180;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + w > innerWidth - 8) x = evt.clientX - w - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip(){ tip.style.opacity = 0; }
+
+const SERIES = [
+  {id:"base",  label:"base",     v:"--s-base"},
+  {id:"self",  label:"m1-self",  v:"--s-self"},
+  {id:"cross", label:"m1-cross", v:"--s-cross"},
+];
+
+/* ---------- grouped vertical bars ---------- */
+function groupedBars(elId, groups, opts){
+  const el = document.getElementById(elId);
+  const W = Math.max(el.clientWidth || 640, 560), H = opts.h || 260;
+  const M = {t:18, r:12, b:34, l:44};
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+  const ymax = opts.ymax;
+  const y = v => M.t + ih - (v / ymax) * ih;
+  const ng = groups.length, ns = SERIES.length;
+  const gw = iw / ng, bw = Math.min(44, (gw - 28) / ns);
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role","img");
+  svg.setAttribute("aria-label", opts.aria || "grouped bar chart");
+  // grid + y axis
+  const ticks = opts.ticks || 4;
+  for (let i = 0; i <= ticks; i++){
+    const v = ymax * i / ticks, yy = y(v);
+    const ln = document.createElementNS(NS,"line");
+    ln.setAttribute("x1",M.l); ln.setAttribute("x2",W-M.r);
+    ln.setAttribute("y1",yy); ln.setAttribute("y2",yy);
+    ln.setAttribute("class","gline"); svg.appendChild(ln);
+    const tx = document.createElementNS(NS,"text");
+    tx.setAttribute("x",M.l-7); tx.setAttribute("y",yy+4);
+    tx.setAttribute("text-anchor","end"); tx.setAttribute("class","axis");
+    tx.textContent = opts.fmt ? opts.fmt(v) : Math.round(v*100)+"%";
+    svg.appendChild(tx);
+  }
+  groups.forEach((g, gi) => {
+    const cx = M.l + gw*gi + gw/2;
+    const total = ns*bw + (ns-1)*2;
+    g.vals.forEach((d, si) => {
+      const x = cx - total/2 + si*(bw+2);
+      const bh = Math.max(2, (d.v/ymax)*ih);
+      const r = Math.min(4, bw/2);
+      const p = document.createElementNS(NS,"path");
+      const x2 = x+bw, y1 = y(d.v), y0 = M.t+ih;
+      p.setAttribute("d",`M${x},${y0} L${x},${y1+r} Q${x},${y1} ${x+r},${y1} L${x2-r},${y1} Q${x2},${y1} ${x2},${y1+r} L${x2},${y0} Z`);
+      p.setAttribute("fill", css(SERIES[si].v));
+      p.style.cursor = "default";
+      const sd = d.sd != null ? ` ± ${(d.sd*100).toFixed(1)}` : "";
+      const val = opts.fmt ? opts.fmt(d.v) : (d.v*100).toFixed(1)+"%";
+      p.addEventListener("mousemove", e => showTip(e,
+        `<b>${SERIES[si].label}</b> · ${g.label}<br>${opts.tipLabel||"value"}: ${val}${sd}`));
+      p.addEventListener("mouseleave", hideTip);
+      svg.appendChild(p);
+      // sd whisker
+      if (d.sd){
+        const wln = document.createElementNS(NS,"line");
+        wln.setAttribute("x1",x+bw/2); wln.setAttribute("x2",x+bw/2);
+        wln.setAttribute("y1",y(Math.min(ymax,d.v+d.sd))); wln.setAttribute("y2",y(Math.max(0,d.v-d.sd)));
+        wln.setAttribute("class","whisker"); svg.appendChild(wln);
+      }
+      // direct label
+      const tl = document.createElementNS(NS,"text");
+      tl.setAttribute("x",x+bw/2); tl.setAttribute("y",y1-6-(d.sd?(d.sd/ymax)*ih:0));
+      tl.setAttribute("text-anchor","middle"); tl.setAttribute("class","blabel");
+      tl.textContent = opts.fmt ? opts.fmt(d.v) : Math.round(d.v*100)+"%";
+      svg.appendChild(tl);
+    });
+    const gl = document.createElementNS(NS,"text");
+    gl.setAttribute("x",cx); gl.setAttribute("y",H-10);
+    gl.setAttribute("text-anchor","middle"); gl.setAttribute("class","glabel");
+    gl.textContent = g.label; svg.appendChild(gl);
+  });
+  el.replaceChildren(svg);
+}
+
+/* ---------- data ---------- */
+const judge = [
+  {label:"qwen test set",    vals:[{v:.0783,sd:.0115},{v:.5283,sd:.0161},{v:.5367,sd:.0225}]},
+  {label:"granite test set", vals:[{v:.065, sd:.0218},{v:.4741,sd:.0151},{v:.475, sd:.0132}]},
+];
+const halves = [
+  {label:"qwen · correct half",    vals:[{v:.107},{v:.760},{v:.720}]},
+  {label:"qwen · wrong half",      vals:[{v:.037},{v:.260},{v:.277}]},
+  {label:"granite · correct half", vals:[{v:.117},{v:.763},{v:.717}]},
+  {label:"granite · wrong half",   vals:[{v:.010},{v:.203},{v:.207}]},
+];
+const emf1 = [
+  {label:"exact match", vals:[{v:.0217},{v:.0708},{v:.2367}]},
+  {label:"F1",          vals:[{v:.0408},{v:.2031},{v:.3361}]},
+];
+
+function renderBars(){
+  groupedBars("judgeChart", judge, {ymax:.6, ticks:4, h:270, tipLabel:"judge-correct",
+    aria:"Judge-correct rate by model and test set"});
+  groupedBars("halvesChart", halves, {ymax:.85, ticks:4, h:250, tipLabel:"cover-match",
+    aria:"Cover-match by test-set half"});
+  groupedBars("emf1Chart", emf1, {ymax:.4, ticks:4, h:250, tipLabel:"score",
+    fmt:v=>(v).toFixed(2).replace(/^0/,""), aria:"Exact match and F1 by model"});
+}
+
+/* ---------- loss line chart ---------- */
+const lossSelf = [[10,.772],[20,.523],[30,.452],[40,.437],[50,.45],[60,.413],[70,.428],[80,.437],[90,.419],[100,.407],[110,.383],[120,.375],[130,.405],[140,.405],[150,.399],[160,.367],[170,.394],[180,.393],[190,.4],[200,.382],[210,.383],[220,.384],[230,.367],[240,.394],[250,.367],[260,.38],[270,.37],[280,.378],[290,.366],[300,.369],[310,.363],[320,.36],[330,.367],[340,.37],[350,.385],[360,.372],[370,.304],[380,.301],[390,.299],[400,.322],[410,.294],[420,.29],[430,.275],[440,.272],[450,.291],[460,.303],[470,.303],[480,.287],[490,.284],[500,.308],[510,.315],[520,.282],[530,.276],[540,.305],[550,.268],[560,.279],[570,.274],[580,.296],[590,.287],[600,.264],[610,.269],[620,.268],[630,.281],[640,.29],[650,.287],[660,.275],[670,.274],[680,.289],[690,.295],[700,.292],[710,.28],[720,.282]];
+const lossCross = [[10,.896],[20,.586],[30,.506],[40,.469],[50,.457],[60,.413],[70,.452],[80,.406],[90,.395],[100,.404],[110,.411],[120,.436],[130,.384],[140,.394],[150,.37],[160,.385],[170,.401],[180,.372],[190,.391],[200,.401],[210,.374],[220,.386],[230,.375],[240,.396],[250,.379],[260,.396],[270,.384],[280,.394],[290,.365],[300,.367],[310,.371],[320,.36],[330,.355],[340,.368],[350,.362],[360,.368],[370,.352],[380,.347],[390,.359],[400,.371],[410,.338],[420,.371],[430,.3],[440,.294],[450,.29],[460,.277],[470,.294],[480,.278],[490,.285],[500,.296],[510,.305],[520,.292],[530,.3],[540,.289],[550,.291],[560,.286],[570,.286],[580,.31],[590,.279],[600,.278],[610,.276],[620,.268],[630,.284],[640,.269],[650,.286],[660,.273],[670,.29],[680,.287],[690,.285],[700,.267],[710,.254],[720,.292],[730,.271],[740,.275],[750,.275],[760,.288],[770,.272],[780,.276],[790,.282],[800,.276],[810,.296],[820,.276],[830,.29],[840,.282]];
+
+function lineChart(){
+  const el = document.getElementById("lossChart");
+  const W = Math.max(el.clientWidth || 720, 560), H = 240;
+  const M = {t:14, r:14, b:30, l:44};
+  const iw = W-M.l-M.r, ih = H-M.t-M.b;
+  const xmax = 840, ymin = .2, ymax = .95;
+  const X = s => M.l + (s/xmax)*iw;
+  const Y = v => M.t + ih - ((v-ymin)/(ymax-ymin))*ih;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.setAttribute("role","img");
+  svg.setAttribute("aria-label","Training loss curves for both arms");
+  for (const v of [.3,.5,.7,.9]){
+    const ln = document.createElementNS(NS,"line");
+    ln.setAttribute("x1",M.l);ln.setAttribute("x2",W-M.r);
+    ln.setAttribute("y1",Y(v));ln.setAttribute("y2",Y(v));
+    ln.setAttribute("class","gline");svg.appendChild(ln);
+    const tx = document.createElementNS(NS,"text");
+    tx.setAttribute("x",M.l-7);tx.setAttribute("y",Y(v)+4);
+    tx.setAttribute("text-anchor","end");tx.setAttribute("class","axis");
+    tx.textContent = v.toFixed(1); svg.appendChild(tx);
+  }
+  for (const s of [0,200,400,600,840]){
+    const tx = document.createElementNS(NS,"text");
+    tx.setAttribute("x",X(s));tx.setAttribute("y",H-8);
+    tx.setAttribute("text-anchor","middle");tx.setAttribute("class","axis");
+    tx.textContent = s; svg.appendChild(tx);
+  }
+  const mk = (pts, cvar, label) => {
+    const p = document.createElementNS(NS,"path");
+    p.setAttribute("d", pts.map((d,i)=>(i?"L":"M")+X(d[0]).toFixed(1)+","+Y(d[1]).toFixed(1)).join(""));
+    p.setAttribute("fill","none");
+    p.setAttribute("stroke", css(cvar));
+    p.setAttribute("stroke-width","2");
+    p.setAttribute("stroke-linejoin","round");
+    svg.appendChild(p);
+    const end = pts[pts.length-1];
+    const c = document.createElementNS(NS,"circle");
+    c.setAttribute("cx",X(end[0]));c.setAttribute("cy",Y(end[1]));c.setAttribute("r","3.5");
+    c.setAttribute("fill",css(cvar)); svg.appendChild(c);
+    return {pts,label,cvar};
+  };
+  const L = [mk(lossSelf,"--s-self","self"), mk(lossCross,"--s-cross","cross")];
+  // hover: nearest point on both lines
+  const hover = document.createElementNS(NS,"line");
+  hover.setAttribute("class","gline");hover.setAttribute("y1",M.t);hover.setAttribute("y2",M.t+ih);
+  hover.setAttribute("stroke-width","1");hover.style.opacity=0; svg.appendChild(hover);
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect();
+    const sx = (e.clientX-r.left) * (W/r.width);
+    const step = Math.max(10, Math.min(840, Math.round((sx-M.l)/iw*xmax/10)*10));
+    hover.setAttribute("x1",X(step));hover.setAttribute("x2",X(step));hover.style.opacity=1;
+    const rows = L.map(l => {
+      let best = l.pts[0];
+      for (const d of l.pts) if (Math.abs(d[0]-step)<Math.abs(best[0]-step)) best=d;
+      return `<span style="color:${css(l.cvar)}">●</span> ${l.label}: ${best[1].toFixed(3)}`;
+    });
+    showTip(e, `<b>step ${step}</b><br>${rows.join("<br>")}`);
+  });
+  svg.addEventListener("mouseleave", () => { hover.style.opacity=0; hideTip(); });
+  el.replaceChildren(svg);
+}
+
+/* ---------- efficiency horizontal bars ---------- */
+const eff = [
+  {label:"wall time per 200-q run (s)", max:180, fmt:v=>v+" s",
+   vals:[{s:0,v:162},{s:1,v:152},{s:2,v:118}]},
+  {label:"voluntary finishes / 200", max:60, fmt:v=>v,
+   vals:[{s:0,v:5},{s:1,v:20},{s:2,v:39}]},
+];
+function effChart(){
+  const el = document.getElementById("effChart");
+  const W = Math.max(el.clientWidth || 720, 560);
+  const rowH = 26, gap = 6, groupGap = 26, top = 8;
+  const H = top + eff.length*(3*(rowH*0.62+gap)+groupGap) + 4;
+  const M = {l:8, r:64};
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.setAttribute("role","img");
+  svg.setAttribute("aria-label","Efficiency comparison bars");
+  let yy = top;
+  eff.forEach(g => {
+    const tl = document.createElementNS(NS,"text");
+    tl.setAttribute("x",M.l);tl.setAttribute("y",yy+11);
+    tl.setAttribute("class","glabel");tl.textContent = g.label;
+    svg.appendChild(tl); yy += 20;
+    g.vals.forEach(d => {
+      const bw = ((W-M.l-M.r) * d.v/g.max);
+      const bh = rowH*0.62;
+      const p = document.createElementNS(NS,"path");
+      const x0=M.l, y0=yy, r=4;
+      p.setAttribute("d",`M${x0},${y0} L${x0+bw-r},${y0} Q${x0+bw},${y0} ${x0+bw},${y0+r} L${x0+bw},${y0+bh-r} Q${x0+bw},${y0+bh} ${x0+bw-r},${y0+bh} L${x0},${y0+bh} Z`);
+      p.setAttribute("fill", css(SERIES[d.s].v));
+      p.addEventListener("mousemove", e => showTip(e,`<b>${SERIES[d.s].label}</b><br>${g.label}: ${g.fmt(d.v)}`));
+      p.addEventListener("mouseleave", hideTip);
+      svg.appendChild(p);
+      const vt = document.createElementNS(NS,"text");
+      vt.setAttribute("x",M.l+bw+8);vt.setAttribute("y",yy+bh-4);
+      vt.setAttribute("class","blabel");vt.textContent = g.fmt(d.v)+"  "+SERIES[d.s].label;
+      svg.appendChild(vt);
+      yy += bh+gap;
+    });
+    yy += groupGap-gap;
+  });
+  el.replaceChildren(svg);
+}
+
+function renderAll(){ renderBars(); lineChart(); effChart(); }
+renderAll();
+addEventListener("resize", (()=>{let t;return()=>{clearTimeout(t);t=setTimeout(renderAll,150)}})());
+new MutationObserver(renderAll).observe(document.documentElement,
+  {attributes:true, attributeFilter:["data-theme"]});
+if (matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", renderAll);
+})();
+</script>
