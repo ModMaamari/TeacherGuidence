@@ -1,0 +1,68 @@
+id: hotpot_tg_b5_g3_plan_review_ornith9b_local
+name: "HotpotQA Teacher Guidance B=5 G=3 + plan review (local Ornith-1.0-9B student / GLM-5.2 teacher)"
+mode: standard
+
+# Same as hotpot_tg_b5_g3_plan_review_qwen_local but with the Ornith-1.0-9B student
+# (https://huggingface.co/deepreinforce-ai/Ornith-1.0-9B-GGUF), for a model comparison
+# alongside the qwen3.5 4B/2B/0.8B runs (student is the only intended variable). Also
+# the first run generated with the new per-call raw I/O + timing logging.
+teacher_models:
+  - name: student
+    model_id: ollama/hf.co/deepreinforce-ai/Ornith-1.0-9B-GGUF:latest
+    role: teacher
+    temperature: 0.2
+
+consultant_models: []
+
+workflows:
+  - hotpot_teacher_guided_b5_plan_review
+
+datasets:
+  # Same 10 questions as the previous sessions (do NOT regenerate this file).
+  - name: hotpot_questions
+    path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_questions.jsonl
+    num_samples: 10
+    sample_strategy: sequential
+
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+
+verification:
+  enabled: false
+
+mode_config:
+  budget: 5
+  student_model: ollama/hf.co/deepreinforce-ai/Ornith-1.0-9B-GGUF:latest
+  teacher_model: custom/z-ai/glm-5.2
+  corpus_path: ./data/datasets/hotpot_teacher_guidance/hotpot_distractor_validation_corpus.jsonl
+  retrieval_backend: hotpot_local
+
+  guidance:
+    level: 3
+    name: diagnostic_feedback
+    score_mode: continuous
+    max_feedback_words: 60
+    expose_next_action_hint: false
+    expose_tool_hint: false
+    expose_query_hint: false
+    expose_doc_title_hint: false
+    expose_gold_answer_hint: false
+    leak_policy: strict
+
+  plan_review:
+    enabled: true
+    planner: student
+    planning_steps: 1
+    formal_plan: false
+    review_guidance_level: 3
+    max_initial_plan_steps: 6
+    max_revised_plan_steps: 6
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+
+output_dir: ./data/simulation_output/hotpot_tg_b5_g3_plan_review_ornith9b_local

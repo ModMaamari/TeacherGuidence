@@ -1,0 +1,63 @@
+# Auto-generated smoke (10 samples) -- teacher router FAU -> OpenRouter free -> paid.
+id: smoke10_minicpm
+name: FAU gpt-oss-120b teacher (ollama/hf.co/openbmb/MiniCPM5-1B-GGUF:Q8_0 student, b=5)
+mode: standard
+teacher_models:
+- name: student
+  model_id: ollama/hf.co/openbmb/MiniCPM5-1B-GGUF:Q8_0
+  role: teacher
+  temperature: 0.2
+consultant_models: []
+workflows:
+- hotpot_teacher_guided_b5_plan_review
+datasets:
+- name: hotpot_questions
+  path: ./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_questions.jsonl
+  num_samples: 10
+  sample_strategy: sequential
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+verification:
+  enabled: false
+mode_config:
+  budget: 5
+  student_model: ollama/hf.co/openbmb/MiniCPM5-1B-GGUF:Q8_0
+  teacher_model: fau/gpt-oss-120b
+  teacher_router:
+  - fau/gpt-oss-120b
+  - custom/openai/gpt-oss-120b:free
+  - custom/openai/gpt-oss-120b
+  student_use_response_schema: false
+  disclose_budget: true
+  corpus_path: ./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_corpus.jsonl
+  retrieval_backend: hotpot_local
+  skip_teacher: false
+  teacher_max_tokens: 2500
+  teacher_max_tokens_retry: 4000
+  guidance:
+    level: 3
+    name: diagnostic_feedback
+    score_mode: continuous
+    max_feedback_words: 60
+    expose_next_action_hint: false
+    expose_tool_hint: false
+    expose_query_hint: false
+    expose_doc_title_hint: false
+    expose_gold_answer_hint: false
+    leak_policy: strict
+  plan_review:
+    enabled: true
+    planner: student
+    planning_steps: 1
+    formal_plan: false
+    review_guidance_level: 3
+    max_initial_plan_steps: 6
+    max_revised_plan_steps: 6
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+output_dir: ./data/simulation_output/smoke10_minicpm
