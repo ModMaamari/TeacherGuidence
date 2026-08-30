@@ -50,6 +50,10 @@ class Config:
     # stripped before the request. Commercial: every call bills real money and returns a
     # ``cost`` field.
     EDENAI_LLM_ENDPOINT: str = os.getenv("EDENAI_LLM_ENDPOINT", "https://api.edenai.run/v3/responses")
+    #: EdenAI also exposes an OpenAI-compatible chat-completions endpoint, which serves
+    #: models the Responses API does not (and whose adapter is currently broken for some
+    #: providers). Models listed here are sent there instead, in OpenAI request shape.
+    EDENAI_CHAT_ENDPOINT: str = os.getenv("EDENAI_CHAT_ENDPOINT", "https://api.edenai.run/v3/chat/completions")
     EDENAI_API_KEY: Optional[str] = os.getenv("EDENAI_API_KEY")
 
     # Local vLLM OpenAI-compatible server (student serving). Used instead of Ollama when a
@@ -146,6 +150,10 @@ class Config:
         elif model_id.startswith("fau/"):
             return "fau"
         elif model_id.startswith("edenai/"):
+            return "edenai"
+        elif model_id.startswith("edenchat/"):
+            # Same provider and credentials, but EdenAI's OpenAI-compatible
+            # chat-completions endpoint rather than the Responses API.
             return "edenai"
         elif model_id.startswith("vllm/"):
             return "vllm"

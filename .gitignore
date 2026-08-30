@@ -67,3 +67,9 @@ reports/SESSION_SUMMARY.md
 training_methods/*/data/
 training_methods/*/runs/
 training_methods/common/data/
+
+# Archived raw generation output (21 GB tarball, regenerate or extract locally)
+data/*.tar
+
+# Throwaway probe environment
+.venv_probe/
