@@ -1,0 +1,641 @@
+{
+  "threshold": 0.4,
+  "students": {
+    "q08b": {
+      "model": "qwen3.5:0.8b",
+      "nowiki": {
+        "reps": [
+          {
+            "rep": 1,
+            "n": 10,
+            "teacher_correct": 3,
+            "teacher_scored": 7,
+            "teacher_rate": 0.42857142857142855,
+            "cover": 5,
+            "mean_steps": 8.8,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 2,
+            "n": 9,
+            "teacher_correct": 2,
+            "teacher_scored": 7,
+            "teacher_rate": 0.2857142857142857,
+            "cover": 5,
+            "mean_steps": 8.11,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 3,
+            "n": 10,
+            "teacher_correct": 3,
+            "teacher_scored": 10,
+            "teacher_rate": 0.3,
+            "cover": 6,
+            "mean_steps": 9,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 4,
+            "n": 10,
+            "teacher_correct": 3,
+            "teacher_scored": 8,
+            "teacher_rate": 0.375,
+            "cover": 6,
+            "mean_steps": 7.9,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 5,
+            "n": 10,
+            "teacher_correct": 2,
+            "teacher_scored": 9,
+            "teacher_rate": 0.2222222222222222,
+            "cover": 3,
+            "mean_steps": 8.5,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          }
+        ],
+        "teacher_rate_mean": 0.3223,
+        "teacher_rate_std": 0.0805,
+        "cover_mean": 5,
+        "cover_std": 1.2247,
+        "steps_mean": 8.462,
+        "natural_mean": 0,
+        "unknown_mean": 0
+      },
+      "wiki": {
+        "reps": [
+          {
+            "rep": 1,
+            "n": 10,
+            "teacher_correct": 2,
+            "teacher_scored": 7,
+            "teacher_rate": 0.2857142857142857,
+            "cover": 3,
+            "mean_steps": 7.9,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 4,
+            "edit_ops": {
+              "applied": 153,
+              "ignored": 48,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 2,
+            "n": 8,
+            "teacher_correct": 1,
+            "teacher_scored": 6,
+            "teacher_rate": 0.16666666666666666,
+            "cover": 1,
+            "mean_steps": 8.62,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 3,
+            "edit_ops": {
+              "applied": 112,
+              "ignored": 67,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 3,
+            "n": 10,
+            "teacher_correct": 5,
+            "teacher_scored": 10,
+            "teacher_rate": 0.5,
+            "cover": 4,
+            "mean_steps": 8.5,
+            "natural": 1,
+            "unknown": 0,
+            "gold_in_wiki_missed": 4,
+            "edit_ops": {
+              "applied": 147,
+              "ignored": 62,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 4,
+            "n": 10,
+            "teacher_correct": 3,
+            "teacher_scored": 8,
+            "teacher_rate": 0.375,
+            "cover": 3,
+            "mean_steps": 7.8,
+            "natural": 0,
+            "unknown": 0,
+            "gold_in_wiki_missed": 3,
+            "edit_ops": {
+              "applied": 140,
+              "ignored": 55,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 5,
+            "n": 10,
+            "teacher_correct": 3,
+            "teacher_scored": 9,
+            "teacher_rate": 0.3333333333333333,
+            "cover": 3,
+            "mean_steps": 7.5,
+            "natural": 2,
+            "unknown": 1,
+            "gold_in_wiki_missed": 4,
+            "edit_ops": {
+              "applied": 138,
+              "ignored": 46,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          }
+        ],
+        "teacher_rate_mean": 0.3321,
+        "teacher_rate_std": 0.122,
+        "cover_mean": 2.8,
+        "cover_std": 1.0954,
+        "steps_mean": 8.064,
+        "natural_mean": 0.6,
+        "unknown_mean": 0.2
+      },
+      "paired_teacher_rate_deltas": [
+        -0.1429,
+        -0.119,
+        0.2,
+        0.0,
+        0.1111
+      ]
+    },
+    "q2b": {
+      "model": "qwen3.5:2b",
+      "nowiki": {
+        "reps": [
+          {
+            "rep": 1,
+            "n": 10,
+            "teacher_correct": 5,
+            "teacher_scored": 8,
+            "teacher_rate": 0.625,
+            "cover": 6,
+            "mean_steps": 5.6,
+            "natural": 6,
+            "unknown": 1,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 2,
+            "n": 10,
+            "teacher_correct": 5,
+            "teacher_scored": 8,
+            "teacher_rate": 0.625,
+            "cover": 4,
+            "mean_steps": 7.4,
+            "natural": 2,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 3,
+            "n": 9,
+            "teacher_correct": 4,
+            "teacher_scored": 8,
+            "teacher_rate": 0.5,
+            "cover": 6,
+            "mean_steps": 7.78,
+            "natural": 2,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 4,
+            "n": 10,
+            "teacher_correct": 8,
+            "teacher_scored": 10,
+            "teacher_rate": 0.8,
+            "cover": 8,
+            "mean_steps": 6.9,
+            "natural": 4,
+            "unknown": 1,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 5,
+            "n": 10,
+            "teacher_correct": 4,
+            "teacher_scored": 8,
+            "teacher_rate": 0.5,
+            "cover": 4,
+            "mean_steps": 6.7,
+            "natural": 3,
+            "unknown": 1,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          }
+        ],
+        "teacher_rate_mean": 0.61,
+        "teacher_rate_std": 0.1232,
+        "cover_mean": 5.6,
+        "cover_std": 1.6733,
+        "steps_mean": 6.876,
+        "natural_mean": 3.4,
+        "unknown_mean": 0.6
+      },
+      "wiki": {
+        "reps": [
+          {
+            "rep": 1,
+            "n": 10,
+            "teacher_correct": 4,
+            "teacher_scored": 10,
+            "teacher_rate": 0.4,
+            "cover": 4,
+            "mean_steps": 8,
+            "natural": 2,
+            "unknown": 0,
+            "gold_in_wiki_missed": 3,
+            "edit_ops": {
+              "applied": 171,
+              "ignored": 40,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 2,
+            "n": 9,
+            "teacher_correct": 5,
+            "teacher_scored": 9,
+            "teacher_rate": 0.5555555555555556,
+            "cover": 6,
+            "mean_steps": 8,
+            "natural": 3,
+            "unknown": 0,
+            "gold_in_wiki_missed": 1,
+            "edit_ops": {
+              "applied": 152,
+              "ignored": 30,
+              "rewrites": 0,
+              "keeps": 1
+            }
+          },
+          {
+            "rep": 3,
+            "n": 10,
+            "teacher_correct": 8,
+            "teacher_scored": 10,
+            "teacher_rate": 0.8,
+            "cover": 7,
+            "mean_steps": 8,
+            "natural": 3,
+            "unknown": 0,
+            "gold_in_wiki_missed": 1,
+            "edit_ops": {
+              "applied": 171,
+              "ignored": 31,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 4,
+            "n": 9,
+            "teacher_correct": 8,
+            "teacher_scored": 9,
+            "teacher_rate": 0.8888888888888888,
+            "cover": 6,
+            "mean_steps": 7.56,
+            "natural": 3,
+            "unknown": 0,
+            "gold_in_wiki_missed": 1,
+            "edit_ops": {
+              "applied": 145,
+              "ignored": 35,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 5,
+            "n": 10,
+            "teacher_correct": 7,
+            "teacher_scored": 10,
+            "teacher_rate": 0.7,
+            "cover": 8,
+            "mean_steps": 7.5,
+            "natural": 4,
+            "unknown": 0,
+            "gold_in_wiki_missed": 2,
+            "edit_ops": {
+              "applied": 149,
+              "ignored": 42,
+              "rewrites": 0,
+              "keeps": 1
+            }
+          }
+        ],
+        "teacher_rate_mean": 0.6689,
+        "teacher_rate_std": 0.1947,
+        "cover_mean": 6.2,
+        "cover_std": 1.4832,
+        "steps_mean": 7.812,
+        "natural_mean": 3,
+        "unknown_mean": 0
+      },
+      "paired_teacher_rate_deltas": [
+        -0.225,
+        -0.0694,
+        0.3,
+        0.0889,
+        0.2
+      ]
+    },
+    "g3b": {
+      "model": "granite4.1:3b",
+      "nowiki": {
+        "reps": [
+          {
+            "rep": 1,
+            "n": 9,
+            "teacher_correct": 7,
+            "teacher_scored": 8,
+            "teacher_rate": 0.875,
+            "cover": 9,
+            "mean_steps": 6.67,
+            "natural": 3,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 2,
+            "n": 10,
+            "teacher_correct": 5,
+            "teacher_scored": 6,
+            "teacher_rate": 0.8333333333333334,
+            "cover": 6,
+            "mean_steps": 5.7,
+            "natural": 4,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 3,
+            "n": 10,
+            "teacher_correct": 7,
+            "teacher_scored": 8,
+            "teacher_rate": 0.875,
+            "cover": 8,
+            "mean_steps": 7,
+            "natural": 3,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 4,
+            "n": 10,
+            "teacher_correct": 8,
+            "teacher_scored": 9,
+            "teacher_rate": 0.8888888888888888,
+            "cover": 9,
+            "mean_steps": 6.9,
+            "natural": 5,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 5,
+            "n": 7,
+            "teacher_correct": 5,
+            "teacher_scored": 5,
+            "teacher_rate": 1.0,
+            "cover": 7,
+            "mean_steps": 6.14,
+            "natural": 3,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 0,
+              "ignored": 0,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          }
+        ],
+        "teacher_rate_mean": 0.8944,
+        "teacher_rate_std": 0.0626,
+        "cover_mean": 7.8,
+        "cover_std": 1.3038,
+        "steps_mean": 6.482,
+        "natural_mean": 3.6,
+        "unknown_mean": 0
+      },
+      "wiki": {
+        "reps": [
+          {
+            "rep": 1,
+            "n": 9,
+            "teacher_correct": 7,
+            "teacher_scored": 9,
+            "teacher_rate": 0.7777777777777778,
+            "cover": 7,
+            "mean_steps": 7.22,
+            "natural": 4,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 46,
+              "ignored": 33,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 2,
+            "n": 10,
+            "teacher_correct": 7,
+            "teacher_scored": 8,
+            "teacher_rate": 0.875,
+            "cover": 8,
+            "mean_steps": 6.2,
+            "natural": 4,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 45,
+              "ignored": 19,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 3,
+            "n": 10,
+            "teacher_correct": 7,
+            "teacher_scored": 10,
+            "teacher_rate": 0.7,
+            "cover": 8,
+            "mean_steps": 5.7,
+            "natural": 6,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 37,
+              "ignored": 26,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 4,
+            "n": 10,
+            "teacher_correct": 7,
+            "teacher_scored": 9,
+            "teacher_rate": 0.7777777777777778,
+            "cover": 7,
+            "mean_steps": 5.7,
+            "natural": 6,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 48,
+              "ignored": 23,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          },
+          {
+            "rep": 5,
+            "n": 10,
+            "teacher_correct": 7,
+            "teacher_scored": 9,
+            "teacher_rate": 0.7777777777777778,
+            "cover": 8,
+            "mean_steps": 6.8,
+            "natural": 2,
+            "unknown": 0,
+            "gold_in_wiki_missed": 0,
+            "edit_ops": {
+              "applied": 46,
+              "ignored": 26,
+              "rewrites": 0,
+              "keeps": 0
+            }
+          }
+        ],
+        "teacher_rate_mean": 0.7817,
+        "teacher_rate_std": 0.0621,
+        "cover_mean": 7.6,
+        "cover_std": 0.5477,
+        "steps_mean": 6.324,
+        "natural_mean": 4.4,
+        "unknown_mean": 0
+      },
+      "paired_teacher_rate_deltas": [
+        -0.0972,
+        0.0417,
+        -0.175,
+        -0.1111,
+        -0.2222
+      ]
+    }
+  }
+}

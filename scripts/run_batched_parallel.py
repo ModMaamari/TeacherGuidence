@@ -168,6 +168,11 @@ def main() -> None:
     ap.add_argument("--corpus", default="./data/datasets/hotpot_teacher_guidance_exp100/hotpot_distractor_validation_corpus.jsonl")
     args = ap.parse_args()
 
+    # Worker output dirs are built as "./{out_root}/w{i}" and resolved relative to the
+    # repo root, so an absolute --out-root would silently write into a nested ghost tree.
+    if Path(args.out_root).is_absolute():
+        args.out_root = os.path.relpath(args.out_root, REPO_ROOT)
+
     if not config.provider_available("fau/gpt-oss-120b") and not config.provider_available("custom/openai/gpt-oss-120b"):
         sys.exit("No teacher provider configured (set FAU_LLM_API_KEY or CUSTOM_LLM_API_KEY in .env).")
 

@@ -1,0 +1,64 @@
+id: hardq_xr0_r2_w16
+name: FAU gpt-oss-120b teacher (ollama/granite4.1:3b student, b=4)
+mode: standard
+teacher_models:
+- name: student
+  model_id: ollama/granite4.1:3b
+  role: teacher
+  temperature: 0.2
+consultant_models: []
+workflows:
+- hotpot_teacher_guided_b4_plan_review
+datasets:
+- name: hotpot_questions
+  path: /root/DeKIS/teacher-guidence/data/simulation_output/hard_q_xr/xr0_r2/w16_questions.jsonl
+  num_samples: 8
+  sample_strategy: sequential
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+verification:
+  enabled: false
+mode_config:
+  budget: 4
+  student_model: ollama/granite4.1:3b
+  teacher_model: fau/gpt-oss-120b
+  teacher_router:
+  - fau/gpt-oss-120b
+  - custom/openai/gpt-oss-120b:free
+  - custom/openai/gpt-oss-120b
+  student_use_response_schema: true
+  disclose_budget: true
+  wiki_enabled: false
+  wiki_mode: tools
+  corpus_path: /root/DeKIS/teacher-guidence/data/datasets/hotpot_teacher_guidance_train3000/hotpot_distractor_train_corpus.jsonl
+  retrieval_backend: hotpot_local
+  skip_teacher: false
+  teacher_max_tokens: 2500
+  teacher_max_tokens_retry: 4000
+  guidance:
+    level: 3
+    name: diagnostic_feedback
+    score_mode: continuous
+    max_feedback_words: 60
+    expose_next_action_hint: false
+    expose_tool_hint: false
+    expose_query_hint: false
+    expose_doc_title_hint: false
+    expose_gold_answer_hint: false
+    leak_policy: strict
+  plan_review:
+    enabled: true
+    planner: student
+    planning_steps: 3
+    formal_plan: false
+    review_guidance_level: 3
+    max_initial_plan_steps: 4
+    max_revised_plan_steps: 4
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+output_dir: .//root/DeKIS/teacher-guidence/data/simulation_output/hard_q_xr/xr0_r2/w16
