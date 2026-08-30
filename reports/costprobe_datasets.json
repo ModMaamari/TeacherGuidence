@@ -1,0 +1,810 @@
+[
+  {
+    "run": "data/simulation_output/costprobe/costprobe_qwen38/43f2c070",
+    "n_episodes": 5,
+    "mean_cost": 0.04475146,
+    "sd_cost": 0.013380976013094112,
+    "min_cost": 0.0352339,
+    "max_cost": 0.0676325,
+    "mean_teacher_calls": 4.2,
+    "mean_teacher_in": 6543.4,
+    "mean_teacher_out": 9293.6,
+    "mean_api_s": 199.75853872299194,
+    "answer_correct": 4,
+    "exact_match": 1,
+    "teacher_correct": 4,
+    "teacher_scored": 5,
+    "grounded": 5,
+    "mean_f1": 0.3405,
+    "mean_doc_recall": 0.8,
+    "episodes": [
+      {
+        "qid": "5a8b57f25542995d1e6f1371",
+        "dataset": "hotpotqa",
+        "query": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.1429,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "Yes, Scott Derrickson and Ed Wood were of the same nationality, both being American.",
+        "gold_answer": "yes",
+        "roles": {
+          "student": {
+            "calls": 4,
+            "in": 4508,
+            "out": 823,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2410.135269165039,
+            "cost_missing": 4,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6587,
+            "out": 6953,
+            "reasoning": 5818,
+            "cost": 0.0356798,
+            "ms": 147411.7774963379,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0356798,
+        "wall_s": 149.82191276550293
+      },
+      {
+        "qid": "5a8c7595554299585d9e36b6",
+        "dataset": "hotpotqa",
+        "query": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 0.1,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 1,
+        "final_answer": "diplomat",
+        "gold_answer": "Chief of Protocol",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 5180,
+            "out": 703,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2493.135929107666,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6720,
+            "out": 8095,
+            "reasoning": 7012,
+            "cost": 0.0403065,
+            "ms": 159993.51382255554,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0403065,
+        "wall_s": 162.4866497516632
+      },
+      {
+        "qid": "5a85ea095542994775f606a8",
+        "dataset": "hotpotqa",
+        "query": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "Animorphs",
+        "gold_answer": "Animorphs",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 6111,
+            "out": 1130,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 4640.126943588257,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6957,
+            "out": 9195,
+            "reasoning": 8123,
+            "cost": 0.0449046,
+            "ms": 192620.94736099243,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0449046,
+        "wall_s": 197.2610743045807
+      },
+      {
+        "qid": "5adbf0a255429947ff17385a",
+        "dataset": "hotpotqa",
+        "query": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.1429,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 2,
+        "final_answer": "No, the Laleli Mosque and Esma Sultan Mansion are not located in the same neighborhood.",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 7412,
+            "out": 1257,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6847.439289093018,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 7052,
+            "out": 14991,
+            "reasoning": 13631,
+            "cost": 0.0676325,
+            "ms": 325514.5483016968,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0676325,
+        "wall_s": 332.3619875907898
+      },
+      {
+        "qid": "5a8e3ea95542995a26add48d",
+        "dataset": "hotpotqa",
+        "query": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 2,
+        "budget": 3,
+        "stop_reason": "teacher_accept",
+        "exact_match": false,
+        "f1": 0.4167,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 2,
+        "final_answer": "The director of the romantic comedy 'Big Stone Gap' is Adriana Trigiani, who is based in Greenwich Village, New York Cit",
+        "gold_answer": "Greenwich Village, New York City",
+        "roles": {
+          "student": {
+            "calls": 4,
+            "in": 3352,
+            "out": 829,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2995.5761432647705,
+            "cost_missing": 4,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 5401,
+            "out": 7234,
+            "reasoning": 6031,
+            "cost": 0.0352339,
+            "ms": 153865.49305915833,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0352339,
+        "wall_s": 156.8610692024231
+      }
+    ],
+    "projections": {
+      "1000": 44.75146
+    },
+    "projections_hi": {
+      "1000": 58.132436013094114
+    }
+  },
+  {
+    "run": "data/simulation_output/costprobe/costprobe_ds_2wiki",
+    "n_episodes": 3,
+    "mean_cost": 0.052978899999999995,
+    "sd_cost": 0.003837457534618467,
+    "min_cost": 0.050192999999999995,
+    "max_cost": 0.057356000000000004,
+    "mean_teacher_calls": 4,
+    "mean_teacher_in": 6747,
+    "mean_teacher_out": 11335.333333333334,
+    "mean_api_s": 284.5256467660268,
+    "answer_correct": 1,
+    "exact_match": 1,
+    "teacher_correct": 1,
+    "teacher_scored": 3,
+    "grounded": 1,
+    "mean_f1": 0.3333333333333333,
+    "mean_doc_recall": 0.75,
+    "episodes": [
+      {
+        "qid": "13f5ad2c088c11ebbd6fac1f6bf848b6",
+        "dataset": "2wikimultihopqa",
+        "query": "Are director of film Move (1970 Film) and director of film M\u00e9diterran\u00e9e (1963 Film) from the same country?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": false,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "no",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 4821,
+            "out": 838,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 5384.944438934326,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6527,
+            "out": 12531,
+            "reasoning": 11434,
+            "cost": 0.057356000000000004,
+            "ms": 311125.550031662,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.057356000000000004,
+        "wall_s": 316.5104944705963
+      },
+      {
+        "qid": "3057c6c4086111ebbd5dac1f6bf848b6",
+        "dataset": "2wikimultihopqa",
+        "query": "Do both films The Falcon (Film) and Valentin The Good have the directors from the same country?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 0.75,
+        "answer_grounded": false,
+        "teacher_answer_score": 0.0,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 1,
+        "final_answer": "yes",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 6392,
+            "out": 1365,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6116.480827331543,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 7278,
+            "out": 10444,
+            "reasoning": 9283,
+            "cost": 0.050192999999999995,
+            "ms": 261001.92523002625,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.050192999999999995,
+        "wall_s": 267.1184060573578
+      },
+      {
+        "qid": "89bc944808a111ebbd79ac1f6bf848b6",
+        "dataset": "2wikimultihopqa",
+        "query": "Which film whose director is younger, Charge It To Me or Danger: Diabolik?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 0.0,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 1,
+        "final_answer": "Charge It to Me",
+        "gold_answer": "Danger: Diabolik",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 6527,
+            "out": 1067,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6896.702527999878,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6436,
+            "out": 11031,
+            "reasoning": 9898,
+            "cost": 0.051387699999999994,
+            "ms": 263051.33724212646,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.051387699999999994,
+        "wall_s": 269.94803977012634
+      }
+    ],
+    "projections": {
+      "1000": 52.978899999999996
+    },
+    "projections_hi": {
+      "1000": 56.81635753461847
+    }
+  },
+  {
+    "run": "data/simulation_output/costprobe/costprobe_ds_musique",
+    "n_episodes": 3,
+    "mean_cost": 0.0469885,
+    "sd_cost": 0.009664701258186928,
+    "min_cost": 0.039535600000000004,
+    "max_cost": 0.0579085,
+    "mean_teacher_calls": 4.666666666666667,
+    "mean_teacher_in": 7271,
+    "mean_teacher_out": 9624.666666666666,
+    "mean_api_s": 244.67788751920065,
+    "answer_correct": 1,
+    "exact_match": 1,
+    "teacher_correct": 1,
+    "teacher_scored": 3,
+    "grounded": 3,
+    "mean_f1": 0.3333333333333333,
+    "mean_doc_recall": 0.6666666666666666,
+    "episodes": [
+      {
+        "qid": "2hop__482757_12019",
+        "dataset": "musique",
+        "query": "When was the institute that owned The Collegian founded?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 0.0,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 1,
+        "final_answer": "1963",
+        "gold_answer": "1960",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 7680,
+            "out": 919,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 5458.514213562012,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 9214,
+            "out": 8088,
+            "reasoning": 6981,
+            "cost": 0.0435214,
+            "ms": 205237.45226860046,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0435214,
+        "wall_s": 210.69596648216248
+      },
+      {
+        "qid": "2hop__129292_160863",
+        "dataset": "musique",
+        "query": "What year saw the creation of the region where the county of Hertfordshire is located?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 2,
+        "final_answer": "1994",
+        "gold_answer": "1994",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 6939,
+            "out": 1141,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 5959.2931270599365,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 7015,
+            "out": 12510,
+            "reasoning": 11011,
+            "cost": 0.0579085,
+            "ms": 312110.4745864868,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0579085,
+        "wall_s": 318.06976771354675
+      },
+      {
+        "qid": "2hop__679261_120616",
+        "dataset": "musique",
+        "query": "When was the abolishment of the studio that distributed The Game?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 0.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 0.0,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 2,
+        "final_answer": "The studio that distributed The Game, MaxPlay, ceased operations in 2010.",
+        "gold_answer": "1999",
+        "roles": {
+          "student": {
+            "calls": 7,
+            "in": 7353,
+            "out": 1017,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 5752.5739669799805,
+            "cost_missing": 7,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 5584,
+            "out": 8276,
+            "reasoning": 6790,
+            "cost": 0.039535600000000004,
+            "ms": 199515.35439491272,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.039535600000000004,
+        "wall_s": 205.2679283618927
+      }
+    ],
+    "projections": {
+      "1000": 46.9885
+    },
+    "projections_hi": {
+      "1000": 56.65320125818693
+    }
+  },
+  {
+    "run": "data/simulation_output/costprobe/costprobe_ds_strategyqa",
+    "n_episodes": 3,
+    "mean_cost": 0.04245323333333333,
+    "sd_cost": 0.010698356641247912,
+    "min_cost": 0.0307411,
+    "max_cost": 0.0517114,
+    "mean_teacher_calls": 4.333333333333333,
+    "mean_teacher_in": 6720.333333333333,
+    "mean_teacher_out": 8645.333333333334,
+    "mean_api_s": 218.70910048484802,
+    "answer_correct": 2,
+    "exact_match": 1,
+    "teacher_correct": 3,
+    "teacher_scored": 3,
+    "grounded": 1,
+    "mean_f1": 0.3456666666666667,
+    "mean_doc_recall": 0.7123,
+    "episodes": [
+      {
+        "qid": "b8677742616fef051f00",
+        "dataset": "strategyqa",
+        "query": "Are more people today related to Genghis Khan than Julius Caesar?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.875,
+        "answer_grounded": false,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 2,
+        "final_answer": "Yes",
+        "gold_answer": "yes",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 6859,
+            "out": 896,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6127.011060714722,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 8740,
+            "out": 10346,
+            "reasoning": 8754,
+            "cost": 0.0517114,
+            "ms": 256295.9315776825,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0517114,
+        "wall_s": 262.4229426383972
+      },
+      {
+        "qid": "4668264df84fb7c25b39",
+        "dataset": "strategyqa",
+        "query": "Could the members of The Police perform lawful arrests?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 2,
+        "budget": 3,
+        "stop_reason": "teacher_accept",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 0.4286,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 3,
+        "final_answer": "The members of The Police, as a rock band, do not have the legal authority to perform lawful arrests. Their role is musi",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 4213,
+            "out": 1256,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6573.416948318481,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 6902,
+            "out": 9214,
+            "reasoning": 7553,
+            "cost": 0.0449072,
+            "ms": 226166.57757759094,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0449072,
+        "wall_s": 232.73999452590942
+      },
+      {
+        "qid": "41450dbd623437269f8f",
+        "dataset": "strategyqa",
+        "query": "Would a Monoamine Oxidase candy bar cheer up a depressed friend?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 2,
+        "budget": 3,
+        "stop_reason": "teacher_accept",
+        "exact_match": false,
+        "f1": 0.037,
+        "answer_correct": true,
+        "doc_recall": 0.8333,
+        "answer_grounded": false,
+        "teacher_answer_score": 0.9,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "No, a Monoamine Oxidase candy bar would not cheer up a depressed friend. Monoamine oxidase is an intracellular enzyme th",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 3,
+            "in": 2548,
+            "out": 662,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 3204.3709754943848,
+            "cost_missing": 3,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 3,
+            "in": 4519,
+            "out": 6376,
+            "reasoning": 5423,
+            "cost": 0.0307411,
+            "ms": 157759.99331474304,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0307411,
+        "wall_s": 160.96436429023743
+      }
+    ],
+    "projections": {
+      "1000": 42.45323333333333
+    },
+    "projections_hi": {
+      "1000": 53.15158997458125
+    }
+  }
+]

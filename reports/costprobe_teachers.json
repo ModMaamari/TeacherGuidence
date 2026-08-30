@@ -1,0 +1,918 @@
+[
+  {
+    "run": "data/simulation_output/costprobe/costprobe_glm53/b1f6a330",
+    "n_episodes": 5,
+    "mean_cost": 0.079974624,
+    "sd_cost": 0.02323627350731783,
+    "min_cost": 0.055132239999999985,
+    "max_cost": 0.10550152,
+    "mean_teacher_calls": 9.2,
+    "mean_teacher_in": 11360.4,
+    "mean_teacher_out": 17697.6,
+    "mean_api_s": 407.19744901657106,
+    "answer_correct": 4,
+    "exact_match": 2,
+    "teacher_correct": 3,
+    "teacher_scored": 3,
+    "grounded": 4,
+    "mean_f1": 0.52622,
+    "mean_doc_recall": 0.8,
+    "episodes": [
+      {
+        "qid": "5a8b57f25542995d1e6f1371",
+        "dataset": "hotpotqa",
+        "query": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/deepinfra/zai-org/GLM-5.3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": false,
+        "teacher_answer_score": null,
+        "teacher_answer_correct": null,
+        "plan_rounds": 3,
+        "final_answer": "Yes",
+        "gold_answer": "yes",
+        "roles": {
+          "student": {
+            "calls": 8,
+            "in": 6435,
+            "out": 1406,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 5710.886001586914,
+            "cost_missing": 8,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 11,
+            "in": 13045,
+            "out": 23875,
+            "reasoning": 0,
+            "cost": 0.10550152,
+            "ms": 525083.7202072144,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/deepinfra/zai-org/GLM-5.3"
+            ]
+          }
+        },
+        "total_cost": 0.10550152,
+        "wall_s": 530.7946062088013
+      },
+      {
+        "qid": "5a8c7595554299585d9e36b6",
+        "dataset": "hotpotqa",
+        "query": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/deepinfra/zai-org/GLM-5.3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.1538,
+        "answer_correct": false,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": null,
+        "teacher_answer_correct": null,
+        "plan_rounds": 3,
+        "final_answer": "Shirley Temple held the government position of U.S. Ambassador to Ghana.",
+        "gold_answer": "Chief of Protocol",
+        "roles": {
+          "student": {
+            "calls": 7,
+            "in": 6144,
+            "out": 1328,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 10980.68904876709,
+            "cost_missing": 7,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 10,
+            "in": 12892,
+            "out": 19287,
+            "reasoning": 0,
+            "cost": 0.08782608,
+            "ms": 538860.0654602051,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/deepinfra/zai-org/GLM-5.3"
+            ]
+          }
+        },
+        "total_cost": 0.08782608,
+        "wall_s": 549.8407545089722
+      },
+      {
+        "qid": "5a85ea095542994775f606a8",
+        "dataset": "hotpotqa",
+        "query": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/deepinfra/zai-org/GLM-5.3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 3,
+        "final_answer": "Animorphs",
+        "gold_answer": "Animorphs",
+        "roles": {
+          "student": {
+            "calls": 7,
+            "in": 6011,
+            "out": 1461,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6315.186023712158,
+            "cost_missing": 7,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 11,
+            "in": 14752,
+            "out": 21199,
+            "reasoning": 0,
+            "cost": 0.09561712000000001,
+            "ms": 319014.586687088,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/deepinfra/zai-org/GLM-5.3"
+            ]
+          }
+        },
+        "total_cost": 0.09561712000000001,
+        "wall_s": 325.32977271080017
+      },
+      {
+        "qid": "5adbf0a255429947ff17385a",
+        "dataset": "hotpotqa",
+        "query": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/deepinfra/zai-org/GLM-5.3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0606,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "No, the Laleli Mosque and Esma Sultan Mansion are not located in the same neighborhood. The Laleli Mosque is in the Lale",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 7452,
+            "out": 1363,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 5805.205583572388,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 6,
+            "in": 7830,
+            "out": 12153,
+            "reasoning": 0,
+            "cost": 0.05579616,
+            "ms": 257448.3289718628,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/deepinfra/zai-org/GLM-5.3"
+            ]
+          }
+        },
+        "total_cost": 0.05579616,
+        "wall_s": 263.2535345554352
+      },
+      {
+        "qid": "5a8e3ea95542995a26add48d",
+        "dataset": "hotpotqa",
+        "query": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/deepinfra/zai-org/GLM-5.3"
+        ],
+        "steps": 2,
+        "budget": 3,
+        "stop_reason": "teacher_accept",
+        "exact_match": false,
+        "f1": 0.4167,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 3,
+        "final_answer": "The director of the romantic comedy 'Big Stone Gap' is Adriana Trigiani, who is based in Greenwich Village, New York Cit",
+        "gold_answer": "Greenwich Village, New York City",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 5588,
+            "out": 1221,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6174.762964248657,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 8,
+            "in": 8283,
+            "out": 11974,
+            "reasoning": 0,
+            "cost": 0.055132239999999985,
+            "ms": 360593.8141345978,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/deepinfra/zai-org/GLM-5.3"
+            ]
+          }
+        },
+        "total_cost": 0.055132239999999985,
+        "wall_s": 366.76857709884644
+      }
+    ],
+    "projections": {
+      "10000": 799.74624,
+      "120000": 9596.95488
+    },
+    "projections_hi": {
+      "10000": 1032.1089750731783,
+      "120000": 12385.307700878138
+    }
+  },
+  {
+    "run": "data/simulation_output/costprobe/costprobe_qwen38/43f2c070",
+    "n_episodes": 5,
+    "mean_cost": 0.04475146,
+    "sd_cost": 0.013380976013094112,
+    "min_cost": 0.0352339,
+    "max_cost": 0.0676325,
+    "mean_teacher_calls": 4.2,
+    "mean_teacher_in": 6543.4,
+    "mean_teacher_out": 9293.6,
+    "mean_api_s": 199.75853872299194,
+    "answer_correct": 4,
+    "exact_match": 1,
+    "teacher_correct": 4,
+    "teacher_scored": 5,
+    "grounded": 5,
+    "mean_f1": 0.3405,
+    "mean_doc_recall": 0.8,
+    "episodes": [
+      {
+        "qid": "5a8b57f25542995d1e6f1371",
+        "dataset": "hotpotqa",
+        "query": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.1429,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "Yes, Scott Derrickson and Ed Wood were of the same nationality, both being American.",
+        "gold_answer": "yes",
+        "roles": {
+          "student": {
+            "calls": 4,
+            "in": 4508,
+            "out": 823,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2410.135269165039,
+            "cost_missing": 4,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6587,
+            "out": 6953,
+            "reasoning": 5818,
+            "cost": 0.0356798,
+            "ms": 147411.7774963379,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0356798,
+        "wall_s": 149.82191276550293
+      },
+      {
+        "qid": "5a8c7595554299585d9e36b6",
+        "dataset": "hotpotqa",
+        "query": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 0.1,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 1,
+        "final_answer": "diplomat",
+        "gold_answer": "Chief of Protocol",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 5180,
+            "out": 703,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2493.135929107666,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6720,
+            "out": 8095,
+            "reasoning": 7012,
+            "cost": 0.0403065,
+            "ms": 159993.51382255554,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0403065,
+        "wall_s": 162.4866497516632
+      },
+      {
+        "qid": "5a85ea095542994775f606a8",
+        "dataset": "hotpotqa",
+        "query": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "Animorphs",
+        "gold_answer": "Animorphs",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 6111,
+            "out": 1130,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 4640.126943588257,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6957,
+            "out": 9195,
+            "reasoning": 8123,
+            "cost": 0.0449046,
+            "ms": 192620.94736099243,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0449046,
+        "wall_s": 197.2610743045807
+      },
+      {
+        "qid": "5adbf0a255429947ff17385a",
+        "dataset": "hotpotqa",
+        "query": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.1429,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 2,
+        "final_answer": "No, the Laleli Mosque and Esma Sultan Mansion are not located in the same neighborhood.",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 7412,
+            "out": 1257,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 6847.439289093018,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 7052,
+            "out": 14991,
+            "reasoning": 13631,
+            "cost": 0.0676325,
+            "ms": 325514.5483016968,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0676325,
+        "wall_s": 332.3619875907898
+      },
+      {
+        "qid": "5a8e3ea95542995a26add48d",
+        "dataset": "hotpotqa",
+        "query": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/qwen3.8-2.4t-a95b"
+        ],
+        "steps": 2,
+        "budget": 3,
+        "stop_reason": "teacher_accept",
+        "exact_match": false,
+        "f1": 0.4167,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 2,
+        "final_answer": "The director of the romantic comedy 'Big Stone Gap' is Adriana Trigiani, who is based in Greenwich Village, New York Cit",
+        "gold_answer": "Greenwich Village, New York City",
+        "roles": {
+          "student": {
+            "calls": 4,
+            "in": 3352,
+            "out": 829,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2995.5761432647705,
+            "cost_missing": 4,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 5401,
+            "out": 7234,
+            "reasoning": 6031,
+            "cost": 0.0352339,
+            "ms": 153865.49305915833,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/qwen3.8-2.4t-a95b"
+            ]
+          }
+        },
+        "total_cost": 0.0352339,
+        "wall_s": 156.8610692024231
+      }
+    ],
+    "projections": {
+      "10000": 447.5146,
+      "120000": 5370.1752
+    },
+    "projections_hi": {
+      "10000": 581.3243601309412,
+      "120000": 6975.892321571293
+    }
+  },
+  {
+    "run": "data/simulation_output/costprobe/costprobe_kimik3/e0feb3bf",
+    "n_episodes": 5,
+    "mean_cost": 0.059865546,
+    "sd_cost": 0.014163690906427957,
+    "min_cost": 0.04630118999999999,
+    "max_cost": 0.07965515999999999,
+    "mean_teacher_calls": 4.2,
+    "mean_teacher_in": 5822.8,
+    "mean_teacher_out": 5150.6,
+    "mean_api_s": 141.39269824028014,
+    "answer_correct": 3,
+    "exact_match": 1,
+    "teacher_correct": 3,
+    "teacher_scored": 5,
+    "grounded": 4,
+    "mean_f1": 0.29546,
+    "mean_doc_recall": 0.7,
+    "episodes": [
+      {
+        "qid": "5a8b57f25542995d1e6f1371",
+        "dataset": "hotpotqa",
+        "query": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/kimi-k3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 0.0,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 1,
+        "final_answer": "Conrad Brooks, who worked with Ed Wood, is described as an American actor.",
+        "gold_answer": "yes",
+        "roles": {
+          "student": {
+            "calls": 4,
+            "in": 4452,
+            "out": 675,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 2007.2062015533447,
+            "cost_missing": 4,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 5866,
+            "out": 4645,
+            "reasoning": 3237,
+            "cost": 0.05223465,
+            "ms": 129532.72199630737,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/kimi-k3"
+            ]
+          }
+        },
+        "total_cost": 0.05223465,
+        "wall_s": 131.53992819786072
+      },
+      {
+        "qid": "5a8c7595554299585d9e36b6",
+        "dataset": "hotpotqa",
+        "query": "What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/kimi-k3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0,
+        "answer_correct": false,
+        "doc_recall": 0.5,
+        "answer_grounded": false,
+        "teacher_answer_score": 0.0,
+        "teacher_answer_correct": 0,
+        "plan_rounds": 2,
+        "final_answer": "none",
+        "gold_answer": "Chief of Protocol",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 5693,
+            "out": 782,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 4047.806978225708,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 5,
+            "in": 6225,
+            "out": 7063,
+            "reasoning": 5236,
+            "cost": 0.07965515999999999,
+            "ms": 180218.32299232483,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/kimi-k3"
+            ]
+          }
+        },
+        "total_cost": 0.07965515999999999,
+        "wall_s": 184.26612997055054
+      },
+      {
+        "qid": "5a85ea095542994775f606a8",
+        "dataset": "hotpotqa",
+        "query": "What science fantasy young adult series, told in first person, has a set of companion books narrating the stories of enslaved worlds and alien species?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/kimi-k3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": true,
+        "f1": 1.0,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "Animorphs",
+        "gold_answer": "Animorphs",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 6151,
+            "out": 771,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 3061.516046524048,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 6071,
+            "out": 6029,
+            "reasoning": 4618,
+            "cost": 0.06972264,
+            "ms": 156217.39673614502,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/kimi-k3"
+            ]
+          }
+        },
+        "total_cost": 0.06972264,
+        "wall_s": 159.27891278266907
+      },
+      {
+        "qid": "5adbf0a255429947ff17385a",
+        "dataset": "hotpotqa",
+        "query": "Are the Laleli Mosque and Esma Sultan Mansion located in the same neighborhood?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/kimi-k3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.0606,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "No, the Laleli Mosque and Esma Sultan Mansion are not located in the same neighborhood. The Laleli Mosque is in the Lale",
+        "gold_answer": "no",
+        "roles": {
+          "student": {
+            "calls": 6,
+            "in": 7533,
+            "out": 1347,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 7931.729078292847,
+            "cost_missing": 6,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 5640,
+            "out": 3713,
+            "reasoning": 2524,
+            "cost": 0.04630118999999999,
+            "ms": 102718.59788894653,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/kimi-k3"
+            ]
+          }
+        },
+        "total_cost": 0.04630118999999999,
+        "wall_s": 110.65032696723938
+      },
+      {
+        "qid": "5a8e3ea95542995a26add48d",
+        "dataset": "hotpotqa",
+        "query": "The director of the romantic comedy \"Big Stone Gap\" is based in what New York city?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/qwen/kimi-k3"
+        ],
+        "steps": 3,
+        "budget": 3,
+        "stop_reason": "budget_forced_finish",
+        "exact_match": false,
+        "f1": 0.4167,
+        "answer_correct": true,
+        "doc_recall": 1.0,
+        "answer_grounded": true,
+        "teacher_answer_score": 1.0,
+        "teacher_answer_correct": 1,
+        "plan_rounds": 1,
+        "final_answer": "The director of the romantic comedy 'Big Stone Gap' is Adriana Trigiani, who is based in Greenwich Village, New York Cit",
+        "gold_answer": "Greenwich Village, New York City",
+        "roles": {
+          "student": {
+            "calls": 4,
+            "in": 4139,
+            "out": 597,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 3283.9229106903076,
+            "cost_missing": 4,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 4,
+            "in": 5312,
+            "out": 4303,
+            "reasoning": 3220,
+            "cost": 0.051414089999999996,
+            "ms": 117944.27037239075,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/qwen/kimi-k3"
+            ]
+          }
+        },
+        "total_cost": 0.051414089999999996,
+        "wall_s": 121.22819328308105
+      }
+    ],
+    "projections": {
+      "10000": 598.65546,
+      "120000": 7183.86552
+    },
+    "projections_hi": {
+      "10000": 740.2923690642796,
+      "120000": 8883.508428771354
+    }
+  },
+  {
+    "run": "data/simulation_output/costprobe/costprobe_glm53_mt8k",
+    "n_episodes": 1,
+    "mean_cost": 0.0550064,
+    "sd_cost": 0.0,
+    "min_cost": 0.0550064,
+    "max_cost": 0.0550064,
+    "mean_teacher_calls": 7,
+    "mean_teacher_in": 6310,
+    "mean_teacher_out": 12473,
+    "mean_api_s": 290.8812026977539,
+    "answer_correct": 1,
+    "exact_match": 0,
+    "teacher_correct": 0,
+    "teacher_scored": 0,
+    "grounded": 1,
+    "mean_f1": 0.1429,
+    "mean_doc_recall": 0.5,
+    "episodes": [
+      {
+        "qid": "5a8b57f25542995d1e6f1371",
+        "dataset": "hotpotqa",
+        "query": "Were Scott Derrickson and Ed Wood of the same nationality?",
+        "student_model": "fau/ibm-granite/granite-4.1-3b",
+        "teacher_models": [
+          "edenchat/deepinfra/zai-org/GLM-5.3"
+        ],
+        "steps": 1,
+        "budget": 3,
+        "stop_reason": "error",
+        "exact_match": false,
+        "f1": 0.1429,
+        "answer_correct": true,
+        "doc_recall": 0.5,
+        "answer_grounded": true,
+        "teacher_answer_score": null,
+        "teacher_answer_correct": null,
+        "plan_rounds": 3,
+        "final_answer": "Yes, Scott Derrickson and Ed Wood are of the same nationality; both are American.",
+        "gold_answer": "yes",
+        "roles": {
+          "student": {
+            "calls": 5,
+            "in": 2546,
+            "out": 878,
+            "reasoning": 0,
+            "cost": 0.0,
+            "ms": 4000.5218982696533,
+            "cost_missing": 5,
+            "models": [
+              "fau/ibm-granite/granite-4.1-3b"
+            ]
+          },
+          "teacher": {
+            "calls": 7,
+            "in": 6310,
+            "out": 12473,
+            "reasoning": 0,
+            "cost": 0.0550064,
+            "ms": 286880.68079948425,
+            "cost_missing": 0,
+            "models": [
+              "edenchat/deepinfra/zai-org/GLM-5.3"
+            ]
+          }
+        },
+        "total_cost": 0.0550064,
+        "wall_s": 290.8812026977539
+      }
+    ],
+    "projections": {
+      "10000": 550.064,
+      "120000": 6600.768
+    },
+    "projections_hi": {
+      "10000": 550.064,
+      "120000": 6600.768
+    }
+  }
+]

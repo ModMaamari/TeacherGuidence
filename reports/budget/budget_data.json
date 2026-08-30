@@ -1,0 +1,159 @@
+{
+  "generated_for": "teacher-guidance corpus budget",
+  "rate_eur_usd": 1.160718,
+  "contingency": 0.3,
+  "datasets": {
+    "HotpotQA": {
+      "mean": 0.044751,
+      "sd": 0.013381,
+      "n": 5,
+      "hops": "2",
+      "gold": "sentence",
+      "license": "CC BY-SA 4.0"
+    },
+    "2WikiMultihopQA": {
+      "mean": 0.052979,
+      "sd": 0.003837,
+      "n": 3,
+      "hops": "2-4",
+      "gold": "sentence",
+      "license": "Apache-2.0"
+    },
+    "MuSiQue": {
+      "mean": 0.046989,
+      "sd": 0.009665,
+      "n": 3,
+      "hops": "2-4",
+      "gold": "paragraph",
+      "license": "CC BY 4.0"
+    },
+    "StrategyQA": {
+      "mean": 0.042453,
+      "sd": 0.010698,
+      "n": 3,
+      "hops": "2-5",
+      "gold": "paragraph",
+      "license": "MIT"
+    }
+  },
+  "teachers": {
+    "Qwen3.8-2.4T-A95B": {
+      "mean": 0.044751,
+      "sd": 0.013381,
+      "n": 5,
+      "id": "qwen/qwen3.8-2.4t-a95b"
+    },
+    "Kimi K3": {
+      "mean": 0.059866,
+      "sd": 0.014164,
+      "n": 5,
+      "id": "qwen/kimi-k3"
+    },
+    "GLM-5.3": {
+      "mean": 0.079975,
+      "sd": 0.023236,
+      "n": 5,
+      "id": "deepinfra/zai-org/GLM-5.3"
+    }
+  },
+  "ratio": {
+    "Qwen3.8-2.4T-A95B": 1.0,
+    "Kimi K3": 1.337757815467811,
+    "GLM-5.3": 1.7871109025496639
+  },
+  "matrix": {
+    "Qwen3.8-2.4T-A95B": {
+      "HotpotQA": 0.044751,
+      "2WikiMultihopQA": 0.052979,
+      "MuSiQue": 0.046989,
+      "StrategyQA": 0.042453
+    },
+    "Kimi K3": {
+      "HotpotQA": 0.059866,
+      "2WikiMultihopQA": 0.07087307130566915,
+      "MuSiQue": 0.06285990199101697,
+      "StrategyQA": 0.05679183254005497
+    },
+    "GLM-5.3": {
+      "HotpotQA": 0.079975,
+      "2WikiMultihopQA": 0.09467934850617864,
+      "MuSiQue": 0.08397455419990617,
+      "StrategyQA": 0.07586821914594087
+    }
+  },
+  "per_teacher_avg": {
+    "Qwen3.8-2.4T-A95B": 0.046793,
+    "Kimi K3": 0.06259770145918528,
+    "GLM-5.3": 0.08362428046300642
+  },
+  "scenarios": {
+    "Qwen3.8-2.4T-A95B": {
+      "1000": {
+        "usd": 46.793,
+        "usd_plan": 60.8309
+      },
+      "10000": {
+        "usd": 467.93,
+        "usd_plan": 608.3090000000001
+      },
+      "120000": {
+        "usd": 5615.16,
+        "usd_plan": 7299.708
+      }
+    },
+    "Kimi K3": {
+      "1000": {
+        "usd": 62.59770145918528,
+        "usd_plan": 81.37701189694087
+      },
+      "10000": {
+        "usd": 625.9770145918528,
+        "usd_plan": 813.7701189694087
+      },
+      "120000": {
+        "usd": 7511.724175102234,
+        "usd_plan": 9765.241427632904
+      }
+    },
+    "GLM-5.3": {
+      "1000": {
+        "usd": 83.62428046300641,
+        "usd_plan": 108.71156460190834
+      },
+      "10000": {
+        "usd": 836.2428046300643,
+        "usd_plan": 1087.1156460190837
+      },
+      "120000": {
+        "usd": 10034.913655560771,
+        "usd_plan": 13045.387752229002
+      }
+    }
+  },
+  "mix": {
+    "cells": {
+      "Qwen3.8-2.4T-A95B": {
+        "HotpotQA": 44.751,
+        "2WikiMultihopQA": 52.979,
+        "MuSiQue": 46.989000000000004,
+        "StrategyQA": 42.452999999999996
+      },
+      "Kimi K3": {
+        "HotpotQA": 59.866,
+        "2WikiMultihopQA": 70.87307130566916,
+        "MuSiQue": 62.859901991016976,
+        "StrategyQA": 56.791832540054976
+      },
+      "GLM-5.3": {
+        "HotpotQA": 79.97500000000001,
+        "2WikiMultihopQA": 94.67934850617864,
+        "MuSiQue": 83.97455419990617,
+        "StrategyQA": 75.86821914594087
+      }
+    },
+    "total_usd": 772.0599276887667,
+    "total_eur": 665.1571938134558,
+    "episodes": 12000,
+    "total_usd_plan": 1003.6779059953968
+  }
+}

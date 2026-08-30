@@ -1,0 +1,452 @@
+<title>TeachTrace Status Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#f2f3f6;
+    --surface:#ffffff;
+    --surface-2:#e9ebf1;
+    --ink:#15181f;
+    --ink-2:#454c5c;
+    --ink-3:#6d7488;
+    --rule:#d3d7e0;
+    --accent:#b4661a;        /* ochre — the guidance signal */
+    --accent-soft:#f3e3d0;
+    --cool:#1f5f6b;          /* teal — measured / done */
+    --cool-soft:#d8e9ea;
+    --warn:#8a6a12;
+    --warn-soft:#f3ecd2;
+    --stop:#8f2f2f;
+    --stop-soft:#f4dcdc;
+    --shadow:0 1px 2px rgba(21,24,31,.06), 0 8px 24px -16px rgba(21,24,31,.28);
+    --measure:70ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#101319;
+      --surface:#171b23;
+      --surface-2:#1f242e;
+      --ink:#e9ebf1;
+      --ink-2:#b3b9c8;
+      --ink-3:#848b9c;
+      --rule:#2b313d;
+      --accent:#e0a05a;
+      --accent-soft:#3a2c1b;
+      --cool:#6fc0c9;
+      --cool-soft:#16333a;
+      --warn:#d7b45c;
+      --warn-soft:#332c14;
+      --stop:#e08a8a;
+      --stop-soft:#3a1f1f;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#101319; --surface:#171b23; --surface-2:#1f242e;
+    --ink:#e9ebf1; --ink-2:#b3b9c8; --ink-3:#848b9c; --rule:#2b313d;
+    --accent:#e0a05a; --accent-soft:#3a2c1b;
+    --cool:#6fc0c9; --cool-soft:#16333a;
+    --warn:#d7b45c; --warn-soft:#332c14;
+    --stop:#e08a8a; --stop-soft:#3a1f1f;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Source Serif 4","Iowan Old Style",Georgia,serif;
+    font-size:17px; line-height:1.62; margin:0;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px 96px}
+
+  /* ---------- masthead ---------- */
+  header.masthead{
+    border-bottom:2px solid var(--ink);
+    padding:56px 0 22px; margin-bottom:36px;
+  }
+  .eyebrow{
+    font-family:"IBM Plex Mono",ui-monospace,monospace;
+    font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 14px;
+  }
+  h1{
+    font-family:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+    font-weight:800; font-size:clamp(2.4rem,6vw,4rem); line-height:1.02;
+    letter-spacing:-.025em; margin:0 0 16px; text-wrap:balance;
+  }
+  .standfirst{max-width:var(--measure); color:var(--ink-2); font-size:1.12rem; margin:0 0 26px}
+  .standfirst strong{color:var(--ink); font-weight:600}
+  .meta{
+    display:flex; flex-wrap:wrap; gap:8px 28px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px;
+    color:var(--ink-3); letter-spacing:.02em;
+  }
+  .meta b{color:var(--ink-2); font-weight:500}
+
+  /* ---------- stat band ---------- */
+  .band{display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:1px;
+        background:var(--rule); border:1px solid var(--rule); border-radius:3px; overflow:hidden;
+        margin:0 0 56px}
+  .stat{background:var(--surface); padding:18px 20px 16px}
+  .stat .k{font-family:"Bricolage Grotesque",sans-serif; font-weight:700; font-size:1.85rem;
+           letter-spacing:-.02em; line-height:1.1; font-variant-numeric:tabular-nums}
+  .stat .k.hi{color:var(--accent)}
+  .stat .l{font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase;
+           letter-spacing:.11em; color:var(--ink-3); margin-top:7px}
+
+  /* ---------- sections ---------- */
+  section{margin:0 0 68px; scroll-margin-top:24px}
+  .sec-head{display:flex; align-items:baseline; gap:14px; border-top:1px solid var(--rule);
+            padding-top:14px; margin-bottom:22px}
+  .sec-num{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent);
+           letter-spacing:.08em; flex:none; padding-top:6px}
+  h2{font-family:"Bricolage Grotesque",sans-serif; font-weight:700;
+     font-size:clamp(1.5rem,3vw,2rem); letter-spacing:-.02em; margin:0; text-wrap:balance}
+  h3{font-family:"Bricolage Grotesque",sans-serif; font-weight:600; font-size:1.06rem;
+     letter-spacing:-.005em; margin:34px 0 10px}
+  p{max-width:var(--measure); margin:0 0 16px}
+  .lede{font-size:1.06rem; color:var(--ink-2)}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:.86em}
+  code{background:var(--surface-2); padding:.1em .34em; border-radius:3px; color:var(--ink-2)}
+  a{color:var(--accent)}
+  ul{max-width:var(--measure); padding-left:1.1em; margin:0 0 16px}
+  li{margin-bottom:8px}
+  li::marker{color:var(--ink-3)}
+
+  /* ---------- verdict cards ---------- */
+  .verdicts{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin:8px 0 8px}
+  .vcard{background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+         padding:20px 20px 18px; box-shadow:var(--shadow); border-top:3px solid var(--cool)}
+  .vcard.b{border-top-color:var(--accent)}
+  .vcard.c{border-top-color:var(--stop)}
+  .vcard h4{font-family:"Bricolage Grotesque",sans-serif; font-size:1rem; font-weight:700;
+            margin:0 0 8px; letter-spacing:-.01em}
+  .vcard p{font-size:.95rem; color:var(--ink-2); margin:0}
+
+  /* ---------- ladder ---------- */
+  .ladder{border:1px solid var(--rule); border-radius:4px; overflow:hidden; background:var(--surface);
+          margin:6px 0 20px}
+  .rung{display:grid; grid-template-columns:78px 1fr; gap:0; border-bottom:1px solid var(--rule)}
+  .rung:last-child{border-bottom:none}
+  .rung .lvl{font-family:"IBM Plex Mono",monospace; font-size:12px; padding:12px 14px;
+             color:var(--ink-3); background:var(--surface-2); letter-spacing:.04em}
+  .rung .desc{padding:12px 16px; font-size:.95rem}
+  .rung .desc b{font-family:"Bricolage Grotesque",sans-serif; font-weight:600}
+  .rung .bar{display:inline-block; height:7px; border-radius:4px; background:var(--accent);
+             vertical-align:middle; margin-right:10px; opacity:.85}
+  .rung.work{background:var(--accent-soft)}
+
+  /* ---------- tables ---------- */
+  .tw{overflow-x:auto; border:1px solid var(--rule); border-radius:4px; background:var(--surface);
+      margin:6px 0 10px}
+  table{border-collapse:collapse; width:100%; font-size:.9rem}
+  th,td{text-align:left; padding:9px 14px; border-bottom:1px solid var(--rule); white-space:nowrap}
+  thead th{font-family:"IBM Plex Mono",monospace; font-size:10.5px; text-transform:uppercase;
+           letter-spacing:.09em; color:var(--ink-3); background:var(--surface-2); font-weight:500}
+  tbody tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right; font-variant-numeric:tabular-nums;
+                font-family:"IBM Plex Mono",monospace; font-size:.83rem}
+  tr.best td{background:var(--cool-soft)}
+  td.first{font-weight:600}
+  caption{caption-side:bottom; text-align:left; padding:10px 14px; font-size:.82rem;
+          color:var(--ink-3); border-top:1px solid var(--rule)}
+
+  /* ---------- pills ---------- */
+  .pill{display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10px;
+        text-transform:uppercase; letter-spacing:.09em; padding:3px 8px; border-radius:100px;
+        border:1px solid transparent; white-space:nowrap}
+  .p-done{background:var(--cool-soft); color:var(--cool); border-color:var(--cool)}
+  .p-part{background:var(--warn-soft); color:var(--warn); border-color:var(--warn)}
+  .p-open{background:var(--stop-soft); color:var(--stop); border-color:var(--stop)}
+  .p-plan{background:var(--surface-2); color:var(--ink-3); border-color:var(--rule)}
+
+  /* ---------- pipeline ---------- */
+  .pipe{display:grid; gap:10px; margin:6px 0 18px}
+  .step{display:grid; grid-template-columns:30px 1fr; gap:14px; align-items:start;
+        background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--cool);
+        border-radius:4px; padding:12px 16px}
+  .step.todo{border-left-color:var(--stop)}
+  .step .idx{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--ink-3); padding-top:3px}
+  .step .body{font-size:.94rem}
+  .step .body .cmd{font-family:"IBM Plex Mono",monospace; font-size:.8rem; color:var(--accent);
+                   display:block; margin-bottom:3px}
+  .step .body .txt{color:var(--ink-2)}
+
+  /* ---------- callout ---------- */
+  .callout{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--accent);
+           border-radius:4px; padding:18px 22px; margin:20px 0; box-shadow:var(--shadow)}
+  .callout p:last-child{margin-bottom:0}
+  .callout .tag{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.11em;
+                text-transform:uppercase; color:var(--accent); display:block; margin-bottom:8px}
+
+  /* ---------- todo ---------- */
+  .phase{border:1px solid var(--rule); border-radius:4px; background:var(--surface);
+         margin-bottom:14px; overflow:hidden}
+  .phase > summary{cursor:pointer; list-style:none; padding:15px 20px; display:flex;
+                   align-items:center; gap:14px; font-family:"Bricolage Grotesque",sans-serif;
+                   font-weight:600; font-size:1.02rem}
+  .phase > summary::-webkit-details-marker{display:none}
+  .phase > summary:hover{background:var(--surface-2)}
+  .phase > summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+  .phase .code{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--accent);
+               border:1px solid var(--rule); border-radius:3px; padding:2px 7px; flex:none}
+  .phase .when{margin-left:auto; font-family:"IBM Plex Mono",monospace; font-size:11px;
+               color:var(--ink-3); font-weight:400}
+  .phase .inner{padding:2px 20px 18px 20px; border-top:1px solid var(--rule)}
+  .task{display:grid; grid-template-columns:auto 1fr; gap:12px; padding:11px 0;
+        border-bottom:1px solid var(--rule); align-items:start}
+  .task:last-child{border-bottom:none}
+  .task .t{font-size:.94rem; max-width:none}
+  .task .t b{font-family:"Bricolage Grotesque",sans-serif; font-weight:600}
+  .task .t small{display:block; color:var(--ink-3); font-size:.85rem; margin-top:2px}
+
+  .qs{counter-reset:q; padding-left:0; list-style:none; max-width:var(--measure)}
+  .qs li{counter-increment:q; padding-left:34px; position:relative}
+  .qs li::before{content:counter(q); position:absolute; left:0; top:1px;
+                 font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--accent);
+                 border:1px solid var(--rule); border-radius:100px; width:22px; height:22px;
+                 display:grid; place-items:center}
+
+  footer{border-top:2px solid var(--ink); padding-top:18px; color:var(--ink-3);
+          font-family:"IBM Plex Mono",monospace; font-size:11.5px; line-height:1.8}
+  @media (max-width:640px){
+    body{font-size:16px}
+    .rung{grid-template-columns:64px 1fr}
+    .phase .when{display:none}
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Project audit · teacher-guidence</p>
+  <h1>Teacher Guidance:<br>where the work stands</h1>
+  <p class="standfirst">A framework that records a large <strong>teacher</strong> privately grading every step a small <strong>student</strong> agent takes, revealing only a code-enforced dose of feedback — then distils those traces into a student that needs no teacher at all. The machine is built and proven on HotpotQA. <strong>The corpus it was built to produce has not been generated yet.</strong></p>
+  <div class="meta">
+    <span><b>Audit date</b> 2026-08-30</span>
+    <span><b>Last code change</b> 2026-08-02</span>
+    <span><b>Data migrated to Frigga</b> 2026-08-09</span>
+    <span><b>Branch</b> feature/teacher-guidance</span>
+  </div>
+</header>
+
+<div class="band">
+  <div class="stat"><div class="k">~31.6K</div><div class="l">episodes collected</div></div>
+  <div class="stat"><div class="k">1 / 4</div><div class="l">datasets at scale</div></div>
+  <div class="stat"><div class="k hi">3.0 → 60.2%</div><div class="l">SFT lift, no teacher</div></div>
+  <div class="stat"><div class="k">471</div><div class="l">tests</div></div>
+  <div class="stat"><div class="k">69 GB</div><div class="l">traces &amp; checkpoints</div></div>
+  <div class="stat"><div class="k">0</div><div class="l">environments on Frigga</div></div>
+</div>
+
+<section id="verdict">
+  <div class="sec-head"><span class="sec-num">01</span><h2>The three-sentence verdict</h2></div>
+  <div class="verdicts">
+    <div class="vcard">
+      <h4>The framework is production-grade</h4>
+      <p>471 tests, resumable multi-GPU runners, a three-tier teacher cost router with a circuit breaker, leakage enforced in code, per-call cost and provenance telemetry, a trajectory explorer, and converters for four multi-hop datasets.</p>
+    </div>
+    <div class="vcard b">
+      <h4>The science already pays off</h4>
+      <p>Guidance-SFT lifts Qwen3.5-0.8B from 3.0% to 60.2% judge-correct with no teacher at inference — beating the untrained student with a live 120B teacher in the loop, at 57% fewer tokens.</p>
+    </div>
+    <div class="vcard c">
+      <h4>The pivot stalled mid-flight</h4>
+      <p>The multi-dataset corpus is designed, its converters written and tested — but no <span class="mono">tg_v1</span> dataset exists, no collection plan has been generated, no non-HotpotQA episode has ever been produced, and the machine that ran all of this is gone.</p>
+    </div>
+  </div>
+</section>
+
+<section id="what">
+  <div class="sec-head"><span class="sec-num">02</span><h2>What the system does</h2></div>
+  <p class="lede">Per question: the student optionally drafts a plan the teacher critiques, then emits one JSON tool action per step, up to a step budget. The environment executes the tool deterministically against that question's own local paragraph set — no web, fully reproducible. The teacher, who can see the gold answer, grades the step privately. A renderer then exposes only what the guidance level permits, and a leakage checker sanitizes it before the student ever reads it.</p>
+  <p>Nine tools: <code>search</code>, <code>extract</code>, <code>verify</code>, <code>decompose</code>, <code>reformulate</code>, <code>synthesize</code>, <code>finish</code>, <code>wiki_read</code>, <code>wiki_write</code>. The split between the teacher's private diagnosis and the student's visible guidance is the corpus's central asset — and it is enforced by code, not by prompting, which is exactly what a reviewer will probe.</p>
+
+  <h3>The supervision ladder</h3>
+  <div class="ladder">
+    <div class="rung"><div class="lvl">skip</div><div class="desc"><b>Control arm.</b> No teacher call at all.</div></div>
+    <div class="rung"><div class="lvl">G0</div><div class="desc"><span class="bar" style="width:12px"></span><b>Binary reward.</b> A 0 or a 1.</div></div>
+    <div class="rung"><div class="lvl">G1</div><div class="desc"><span class="bar" style="width:26px"></span><b>Continuous reward.</b> A score from 0.0 to 1.0.</div></div>
+    <div class="rung"><div class="lvl">G2</div><div class="desc"><span class="bar" style="width:44px"></span><b>Outcome feedback.</b> Score plus a short note.</div></div>
+    <div class="rung work"><div class="lvl">G3</div><div class="desc"><span class="bar" style="width:66px"></span><b>Diagnostic feedback.</b> Score plus a diagnosis, no next action. <em>The workhorse setting.</em></div></div>
+    <div class="rung"><div class="lvl">G4</div><div class="desc"><span class="bar" style="width:92px"></span><b>Scaffolded guidance.</b> Score, diagnosis, and a next-step hint.</div></div>
+  </div>
+  <p>Holding question, student and seed fixed while moving only this dial is what turns a trace dump into a <em>counterfactual</em> corpus — and what supports paired, per-question significance tests instead of cross-population comparisons.</p>
+</section>
+
+<section id="results">
+  <div class="sec-head"><span class="sec-num">03</span><h2>What the experiments showed</h2></div>
+
+  <h3>Distillation — the headline result</h3>
+  <p>Four arms on 100 fresh unseen questions, five seeds, budget 4, vLLM, judged by an independent gpt-oss-120b. The <b>m1</b> arm is the student trained so the teacher's guidance became its own internal thought, running with no teacher at inference.</p>
+  <div class="tw">
+    <table>
+      <caption>Judge-correct accuracy · tokens per question. <span class="mono">exp_unseen100</span>, 5 seeds, paired t + Wilcoxon with Holm correction.</caption>
+      <thead><tr><th>Student</th><th class="num">Base</th><th class="num">Base + teacher</th><th class="num">m1 — no teacher</th><th class="num">m1 + teacher</th></tr></thead>
+      <tbody>
+        <tr class="best"><td class="first">Qwen3.5-0.8B</td><td class="num">3.0% · 8.4k</td><td class="num">32.6% · 17.7k</td><td class="num">60.2% · 7.6k</td><td class="num">69.6% · 16.1k</td></tr>
+        <tr class="best"><td class="first">Qwen3.5-2B</td><td class="num">21.2% · 9.9k</td><td class="num">60.2% · 18.8k</td><td class="num">63.6% · 7.6k</td><td class="num">74.6% · 16.0k</td></tr>
+        <tr><td class="first">granite-4.1-3B</td><td class="num">30.8% · 8.0k</td><td class="num">63.6% · 17.4k</td><td class="num">48.6% · 8.6k</td><td class="num">59.5% · 20.5k</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>For both Qwen students the internalized model <em>beats the untrained model with a live 120-billion-parameter teacher in the loop</em>, while dropping that teacher entirely. For granite — much the strongest base model — internalization keeps 76% of the teacher-in-loop accuracy. Format adherence is a training outcome too: invalid actions fell from 51 to 2 on dev, and the base model ends 75% of episodes without ever committing an answer where m1 commits in ~99%.</p>
+
+  <h3>Cross-student transfer — trace quality beats trace ownership</h3>
+  <p>Qwen3.5-0.8B trained twice over the same 3,000 questions: once on its own trajectories, once on granite's. Semantic accuracy is a dead heat (52.8% vs 53.7%, inside seed noise) — but the granite-trained model has <b>3.6× the exact-match</b>, +14 F1, finishes voluntarily 2.4× as often, produced <b>zero invalid actions across 3,600 episodes</b>, and evaluates 22% faster. Answer form and efficiency habits transfer from whoever authored the traces.</p>
+
+  <h3>Generation behaviour — budget is the dominant lever</h3>
+  <div class="tw">
+    <table>
+      <caption>Six budget runs over the same 3,000 HotpotQA training questions · granite-4.1-3b student, gpt-oss-120b teacher · <span class="mono">reports/best_answer_v1</span>. "h" = hidden budget.</caption>
+      <thead><tr><th>Run</th><th class="num">b1</th><th class="num">b2</th><th class="num">b3</th><th class="num">b4</th><th class="num">b5h</th><th class="num">b9h</th></tr></thead>
+      <tbody>
+        <tr><td class="first">Teacher-verdict correct</td><td class="num">29.1%</td><td class="num">62.7%</td><td class="num">70.2%</td><td class="num">74.3%</td><td class="num">75.2%</td><td class="num">78.4%</td></tr>
+        <tr><td class="first">Doc recall (correct eps)</td><td class="num">0.00</td><td class="num">0.83</td><td class="num">0.90</td><td class="num">0.92</td><td class="num">0.92</td><td class="num">0.93</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>265 of the 3,000 questions were never solved by any run; an escalating retry campaign at budgets 4 → 20 → 30 later recovered 118 of them, and the remainder became the golden-100 hardest-question test set. Hiding the budget from the student measurably improves both correctness and efficiency — the student stops treating the budget as a quota. And in the 4-student × 5-setting protocol matrix, the hidden max-20 setting won for every model, while the no-teacher arm lost for every model.</p>
+
+  <h3>What guidance costs</h3>
+  <p>Over one 3,000-episode run: 85.8M input and 13.7M visible output tokens. The teacher accounts for <b>57.6% of all billed tokens</b>, and its reasoning overhead — billed output versus visible output — is <b>2.82×</b>. That ratio is the single biggest cost lever in the whole corpus plan, and the reason the internalized student's token economics matter as much as its accuracy.</p>
+
+  <div class="callout">
+    <span class="tag">Read the metrics as a set</span>
+    <p>Cover-match over-credits verbose answers, exact-match and F1 under-credit them, and the teacher verdict (≥ 0.40) is lenient. They disagree materially — in the wiki A/B, one arm's teacher-rate was flat while its cover-match halved. Every table above should be read alongside the others, never averaged.</p>
+  </div>
+</section>
+
+<section id="pipeline">
+  <div class="sec-head"><span class="sec-num">04</span><h2>How a new dataset becomes traces</h2></div>
+  <p class="lede">The engine is already generic. A new multi-hop dataset needs no engine change — only two JSONL shapes: questions carrying gold answers, supporting titles and a per-question candidate document set, and a corpus of those candidate paragraphs. Four converters exist; each one's output is validated row by row.</p>
+  <div class="pipe">
+    <div class="step"><span class="idx">01</span><div class="body"><span class="cmd">prepare_dataset.py --dataset {hotpotqa|2wikimultihopqa|musique|strategyqa}</span><span class="txt">Converts a source into canonical questions + corpus + a manifest recording conversion stats, license, SHA-256 of both files and the framework commit. Gold granularity is represented, not faked: paragraph-level sources report a null supporting-fact recall rather than a zero that would silently drag every cross-dataset average down.</span></div></div>
+    <div class="step"><span class="idx">02</span><div class="body"><span class="cmd">smoke_datasets.py --data-root …</span><span class="txt">Offline preflight, free and in seconds: schema conformance, unique qids, every candidate document present — and the check that actually matters, that the <em>real</em> retriever can reach each question's gold documents. A converter can emit valid rows the retriever cannot serve.</span></div></div>
+    <div class="step"><span class="idx">03</span><div class="body"><span class="cmd">probe_models.py</span><span class="txt">Is each teacher source alive, and does its verdict JSON parse? Reasoning teachers hide their chain-of-thought in three different places; a naive parser returns the model's discarded draft instead of its verdict.</span></div></div>
+    <div class="step todo"><span class="idx">04</span><div class="body"><span class="cmd">plan_collection.py</span><span class="txt">Partitions rather than crosses: each of the 12 teacher×student combinations gets its own question batch plus a <b>shared 500-question anchor set</b>. Anchors make teachers and students comparable on identical items; the disjoint remainder buys breadth at bounded cost. Never run.</span></div></div>
+    <div class="step todo"><span class="idx">05</span><div class="body"><span class="cmd">smoke_matrix.py --plan …</span><span class="txt">A handful of real episodes per matrix cell, audited end to end, before six figures of episodes are spent. Never run against the current teacher roster.</span></div></div>
+    <div class="step todo"><span class="idx">06</span><div class="body"><span class="cmd">run_tg_vllm.py / run_batched_parallel.py</span><span class="txt">Mass generation, resumable — re-running a slice continues where it stopped. Then validate every run for leakage and integrity.</span></div></div>
+    <div class="step todo"><span class="idx">07</span><div class="body"><span class="cmd">build_release.py</span><span class="txt">The boundary between raw and published: drops per-call cost, provider response bodies and the router chain, and emits a <b>full</b> view with the teacher's privileged reasoning and a <b>train_safe</b> view with it stripped — because fine-tuning naively on the full view trains a model on text containing the gold answer.</span></div></div>
+  </div>
+</section>
+
+<section id="gaps">
+  <div class="sec-head"><span class="sec-num">05</span><h2>The gap register</h2></div>
+  <p>Eight gaps were identified as blocking mass generation. Five are closed; three are not.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>#</th><th>Gap</th><th>Status</th><th>What remains</th></tr></thead>
+      <tbody>
+        <tr><td class="first">G1</td><td>Dataset name hardcoded to HotpotQA</td><td><span class="pill p-done">closed</span></td><td>—</td></tr>
+        <tr><td class="first">G2</td><td>No schema version on episodes</td><td><span class="pill p-done">closed</span></td><td>—</td></tr>
+        <tr><td class="first">G3</td><td>No dataset-level validation</td><td><span class="pill p-done">closed</span></td><td>—</td></tr>
+        <tr><td class="first">G4</td><td>Retriever untested off HotpotQA</td><td><span class="pill p-done">closed</span></td><td>—</td></tr>
+        <tr><td class="first">G5</td><td>No canonical config registry</td><td><span class="pill p-part">partial</span></td><td>Write one YAML per matrix cell</td></tr>
+        <tr><td class="first">G6</td><td>Teacher license unverified</td><td><span class="pill p-open">open</span></td><td>Audit before publishing any teacher's outputs</td></tr>
+        <tr><td class="first">G7</td><td>Gateway throttles past ~24-way concurrency</td><td><span class="pill p-part">partial</span></td><td>Global rate limiter still missing</td></tr>
+        <tr><td class="first">G8</td><td>Pilot traces predate several fixes</td><td><span class="pill p-open">open</span></td><td>Regenerate under v1, or ship as documented v0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Open bugs worth fixing before spending GPU-hours</h3>
+  <ul>
+    <li><b>Voluntary "unknown" finishes the teacher accepts.</b> Episodes stop after 2–7 steps, well under budget, on a voluntary finish of "unknown" that the teacher then accepts. Two candidate fixes were designed; neither is implemented. This silently costs correctness in every run.</li>
+    <li><b>The wiki A/B analyzer reports two metrics as permanently zero</b> — it matches the wrong edit-op vocabulary, so anyone reading its stats file programmatically gets silent zeros.</li>
+    <li><b>Teacher capacity is unresolved.</b> At the last probe, one teacher was free and working, one was billed, one returned a deterministic gateway error, and every fallback key was out of credit. That is the single largest risk to a six-figure-episode run.</li>
+  </ul>
+</section>
+
+<section id="todo">
+  <div class="sec-head"><span class="sec-num">06</span><h2>What it takes to finish</h2></div>
+  <p class="lede">Ordered by dependency. P0 unblocks everything else — nothing in the project can run today, because the environments, GPUs and paths all belonged to the previous machine.</p>
+
+  <details class="phase" open>
+    <summary><span class="code">P0</span> Get the project running again on Frigga <span class="when">2–4 days</span></summary>
+    <div class="inner">
+      <div class="task"><span class="pill p-open">blocking</span><div class="t"><b>Confirm the compute plan.</b><small>Current Slurm partitions (they change — never trust a stored name), GPU type and count, and whether compute nodes can reach the teacher gateways at all. Teacher calls are the whole pipeline.</small></div></div>
+      <div class="task"><span class="pill p-open">blocking</span><div class="t"><b>Rebuild the three environments.</b><small>Inference venv on Python 3.10–3.12, a separate training venv, and an isolated vLLM venv. None exist; the login node runs an unsupported Python and has no GPU.</small></div></div>
+      <div class="task"><span class="pill p-open">blocking</span><div class="t"><b>Run the test suite and repoint hard-coded paths.</b><small>Every run manifest still points at the old machine's home directory.</small></div></div>
+      <div class="task"><span class="pill p-open">blocking</span><div class="t"><b>Index the 21 GB trace archive.</b><small>All raw generation output is one un-indexed tar. Write the index once, then extract only the runs that are needed.</small></div></div>
+      <div class="task"><span class="pill p-part">next</span><div class="t"><b>Re-probe every teacher and student, then commit the working tree.</b><small>~40 untracked files including the whole wiki A/B suite and the hard-question campaign. Refresh the handoff doc — it is eight weeks stale on two material points.</small></div></div>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="code">P0.5</span> Small fixes worth making first <span class="when">1–2 days</span></summary>
+    <div class="inner">
+      <div class="task"><span class="pill p-open">bug</span><div class="t"><b>Fix the voluntary-"unknown" finish.</b><small>Extend the answer-extraction fallback to any finish resolving to "unknown", or have the teacher reject such a finish. Add a regression test.</small></div></div>
+      <div class="task"><span class="pill p-open">bug</span><div class="t"><b>Fix the wiki-analysis op matching</b> and regenerate its stats.</div></div>
+      <div class="task"><span class="pill p-part">G7</span><div class="t"><b>Add a global teacher rate limiter.</b><small>A process-wide token bucket in front of the router, tuned to each provider's measured ceiling — otherwise a wide run throttles the free gateway and silently falls through to paid providers.</small></div></div>
+      <div class="task"><span class="pill p-part">G5</span><div class="t"><b>Write the config registry</b> — one reviewable YAML per matrix cell.</div></div>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="code">P1</span> Build the corpus <span class="when">~3 weeks + 2 weeks unattended</span></summary>
+    <div class="inner">
+      <div class="task"><span class="pill p-open">data</span><div class="t"><b>Convert StrategyQA for the first time.</b><small>The only source never converted — its paragraph corpus was never downloaded. Boolean answers also need a sanity check against metrics built for spans.</small></div></div>
+      <div class="task"><span class="pill p-open">data</span><div class="t"><b>Prepare the v1 dataset at scale</b> and pass the offline preflight cleanly.<small>Only 50-question smoke sets exist today, for three of four sources.</small></div></div>
+      <div class="task"><span class="pill p-open">data</span><div class="t"><b>Prepare the held-out evaluation sets</b> — and never generate traces from them, so the zero-shot generalization claim stays clean.</div></div>
+      <div class="task"><span class="pill p-open">models</span><div class="t"><b>Audit teacher licenses, measure provider concurrency ceilings, and stand up vLLM serving for all four students.</b><small>The "fully open, redistributable corpus" claim is worth more than any single teacher.</small></div></div>
+      <div class="task"><span class="pill p-open">gate</span><div class="t"><b>Pilot 500 episodes per new dataset, then a go/no-go per dataset.</b><small>Three good datasets beat four shaky ones.</small></div></div>
+      <div class="task"><span class="pill p-open">scale</span><div class="t"><b>Generate the collection plan, then run the slices — bulk training data first.</b><small>The plan manifest is the experimental design; commit it. Nightly status, cost and failure triage while it runs.</small></div></div>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="code">P2</span> Finish the science <span class="when">~2 weeks, overlapping</span></summary>
+    <div class="inner">
+      <div class="task"><span class="pill p-done">done</span><div class="t"><b>Base → SFT lift, and cross-student transfer.</b><small>Both published; re-run on v1 data for consistency.</small></div></div>
+      <div class="task"><span class="pill p-open">headline</span><div class="t"><b>The dose–response curve.</b><small>Train the same student on data from each guidance level and plot accuracy against supervision. This is the paper's identity — the question nobody else's corpus can answer.</small></div></div>
+      <div class="task"><span class="pill p-open">new</span><div class="t"><b>Cross-dataset zero-shot, teacher-size scaling, and a process reward model for best-of-n reranking.</b><small>The reward model is the cheapest of the three: its 58,218-example dataset is built and a smoke model already reached 0.77 AUC.</small></div></div>
+      <div class="task"><span class="pill p-part">unfinished</span><div class="t"><b>Finish the teacher-only versus guidance comparison.</b><small>Two of three students failed at evaluation and no comparison was published. Preliminary evidence favours the guidance recipe — confirm or refute it.</small></div></div>
+      <div class="task"><span class="pill p-part">smoke only</span><div class="t"><b>Run one real training for the rejection-sampling, preference and reward-model methods.</b><small>All five pipelines pass end-to-end smoke tests, but only the SFT method has ever been trained for real.</small></div></div>
+    </div>
+  </details>
+
+  <details class="phase">
+    <summary><span class="code">P3</span> Quality, human validation, release <span class="when">~3 weeks</span></summary>
+    <div class="inner">
+      <div class="task"><span class="pill p-open">quality</span><div class="t"><b>Full-corpus validation, dedup and contamination checks</b>, with every evaluation question banned from every training view.</div></div>
+      <div class="task"><span class="pill p-open">quality</span><div class="t"><b>Independent post-hoc leakage audit</b> over all student-visible text.<small>Publish the true rate with a confidence interval, not a claim of zero. An in-episode leakage flag means the guard fired and sanitized — detection is not exposure.</small></div></div>
+      <div class="task"><span class="pill p-open">no owner</span><div class="t"><b>The 1,200-episode human validation study.</b><small>Three annotators, 300 overlapping items, five labels each; report agreement, judge-versus-human correlation, and gate precision and recall. On the critical path, and currently unassigned.</small></div></div>
+      <div class="task"><span class="pill p-open">release</span><div class="t"><b>Build the full and train-safe views, the datasheet, the machine-readable metadata, and the public trace explorer.</b><small>The privileged-field warning has to be loud — it is the foreseeable misuse.</small></div></div>
+    </div>
+  </details>
+</section>
+
+<section id="decisions">
+  <div class="sec-head"><span class="sec-num">07</span><h2>Decisions only you can make</h2></div>
+  <p class="lede">Each of these blocks scheduling, not engineering. They are cheap to answer and expensive to leave open.</p>
+  <ol class="qs">
+    <li><b>Target venue and deadline.</b> Everything downstream is sized by this one date.</li>
+    <li><b>Scale.</b> The full ~184K-episode design, or the trimmed variant? The anchor-set design keeps the paired comparisons valid either way.</li>
+    <li><b>Dataset set.</b> Confirm all four sources, or drop the riskiest — the boolean one that has never been converted.</li>
+    <li><b>Teacher roster.</b> Depends on the re-probe and the license audit. If only one teacher is both free and working, the teacher-scaling study needs paid budget or a local small teacher.</li>
+    <li><b>Budget cap.</b> Free-gateway-first keeps cost near zero; a fully paid run is roughly $550, realistically $150–400.</li>
+    <li><b>Human annotation.</b> Who annotates, with what budget and what ethics approval?</li>
+    <li><b>The existing pilot traces.</b> Regenerate them under v1 configs, or ship them as a documented v0?</li>
+  </ol>
+</section>
+
+<section id="week">
+  <div class="sec-head"><span class="sec-num">08</span><h2>A first week that unblocks everything</h2></div>
+  <div class="pipe">
+    <div class="step todo"><span class="idx">D1–2</span><div class="body"><span class="txt"><b>Environments, tests, path repointing, trace-archive index.</b> Nothing else can start until this is done.</span></div></div>
+    <div class="step todo"><span class="idx">D2</span><div class="body"><span class="txt"><b>Re-probe every model</b> and settle the teacher roster. This decides whether the corpus design survives intact.</span></div></div>
+    <div class="step todo"><span class="idx">D3</span><div class="body"><span class="txt"><b>Fix the unknown-finish bug and add the rate limiter</b> — both change what the generated data is worth.</span></div></div>
+    <div class="step todo"><span class="idx">D4–5</span><div class="body"><span class="txt"><b>Convert StrategyQA, prepare the v1 datasets, pass the offline preflight</b>, then smoke the matrix on whichever cells survived the probe. That is the pilot's go/no-go.</span></div></div>
+  </div>
+</section>
+
+<footer>
+  Sources · TEACHER_GUIDANCE_STATUS_REPORT.md · TEACHER_GUIDANCE_TODO.md · resource_paper/PLAN.md · HANDOFF.md<br>
+  Measured results · reports/ · training_methods/*/runs/ · reports/HTML_reports/<br>
+  Audit performed 2026-08-30 against the working tree at /shared/al-maamari/DeKIS/teacher-guidence
+</footer>
+
+</div>

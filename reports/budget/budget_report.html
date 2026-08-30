@@ -1,0 +1,317 @@
+<title>Teacher-Guidance Corpus Budget</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600;6..72,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#f5f4f1;
+    --surface:#fffefc;
+    --surface-2:#eceae5;
+    --ink:#1b1a17;
+    --ink-2:#4b4943;
+    --ink-3:#79766e;
+    --rule:#d9d6ce;
+    --rule-strong:#1b1a17;
+    --accent:#1f5d4c;     /* ledger green */
+    --accent-soft:#dce9e4;
+    --flag:#9a3412;       /* caution */
+    --flag-soft:#f6e2d8;
+    --measure:68ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#131412; --surface:#1a1c19; --surface-2:#232622;
+      --ink:#eceae4; --ink-2:#b6b3ab; --ink-3:#87847c; --rule:#31352f;
+      --rule-strong:#eceae4;
+      --accent:#6cc0a5; --accent-soft:#17302a;
+      --flag:#e79b74; --flag-soft:#33211a;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#131412; --surface:#1a1c19; --surface-2:#232622;
+    --ink:#eceae4; --ink-2:#b6b3ab; --ink-3:#87847c; --rule:#31352f;
+    --rule-strong:#eceae4;
+    --accent:#6cc0a5; --accent-soft:#17302a;
+    --flag:#e79b74; --flag-soft:#33211a;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); margin:0;
+       font-family:"Newsreader","Iowan Old Style",Georgia,serif; font-size:17px; line-height:1.6;}
+  .wrap{max-width:1020px; margin:0 auto; padding:0 26px 80px}
+
+  header{border-bottom:2px solid var(--rule-strong); padding:52px 0 20px; margin-bottom:34px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.16em;
+           text-transform:uppercase; color:var(--accent); margin:0 0 12px}
+  h1{font-family:"IBM Plex Sans",system-ui,sans-serif; font-weight:600;
+     font-size:clamp(2.1rem,5vw,3.1rem); line-height:1.05; letter-spacing:-.02em;
+     margin:0 0 14px; text-wrap:balance}
+  .sub{max-width:var(--measure); color:var(--ink-2); margin:0 0 22px}
+  .facts{display:flex; flex-wrap:wrap; gap:6px 26px; font-family:"IBM Plex Mono",monospace;
+         font-size:11.5px; color:var(--ink-3)}
+  .facts b{color:var(--ink-2); font-weight:500}
+
+  .headline{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:1px;
+            background:var(--rule); border:1px solid var(--rule); margin:0 0 46px}
+  .hcell{background:var(--surface); padding:16px 18px}
+  .hcell .v{font-family:"IBM Plex Sans",sans-serif; font-weight:600; font-size:1.7rem;
+            letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.15}
+  .hcell .v.a{color:var(--accent)}
+  .hcell .l{font-family:"IBM Plex Mono",monospace; font-size:10px; text-transform:uppercase;
+            letter-spacing:.1em; color:var(--ink-3); margin-top:6px}
+
+  section{margin:0 0 52px}
+  .sh{display:flex; align-items:baseline; gap:12px; border-top:1px solid var(--rule);
+      padding-top:12px; margin-bottom:16px}
+  .sn{font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--accent); flex:none}
+  h2{font-family:"IBM Plex Sans",sans-serif; font-weight:600; font-size:1.35rem;
+     letter-spacing:-.015em; margin:0}
+  h3{font-family:"IBM Plex Sans",sans-serif; font-weight:600; font-size:.98rem;
+     margin:26px 0 8px; color:var(--ink-2)}
+  p{max-width:var(--measure); margin:0 0 14px}
+  ul{max-width:var(--measure); padding-left:1.1em; margin:0 0 14px}
+  li{margin-bottom:7px}
+  code{font-family:"IBM Plex Mono",monospace; font-size:.82em; background:var(--surface-2);
+       padding:.1em .34em; border-radius:2px; color:var(--ink-2)}
+  a{color:var(--accent); text-underline-offset:2px}
+
+  .tw{overflow-x:auto; border:1px solid var(--rule); background:var(--surface); margin:4px 0 12px}
+  table{border-collapse:collapse; width:100%; font-size:.87rem;
+        font-family:"IBM Plex Sans",sans-serif}
+  th,td{text-align:left; padding:8px 13px; border-bottom:1px solid var(--rule); white-space:nowrap}
+  thead th{font-family:"IBM Plex Mono",monospace; font-size:10px; text-transform:uppercase;
+           letter-spacing:.09em; color:var(--ink-3); background:var(--surface-2); font-weight:400}
+  tbody tr:last-child td{border-bottom:none}
+  td.n,th.n{text-align:right; font-variant-numeric:tabular-nums;
+            font-family:"IBM Plex Mono",monospace; font-size:.83rem}
+  td.k{font-weight:600}
+  tr.best td{background:var(--accent-soft)}
+  tr.tot td{border-top:2px solid var(--rule-strong); font-weight:600}
+  .plan{color:var(--ink-3); font-size:.92em}
+  caption{caption-side:bottom; text-align:left; padding:9px 13px; font-size:.8rem;
+          color:var(--ink-3); border-top:1px solid var(--rule); font-family:"IBM Plex Sans",sans-serif}
+
+  .note{background:var(--flag-soft); border-left:3px solid var(--flag);
+        padding:14px 18px; margin:16px 0; font-size:.94rem}
+  .note b{color:var(--flag)}
+  .note p{margin:0; max-width:none}
+  .key{background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--accent);
+       padding:16px 20px; margin:16px 0}
+  .key p{margin:0; max-width:none}
+  .meas{color:var(--accent); font-weight:600}
+
+  .cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:22px}
+  .res h3{margin-top:0}
+  .res ul{list-style:none; padding:0; font-size:.9rem; font-family:"IBM Plex Sans",sans-serif}
+  .res li{margin-bottom:6px; color:var(--ink-2)}
+
+  footer{border-top:2px solid var(--rule-strong); padding-top:16px; color:var(--ink-3);
+         font-family:"IBM Plex Mono",monospace; font-size:11px; line-height:1.75}
+
+  @media print{
+    body{background:#fff; color:#000; font-size:10.5pt}
+    .wrap{max-width:none; padding:0}
+    header{padding-top:0}
+    section{break-inside:auto; margin-bottom:22px}
+    .tw{overflow:visible; break-inside:avoid}
+    table{font-size:8.6pt}
+    th,td{padding:4px 7px}
+    h1{font-size:23pt}
+    h2{font-size:13pt}
+    .headline{margin-bottom:20px}
+    a{color:#1f5d4c; text-decoration:none}
+  }
+  @page{size:A4; margin:16mm 14mm}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Teacher-Guidance Corpus · Budget Report</p>
+  <h1>What the corpus costs</h1>
+  <p class="sub">Per-episode generation cost measured on real, EdenAI-billed episodes across three teachers and four multi-hop QA datasets — with projections at 1K, 10K and 120K episodes, and a costed plan for a 12,000-episode mixed corpus.</p>
+  <div class="facts">
+    <span><b>Date</b> 2026-08-30</span>
+    <span><b>Billing</b> EdenAI, per call</span>
+    <span><b>EUR→USD</b> 1.1607</span>
+    <span><b>Episodes measured</b> 26</span>
+    <span><b>Cost of this study</b> ≈ $2.40</span>
+  </div>
+</header>
+
+<div class="headline">
+  <div class="hcell"><div class="v a">$0.0425–0.0947</div><div class="l">cost per episode</div></div>
+  <div class="hcell"><div class="v">€665</div><div class="l">12,000-episode mix</div></div>
+  <div class="hcell"><div class="v">€865</div><div class="l">same, with contingency</div></div>
+  <div class="hcell"><div class="v">€0</div><div class="l">same corpus on FAU</div></div>
+</div>
+
+<section>
+  <div class="sh"><span class="sn">01</span><h2>Basis of estimate</h2></div>
+  <p>Every figure comes from episodes actually run and actually billed — EdenAI returns a real USD <code>cost</code> per call, which is summed across every logged LLM call in an episode. Nothing here is a list-price extrapolation.</p>
+  <div class="tw">
+    <table>
+      <tbody>
+        <tr><td class="k">Configuration</td><td>g3_plan — guidance level 3, plan review (3 rounds), step budget 3, budget hidden</td></tr>
+        <tr><td class="k">Student</td><td><code>fau/ibm-granite/granite-4.1-3b</code> — free FAU gateway, contributes $0</td></tr>
+        <tr><td class="k">Teacher endpoint</td><td><code>https://api.edenai.run/v3/chat/completions</code></td></tr>
+        <tr><td class="k">Sample</td><td>5 episodes per teacher (HotpotQA) · 3 episodes per dataset (Qwen3.8)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="key"><p>A teacher-guidance episode costs <strong>$0.042–$0.095</strong>. Per-episode spend is set by the <em>protocol</em> — roughly four teacher calls per episode — far more than by question difficulty. The teacher is effectively 100% of the bill; the student is free.</p></div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">02</span><h2>Measured cost per episode</h2></div>
+
+  <h3>By teacher — HotpotQA, n=5 each</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Teacher</th><th>EdenAI model id</th><th class="n">$/episode</th><th class="n">sd</th><th class="n">Calls</th><th class="n">API time</th><th class="n">Correct</th></tr></thead>
+      <tbody>
+        <tr class="best"><td class="k">Qwen3.8-2.4T-A95B</td><td><code>qwen/qwen3.8-2.4t-a95b</code></td><td class="n">$0.0448</td><td class="n">±0.0134</td><td class="n">4.2</td><td class="n">200 s</td><td class="n">4/5</td></tr>
+        <tr><td class="k">Kimi K3</td><td><code>qwen/kimi-k3</code></td><td class="n">$0.0599</td><td class="n">±0.0142</td><td class="n">4.2</td><td class="n">141 s</td><td class="n">3/5</td></tr>
+        <tr><td class="k">GLM-5.3 ⚠</td><td><code>deepinfra/zai-org/GLM-5.3</code></td><td class="n">$0.0800</td><td class="n">±0.0232</td><td class="n">9.2</td><td class="n">407 s</td><td class="n">4/5</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note"><p><b>⚠ GLM-5.3's figure reflects a misconfiguration, not its price.</b> At a 2,500-token cap it returns empty content with <code>finish_reason: length</code> — inline reasoning consumes the budget before the JSON verdict — so every call is retried (9.2 calls vs 4.2). An 8,000-token cap returns valid JSON for $0.0137, versus $0.0123 paid for nothing, but then exceeds the 180 s EdenAI timeout. Treat GLM-5.3 as an <strong>upper bound</strong> pending a corrected run.</p></div>
+
+  <h3>By dataset — teacher Qwen3.8-2.4T-A95B</h3>
+  <div class="tw">
+    <table>
+      <caption>Spread across datasets is only ±12%. 2Wiki is dearest because the teacher writes longer critiques on 4-hop comparisons (11.3k output tokens vs 9.3k).</caption>
+      <thead><tr><th>Dataset</th><th class="n">n</th><th class="n">$/episode</th><th class="n">sd</th><th>Hops</th><th>Gold</th><th>Licence</th><th class="n">Correct</th><th class="n">Grounded</th></tr></thead>
+      <tbody>
+        <tr><td class="k">StrategyQA</td><td class="n">3</td><td class="n">$0.0425</td><td class="n">±0.0107</td><td>2–5</td><td>paragraph</td><td>MIT</td><td class="n">2/3</td><td class="n">1/3</td></tr>
+        <tr class="best"><td class="k">HotpotQA</td><td class="n">5</td><td class="n">$0.0448</td><td class="n">±0.0134</td><td>2</td><td>sentence</td><td>CC BY-SA 4.0</td><td class="n">4/5</td><td class="n">5/5</td></tr>
+        <tr><td class="k">MuSiQue</td><td class="n">3</td><td class="n">$0.0470</td><td class="n">±0.0097</td><td>2–4</td><td>paragraph</td><td>CC BY 4.0</td><td class="n">1/3</td><td class="n">3/3</td></tr>
+        <tr><td class="k">2WikiMultihopQA</td><td class="n">3</td><td class="n">$0.0530</td><td class="n">±0.0038</td><td>2–4</td><td>sentence</td><td>Apache-2.0</td><td class="n">1/3</td><td class="n">1/3</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">03</span><h2>Cost per episode — teacher × dataset</h2></div>
+  <p>Nine of the twelve cells are derived: a dataset's measured cost scaled by that teacher's HotpotQA ratio (Qwen 1.00, Kimi 1.34, GLM 1.79). Directly measured cells are marked <span class="meas">●</span>.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>$/episode</th><th class="n">HotpotQA</th><th class="n">2WikiMultihopQA</th><th class="n">MuSiQue</th><th class="n">StrategyQA</th></tr></thead>
+      <tbody>
+        <tr class="best"><td class="k">Qwen3.8-2.4T-A95B</td><td class="n"><span class="meas">●</span> $0.0448</td><td class="n"><span class="meas">●</span> $0.0530</td><td class="n"><span class="meas">●</span> $0.0470</td><td class="n"><span class="meas">●</span> $0.0425</td></tr>
+        <tr><td class="k">Kimi K3</td><td class="n"><span class="meas">●</span> $0.0599</td><td class="n">$0.0709</td><td class="n">$0.0629</td><td class="n">$0.0568</td></tr>
+        <tr><td class="k">GLM-5.3 ⚠</td><td class="n"><span class="meas">●</span> $0.0800</td><td class="n">$0.0947</td><td class="n">$0.0840</td><td class="n">$0.0759</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">04</span><h2>Scale scenarios</h2></div>
+  <p>Single teacher, dataset-balanced. <strong>Plan</strong> adds a 30% contingency over the measured mean, matching the largest observed per-episode standard deviation. Budget against the Plan figure.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Teacher</th><th class="n">1,000</th><th class="n">10,000</th><th class="n">120,000</th></tr></thead>
+      <tbody>
+        <tr class="best"><td class="k">Qwen3.8-2.4T-A95B</td><td class="n">$46.79 <span class="plan">· plan $60.83</span></td><td class="n">$467.93 <span class="plan">· plan $608.31</span></td><td class="n">$5,615 <span class="plan">· plan $7,300</span></td></tr>
+        <tr><td class="k">Kimi K3</td><td class="n">$62.60 <span class="plan">· plan $81.38</span></td><td class="n">$625.98 <span class="plan">· plan $813.77</span></td><td class="n">$7,512 <span class="plan">· plan $9,765</span></td></tr>
+        <tr><td class="k">GLM-5.3 ⚠</td><td class="n">$83.62 <span class="plan">· plan $108.71</span></td><td class="n">$836.24 <span class="plan">· plan $1,087</span></td><td class="n">$10,035 <span class="plan">· plan $13,045</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>In EUR, on the cheapest teacher: <strong>1K ≈ €40</strong> (plan €52) · <strong>10K ≈ €403</strong> (plan €524) · <strong>120K ≈ €4,838</strong> (plan €6,289).</p>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">05</span><h2>The mixed corpus — 1,000 per teacher × dataset</h2></div>
+  <p>Three teachers × four datasets × 1,000 episodes = <strong>12,000 episodes</strong>, the design that makes teacher identity and dataset both analysable as variables.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>USD</th><th class="n">HotpotQA</th><th class="n">2Wiki</th><th class="n">MuSiQue</th><th class="n">StrategyQA</th><th class="n">Row total</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Qwen3.8-2.4T-A95B</td><td class="n">$44.75</td><td class="n">$52.98</td><td class="n">$46.99</td><td class="n">$42.45</td><td class="n">$187.17</td></tr>
+        <tr><td class="k">Kimi K3</td><td class="n">$59.87</td><td class="n">$70.87</td><td class="n">$62.86</td><td class="n">$56.79</td><td class="n">$250.39</td></tr>
+        <tr><td class="k">GLM-5.3 ⚠</td><td class="n">$79.98</td><td class="n">$94.68</td><td class="n">$83.97</td><td class="n">$75.87</td><td class="n">$334.50</td></tr>
+        <tr class="tot"><td class="k">Column total</td><td class="n">$184.60</td><td class="n">$218.53</td><td class="n">$193.82</td><td class="n">$175.11</td><td class="n">$772.06</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>12,000 episodes</th><th class="n">USD</th><th class="n">EUR</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Measured mean</td><td class="n">$772.06</td><td class="n">€665.16</td></tr>
+        <tr class="tot"><td class="k">Planning figure (+30%)</td><td class="n">$1,003.68</td><td class="n">€864.70</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="key"><p><strong>Budget €865 for the 12,000-episode mixed corpus; expect ≈ €665.</strong> Fixing GLM-5.3's token cap should cut its row materially, taking the total toward €550–600.</p></div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">06</span><h2>Cost levers</h2></div>
+  <ul>
+    <li><strong>Run bulk generation on the free FAU gateway.</strong> <code>DeepSeek-V4-Flash</code> and <code>gpt-oss-120b</code> were both verified working and free on 2026-08-30. Paid teachers are only needed where teacher <em>identity</em> is the variable under study. This is the difference between €865 and near-zero for the bulk corpus.</li>
+    <li><strong>Fix GLM-5.3 before buying any of it.</strong> It needs an 8,000-token cap <em>and</em> an EdenAI timeout ≥ 600 s. It expands its reasoning to fill whatever cap it is given (16k → 5,943 tokens, $0.0243), so 8,000 is a sweet spot, not a floor.</li>
+    <li><strong>Step budget drives cost roughly linearly.</strong> These figures are budget 3; plan a budget-5 run on the deeper datasets at ~$0.07–0.08 per episode.</li>
+    <li><strong>Wall-clock may bind before money does.</strong> At ~200 s of teacher API time per episode, 12,000 episodes is ~660 hours serialized. EdenAI concurrency limits are unmeasured.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">07</span><h2>Caveats</h2></div>
+  <ul>
+    <li><strong>n is small</strong> — five episodes per teacher, three per dataset. The 30% contingency exists for this reason.</li>
+    <li><strong>Nine of twelve matrix cells are derived</strong>, not measured.</li>
+    <li><strong>GLM-5.3 is an upper bound</strong>, pending a corrected run.</li>
+    <li><strong>Student deviation:</strong> granite-<strong>4.1</strong>-3b on FAU, not local granite-4.2 — every GPU node was draining for a reboot, and 4.2 is not in the FAU catalogue. Student calls are free either way, so this affects trajectory shape, not cost.</li>
+    <li><strong>Accuracy is not a cost figure</strong> but is reported because it decides how many episodes are needed: 4/5 correct on HotpotQA against 1/3 on 2Wiki and MuSiQue.</li>
+  </ul>
+</section>
+
+<section class="res">
+  <div class="sh"><span class="sn">08</span><h2>Resources</h2></div>
+  <div class="cols">
+    <div>
+      <h3>Endpoints</h3>
+      <ul>
+        <li>EdenAI · <a href="https://docs.edenai.co/">docs.edenai.co</a><br><code>api.edenai.run/v3/chat/completions</code></li>
+        <li>NHR@FAU gateway (free) · <a href="https://hpc.fau.de/">hpc.fau.de</a><br><code>hub.nhr.fau.de/api/llmgw/v1</code></li>
+      </ul>
+      <h3>Models</h3>
+      <ul>
+        <li><a href="https://huggingface.co/Qwen">Qwen</a> · <code>qwen/qwen3.8-2.4t-a95b</code></li>
+        <li><a href="https://huggingface.co/moonshotai">moonshotai</a> · <code>qwen/kimi-k3</code></li>
+        <li><a href="https://huggingface.co/zai-org">zai-org</a> · <code>deepinfra/zai-org/GLM-5.3</code></li>
+        <li><a href="https://huggingface.co/ibm-granite/granite-4.1-3b">ibm-granite/granite-4.1-3b</a> — student</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Datasets</h3>
+      <ul>
+        <li><a href="https://hotpotqa.github.io/">HotpotQA</a> — CC BY-SA 4.0</li>
+        <li><a href="https://github.com/Alab-NII/2wikimultihop">2WikiMultihopQA</a> — Apache-2.0</li>
+        <li><a href="https://github.com/StonyBrookNLP/musique">MuSiQue</a> — CC BY 4.0</li>
+        <li><a href="https://allenai.org/data/strategyqa">StrategyQA</a> — MIT · <a href="https://storage.googleapis.com/ai2i/strategyqa/data/strategyqa_dataset.zip">dataset zip</a></li>
+      </ul>
+      <h3>Data behind this report</h3>
+      <ul>
+        <li><code>reports/costprobe_teachers.json</code></li>
+        <li><code>reports/costprobe_datasets.json</code></li>
+        <li><code>reports/budget/budget_data.json</code></li>
+        <li><code>scripts/episode_cost_report.py</code></li>
+        <li><code>scripts/build_budget_report.py</code></li>
+      </ul>
+      <h3>Exchange rate</h3>
+      <ul><li><a href="https://open.er-api.com/v6/latest/EUR">open.er-api.com</a> — 1.1607, 2026-08-30</li></ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Teacher-Guidance corpus budget · measured 2026-08-30 · all costs are EdenAI per-call billing on real episodes<br>
+  Repository: /shared/al-maamari/DeKIS/teacher-guidence · branch feature/teacher-guidance
+</footer>
+
+</div>
