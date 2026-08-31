@@ -77,3 +77,12 @@ data/*.tar
 .context/
 # HuggingFace datasets cache (re-downloadable)
 .hf_cache/
+
+# Job-local caches redirected off the read-only /home on compute nodes
+.cache/
+
+# m1-LODO generated artifacts (rebuildable; adapters and episode logs are large)
+training_methods/m1_lodo/data/
+training_methods/m1_lodo/runs/
+training_methods/m1_lodo/smoke/
+training_methods/m1_lodo/*.log
