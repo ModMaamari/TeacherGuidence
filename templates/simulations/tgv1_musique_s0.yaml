@@ -12,7 +12,7 @@ workflows:
 datasets:
 - name: hotpot_questions
   path: ./data/datasets/tg_v1_shards/musique/musique_train_s0.jsonl
-  num_samples: 3
+  num_samples: 334
   sample_strategy: sequential
 max_iterations: 1
 similarity_metric: token_overlap
@@ -22,9 +22,9 @@ verification:
 mode_config:
   budget: 3
   student_model: fau/ibm-granite/granite-4.1-3b
-  teacher_model: fau/deepseek-ai/DeepSeek-V4-Flash
+  teacher_model: edenchat/flexai/DeepSeek-V4-Flash-0731
   teacher_router:
-  - fau/deepseek-ai/DeepSeek-V4-Flash
+  - edenchat/flexai/DeepSeek-V4-Flash-0731
   student_use_response_schema: false
   disclose_budget: false
   wiki_enabled: false

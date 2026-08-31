@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.gen_fau_smoke_template import build_fau_smoke_template  # noqa: E402
 
-TEACHER = "fau/deepseek-ai/DeepSeek-V4-Flash"
+TEACHER = "edenchat/flexai/DeepSeek-V4-Flash-0731"
 STUDENT = "fau/ibm-granite/granite-4.1-3b"
 DATA_ROOT = "./data/datasets/tg_v1"
 
@@ -38,13 +38,17 @@ PROD_SAMPLES = 2000
 SMOKE_SAMPLES = 3
 
 
-def build(dataset: str, num_samples: int, template_id: str, out_root: str) -> dict:
+def build(dataset: str, num_samples: int, template_id: str, out_root: str,
+          teacher: str = TEACHER) -> dict:
+    """One dataset's template. ``teacher`` is overridable so a collection can be resumed
+    against a different model when a backend goes down mid-run -- the episode records which
+    model actually served it, so the split stays visible in the data."""
     d, stem = DATASETS[dataset]
     return build_fau_smoke_template(
         template_id=template_id,
         student_model=STUDENT,
-        teacher_model=TEACHER,
-        teacher_router=[TEACHER],          # single teacher: no silent fallback to a paid one
+        teacher_model=teacher,
+        teacher_router=[teacher],          # single teacher: no silent fallback to a paid one
         num_samples=num_samples,
         questions_path=f"{DATA_ROOT}/{d}/{stem}_questions.jsonl",
         corpus_path=f"{DATA_ROOT}/{d}/{stem}_corpus.jsonl",

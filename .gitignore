@@ -73,3 +73,7 @@ data/*.tar
 
 # Throwaway probe environment
 .venv_probe/
+
+.context/
+# HuggingFace datasets cache (re-downloadable)
+.hf_cache/

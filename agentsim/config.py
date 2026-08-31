@@ -55,6 +55,9 @@ class Config:
     #: providers). Models listed here are sent there instead, in OpenAI request shape.
     EDENAI_CHAT_ENDPOINT: str = os.getenv("EDENAI_CHAT_ENDPOINT", "https://api.edenai.run/v3/chat/completions")
     EDENAI_API_KEY: Optional[str] = os.getenv("EDENAI_API_KEY")
+    #: NVIDIA NIM ("NVIDIA Build") -- OpenAI-compatible, free development tier.
+    NVIDIA_LLM_ENDPOINT: str = os.getenv("NVIDIA_LLM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
+    NVIDIA_API_KEY: Optional[str] = os.getenv("NVIDIA_API_KEY")
 
     # Local vLLM OpenAI-compatible server (student serving). Used instead of Ollama when a
     # small student needs high-throughput continuous batching on a big GPU: one server per
@@ -135,6 +138,7 @@ class Config:
     # Same wall-clock cap for a single EdenAI request (a reasoning teacher such as
     # MiniMax-M3 can legitimately generate for a while), matching CUSTOM_TIMEOUT.
     EDENAI_TIMEOUT: int = int(os.getenv("EDENAI_TIMEOUT", "180"))
+    NVIDIA_TIMEOUT: int = int(os.getenv("NVIDIA_TIMEOUT", "180"))
     LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "4096"))
     
     @classmethod
@@ -151,6 +155,8 @@ class Config:
             return "fau"
         elif model_id.startswith("edenai/"):
             return "edenai"
+        elif model_id.startswith("nvidia/"):
+            return "nvidia"
         elif model_id.startswith("edenchat/"):
             # Same provider and credentials, but EdenAI's OpenAI-compatible
             # chat-completions endpoint rather than the Responses API.
@@ -189,6 +195,8 @@ class Config:
             return bool(cls.FAU_LLM_ENDPOINT and cls.FAU_LLM_API_KEY)
         if provider == "edenai":
             return bool(cls.EDENAI_LLM_ENDPOINT and cls.EDENAI_API_KEY)
+        if provider == "nvidia":
+            return bool(cls.NVIDIA_LLM_ENDPOINT and cls.NVIDIA_API_KEY)
         if provider == "custom":
             return bool(cls.CUSTOM_LLM_ENDPOINT and cls.CUSTOM_LLM_API_KEY)
         if provider == "vllm":
@@ -211,6 +219,7 @@ class Config:
             "custom": cls.CUSTOM_LLM_API_KEY,
             "fau": cls.FAU_LLM_API_KEY,
             "edenai": cls.EDENAI_API_KEY,
+            "nvidia": cls.NVIDIA_API_KEY,
             "vllm": None,  # local server, no API key
             "ollama": None,  # Ollama doesn't require API key by default
         }

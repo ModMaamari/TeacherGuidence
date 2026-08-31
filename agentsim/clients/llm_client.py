@@ -34,6 +34,9 @@ _BREAKER_COOLDOWN_S = 120.0
 #: _edenai_chat_completion). Below this, requests are sent greedy (0.0).
 _EDENAI_MIN_TEMPERATURE = 0.6
 
+#: NVIDIA NIM rejects a request above this completion cap outright.
+_NVIDIA_MAX_TOKENS = 16384
+
 
 class LLMClient:
     """Unified client for multiple LLM providers"""
@@ -96,9 +99,9 @@ class LLMClient:
 
         provider = config.get_provider_from_model_id(model)
 
-        if return_raw and provider not in ("custom", "ollama", "fau", "edenai", "vllm"):
+        if return_raw and provider not in ("custom", "ollama", "fau", "edenai", "vllm", "nvidia"):
             raise ValueError(f"return_raw is not supported for provider '{provider}'")
-        if response_schema and provider not in ("custom", "ollama", "fau", "edenai", "vllm"):
+        if response_schema and provider not in ("custom", "ollama", "fau", "edenai", "vllm", "nvidia"):
             raise ValueError(f"response_schema is not supported for provider '{provider}'")
 
         if provider == "openai":
@@ -122,6 +125,11 @@ class LLMClient:
             result = await self._edenai_completion(
                 prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw,
                 response_schema, max_retries,
+            )
+        elif provider == "nvidia":
+            result = await self._nvidia_completion(
+                prompt, model, temperature, max_tokens, return_usage or return_raw, return_raw,
+                max_retries,
             )
         elif provider == "vllm":
             result = await self._vllm_completion(
@@ -782,6 +790,78 @@ class LLMClient:
                     "total_tokens": usage.get("total_tokens", prompt_tokens + completion_tokens),
                     # Real per-call USD billing, top level on this endpoint.
                     "cost": data.get("cost", usage.get("cost")),
+                    "reasoning_tokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
+                },
+            }
+            if return_raw:
+                result["raw_response"] = data
+            return result
+        return text
+
+    async def _nvidia_completion(self, prompt: str, model: str, temperature: float, max_tokens: Optional[int], return_usage: bool = False, return_raw: bool = False, max_retries: Optional[int] = None) -> str | Dict[str, Any]:
+        """NVIDIA NIM completion (OpenAI-compatible, free development tier).
+
+        Same wire format as FAU: ``messages`` in, ``choices[0].message`` out, with a
+        reasoning model's chain-of-thought in ``reasoning_content`` and the answer in
+        ``content``. Two NIM-specific details:
+
+        * ``max_tokens`` is capped at 16,384 by the service; a larger request is rejected
+          outright, so it is clamped here rather than failing the episode.
+        * Reasoning is OFF unless ``chat_template_kwargs.thinking`` is set. We leave it off
+          deliberately: the teacher's job is a short JSON verdict, and the episodes already
+          collected from this model family were produced without it.
+
+        ``response_schema`` is accepted for API symmetry but not forwarded, for the same
+        reason as FAU -- JSON mode corrupts reasoning-model output.
+        """
+        endpoint = config.NVIDIA_LLM_ENDPOINT
+        api_key = config.NVIDIA_API_KEY
+
+        if not endpoint:
+            raise ValueError("NVIDIA_LLM_ENDPOINT not configured")
+        if not api_key:
+            raise ValueError("NVIDIA_API_KEY not configured")
+
+        model_name = model.replace("nvidia/", "", 1)
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": min(max_tokens or config.LLM_MAX_TOKENS, _NVIDIA_MAX_TOKENS),
+        }
+
+        async def _send() -> Dict[str, Any]:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await self._post_json_with_backoff(
+                    client, endpoint.rstrip("/") + "/chat/completions", headers, payload,
+                    provider_label="nvidia", max_retries=max_retries,
+                )
+                response.raise_for_status()
+                return response.json()
+
+        try:
+            data = await asyncio.wait_for(_send(), timeout=config.NVIDIA_TIMEOUT)
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"NVIDIA request exceeded hard timeout of {config.NVIDIA_TIMEOUT}s "
+                f"(model={model_name}); falling through"
+            ) from exc
+
+        message = data["choices"][0]["message"]
+        text = message.get("content") or ""
+
+        if return_usage:
+            usage = data.get("usage", {}) or {}
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            result = {
+                "text": text,
+                "usage": {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": usage.get("total_tokens", prompt_tokens + completion_tokens),
+                    "cost": None,   # free development tier
                     "reasoning_tokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
                 },
             }

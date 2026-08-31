@@ -32,6 +32,8 @@ sys.path.insert(0, str(REPO_ROOT))
 from scripts.episode_cost_report import summarize  # noqa: E402
 
 EXPECTED = {"hotpotqa": 2000, "2wikimultihopqa": 2000, "musique": 2000, "strategyqa": 1999}
+#: Gold values where a bare string match cannot indicate a leak (see analyse()).
+BOOLEAN_ANSWERS = {"yes", "no", "true", "false"}
 
 
 def visible_text(ep: Dict[str, Any]) -> List[str]:
@@ -45,20 +47,35 @@ def visible_text(ep: Dict[str, Any]) -> List[str]:
     return out
 
 
-def load(run_root: Path) -> Dict[str, List[Dict[str, Any]]]:
-    by_ds: Dict[str, List[Dict[str, Any]]] = collections.defaultdict(list)
-    for p in run_root.rglob("teacher_guidance_episodes.jsonl"):
-        for line in p.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+def load(run_roots: List[Path]) -> Dict[str, List[Dict[str, Any]]]:
+    """Merge every run root, keeping ONE episode per (dataset, qid).
+
+    A retry pass re-collects questions the main run lost to gateway failures, so the same
+    qid can appear twice: once ending in ``error`` and once real. The successful episode
+    always wins, regardless of which root it came from.
+    """
+    best: Dict[tuple, Dict[str, Any]] = {}
+    for root in run_roots:
+        for p in root.rglob("teacher_guidance_episodes.jsonl"):
+            for line in p.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
                 ep = json.loads(line)
-                by_ds[ep.get("dataset") or "unknown"].append(ep)
+                key = (ep.get("dataset"), ep.get("qid"))
+                cur = best.get(key)
+                if cur is None or (cur.get("stop_reason") == "error"
+                                   and ep.get("stop_reason") != "error"):
+                    best[key] = ep
+    by_ds: Dict[str, List[Dict[str, Any]]] = collections.defaultdict(list)
+    for ep in best.values():
+        by_ds[ep.get("dataset") or "unknown"].append(ep)
     return by_ds
 
 
 def analyse(eps: List[Dict[str, Any]]) -> Dict[str, Any]:
     rows = [summarize(e) for e in eps]
     flags = collections.Counter()
-    exposures, echo_safe = [], 0
+    exposures, echo_safe, format_safe = [], 0, 0
     for e in eps:
         gold = (e.get("gold_answer") or "").strip()
         for s in e.get("steps") or []:
@@ -70,7 +87,13 @@ def analyse(eps: List[Dict[str, Any]]) -> Dict[str, Any]:
         pat = re.compile(r"\b" + re.escape(gold) + r"\b", re.I)
         if any(pat.search(v) for v in visible_text(e)):
             if pat.search(e.get("query") or ""):
+                # Comparison questions contain their own answer ("which came first, A or B?").
                 echo_safe += 1
+            elif gold.lower() in BOOLEAN_ANSWERS:
+                # A boolean-answer dataset makes the string match meaningless: the teacher
+                # telling a student to "give a clear yes/no answer" is instructing on answer
+                # FORMAT, not revealing which of the two it is.
+                format_safe += 1
             else:
                 exposures.append(e.get("qid"))
     qids = [e.get("qid") for e in eps]
@@ -92,6 +115,7 @@ def analyse(eps: List[Dict[str, Any]]) -> Dict[str, Any]:
         "flags": dict(flags),
         "exposures": exposures,
         "echo_safe": echo_safe,
+        "format_safe": format_safe,
         "provenance": sorted({(e.get("schema_version"), (e.get("framework_commit") or "")[:12],
                               e.get("config_hash")) for e in eps}),
     }
@@ -99,11 +123,11 @@ def analyse(eps: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run-root", default="data/simulation_output/tgv1")
+    ap.add_argument("--run-root", nargs="+", default=["data/simulation_output/tgv1"])
     ap.add_argument("--out", default="reports/tgv1/RUN_REPORT.md")
     args = ap.parse_args()
 
-    by_ds = load(Path(args.run_root))
+    by_ds = load([Path(r) for r in args.run_root])
     if not by_ds:
         raise SystemExit(f"no episodes under {args.run_root}")
 
@@ -112,6 +136,7 @@ def main() -> int:
     L.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     tot = collections.Counter()
     all_exposures, all_flags = [], collections.Counter()
+    echo_total = fmt_total = 0
     for ds in sorted(by_ds):
         a = analyse(by_ds[ds])
         exp = EXPECTED.get(ds, a["n"])
@@ -124,6 +149,7 @@ def main() -> int:
         tot["cost"] += a["cost"]
         all_exposures += a["exposures"]
         all_flags.update(a["flags"])
+        echo_total += a["echo_safe"]; fmt_total += a["format_safe"]
         L += ["", f"**{ds}** — stop reasons: `{a['stop_reasons']}` · provenance: `{a['provenance']}` · "
                   f"unique qids {a['unique_qids']}/{a['n']}", ""]
 
@@ -134,10 +160,23 @@ def main() -> int:
           f"- Grounded: {tot['grounded']} ({tot['grounded']/tot['n']:.1%})",
           f"- Duplicate qids: {tot['duplicates']}",
           f"- **Cost: ${tot['cost']:.4f}**", "",
+          "## Teachers and serving routes", ""]
+    routes = collections.Counter()
+    for eps in by_ds.values():
+        for e in eps:
+            for t in (e.get("teacher_models_used") or ["<none>"]):
+                routes[t] += 1
+    L.append("| Model · route | Episodes |")
+    L.append("|---|---:|")
+    for t, c in routes.most_common():
+        L.append(f"| `{t}` | {c} |")
+    L += ["",
           "## Leakage", "",
           f"- Guard flags fired (detected **and sanitized**): `{dict(all_flags) or 'none'}`",
+          f"- Gold echoed but already present in the question (comparison items): {echo_total}",
+          f"- Boolean gold matched in a \"give a yes/no answer\" instruction (format, not content): {fmt_total}",
           f"- **Hidden gold visible to the student: {len(all_exposures)}**"
-          + (f" — {all_exposures[:10]}" if all_exposures else " ✅"), ""]
+          + (f" — {all_exposures[:10]}" if all_exposures else " ✅ **PASS**"), ""]
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(L) + "\n", encoding="utf-8")

@@ -1,4 +1,4 @@
-id: tgv1_musique_s2
+id: tgv1_2wikimultihopqa_s0
 name: FAU gpt-oss-120b teacher (fau/ibm-granite/granite-4.1-3b student, b=3)
 mode: standard
 teacher_models:
@@ -11,8 +11,8 @@ workflows:
 - hotpot_teacher_guided_b3_plan_review
 datasets:
 - name: hotpot_questions
-  path: ./data/datasets/tg_v1_shards/musique/musique_train_s2.jsonl
-  num_samples: 333
+  path: ./data/datasets/tg_v1_shards/2wikimultihopqa/2wikimultihopqa_train_s0.jsonl
+  num_samples: 334
   sample_strategy: sequential
 max_iterations: 1
 similarity_metric: token_overlap
@@ -29,7 +29,7 @@ mode_config:
   disclose_budget: false
   wiki_enabled: false
   wiki_mode: tools
-  corpus_path: ./data/datasets/tg_v1/musique/musique_train_corpus.jsonl
+  corpus_path: ./data/datasets/tg_v1/2wikimultihopqa/2wikimultihopqa_train_corpus.jsonl
   retrieval_backend: hotpot_local
   skip_teacher: false
   teacher_max_tokens: 2500
@@ -59,4 +59,4 @@ mode_config:
     allow_teacher_to_suggest_queries: false
     allow_teacher_to_reveal_gold_titles: false
     allow_teacher_to_reveal_gold_answer: false
-output_dir: ./data/simulation_output/tgv1/tgv1_musique_s2
+output_dir: ./data/simulation_output/tgv1/tgv1_2wikimultihopqa_s0

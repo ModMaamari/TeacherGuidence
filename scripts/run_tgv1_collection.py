@@ -55,7 +55,8 @@ def episodes_done(out_dir: Path) -> int:
     return n
 
 
-def prepare_shard(dataset: str, shard: int, n_shards: int, lines: List[str]) -> Dict:
+def prepare_shard(dataset: str, shard: int, n_shards: int, lines: List[str],
+                  teacher: str = None) -> Dict:
     """Write one shard's question file and template; return its plan entry."""
     d, stem = DATASETS[dataset]
     shard_lines = lines[shard::n_shards]          # round-robin
@@ -65,7 +66,8 @@ def prepare_shard(dataset: str, shard: int, n_shards: int, lines: List[str]) -> 
     qpath.write_text("\n".join(shard_lines) + "\n", encoding="utf-8")
 
     tid = f"tgv1_{dataset}_s{shard}"
-    tpl = build(dataset, len(shard_lines), tid, OUT_ROOT)
+    tpl = build(dataset, len(shard_lines), tid, OUT_ROOT,
+                **({"teacher": teacher} if teacher else {}))
     tpl["datasets"][0]["path"] = "./" + str(qpath.relative_to(REPO_ROOT))
     (TEMPLATE_DIR / f"{tid}.yaml").write_text(yaml.safe_dump(tpl, sort_keys=False), encoding="utf-8")
     return {"dataset": dataset, "shard": shard, "template": tid,
@@ -81,6 +83,8 @@ def main() -> int:
     ap.add_argument("--shards", type=int, default=6, help="concurrent workers per dataset")
     ap.add_argument("--plan-only", action="store_true", help="write shards/templates, run nothing")
     ap.add_argument("--fau-timeout", default="600")
+    ap.add_argument("--teacher", default=None,
+                    help="override the default teacher (e.g. to resume after a backend outage)")
     args = ap.parse_args()
 
     datasets = sorted(DATASETS) if args.all or not args.datasets else args.datasets
@@ -88,7 +92,7 @@ def main() -> int:
     for ds in datasets:
         lines = question_lines(ds, args.num_samples)
         for s in range(args.shards):
-            plans.append(prepare_shard(ds, s, args.shards, lines))
+            plans.append(prepare_shard(ds, s, args.shards, lines, args.teacher))
 
     total_q = sum(p["questions"] for p in plans)
     print(f"planned {len(plans)} shards over {len(datasets)} dataset(s), {total_q} episodes")
