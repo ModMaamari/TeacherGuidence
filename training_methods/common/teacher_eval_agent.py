@@ -56,6 +56,12 @@ from agentsim.teacher_guidance.metrics import (  # noqa: E402
 )
 from scripts.gen_fau_smoke_template import TEACHER_ROUTER  # noqa: E402
 
+#: Default teacher for the guided-student arm. Overridable with --teacher-router so the
+#: arm can be run against whichever teacher is actually serving; the gpt-oss chain the
+#: module used to import is neither available nor permitted here.
+DEFAULT_TEACHER_ROUTER = ["edenchat/flexai/DeepSeek-V4-Flash-0731"]
+_ROUTER = list(DEFAULT_TEACHER_ROUTER)
+
 HF_STUDENT_SENTINEL = "hf-local"
 
 
@@ -122,8 +128,8 @@ def build_metadata(row: Dict[str, Any], budget: int, corpus_path: str, disclose_
         "retrieval_scope": row.get("retrieval_scope", {}),
         "budget": budget,
         "student_model": HF_STUDENT_SENTINEL,
-        "teacher_model": TEACHER_ROUTER[0],
-        "teacher_router": list(TEACHER_ROUTER),
+        "teacher_model": _ROUTER[0],
+        "teacher_router": list(_ROUTER),
         # HF generation is not grammar-constrained; the parse/repair path covers it
         # (same semantics as student_use_response_schema=False Ollama runs).
         "student_use_response_schema": False,
@@ -266,6 +272,8 @@ def main() -> None:
                     help=">1 runs episodes concurrently: teacher API waits overlap "
                          "with (GPU-serialized) student generation of other episodes")
     ap.add_argument("--student-temperature", type=float, default=0.0)
+    ap.add_argument("--teacher-router", default=",".join(DEFAULT_TEACHER_ROUTER),
+                    help="comma-separated teacher chain used to guide the student")
     ap.add_argument("--seed", type=int, default=None,
                     help="seed torch/random/numpy (meaningful with --student-temperature > 0)")
     ap.add_argument("--backend", choices=["hf", "vllm"], default="hf",
@@ -275,12 +283,14 @@ def main() -> None:
     ap.add_argument("--served-model", default="student",
                     help="served model name (a LoRA module name to evaluate an adapter)")
     args = ap.parse_args()
+    global _ROUTER
+    _ROUTER = [m.strip() for m in args.teacher_router.split(",") if m.strip()]
 
     run_dir = timestamped_dir(args.out, args.tag)
     log = setup_logger("teacher_eval", run_dir / "eval.log")
     log.info(f"args: {vars(args)}")
     log.info(f"artifacts: {run_dir}")
-    log.info(f"teacher router: {TEACHER_ROUTER}")
+    log.info(f"teacher router: {_ROUTER}")
 
     questions = load_questions(args.questions, args.limit)
     if args.shard:
@@ -384,7 +394,7 @@ def main() -> None:
         "arm": "teacher_in_loop",
         "model": args.model,
         "adapter": args.adapter,
-        "teacher_router": list(TEACHER_ROUTER),
+        "teacher_router": list(_ROUTER),
         "seed": args.seed,
         "student_temperature": args.student_temperature,
         "concurrency": args.concurrency,

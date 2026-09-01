@@ -189,8 +189,11 @@ def main() -> int:
     # --- pass 3: per-fold train/dev, with a disjointness proof ---
     stats: Dict[str, Any] = {"per_dataset": {k: dict(v) for k, v in counts.items()},
                              "test_sets": dict(test_counts), "folds": {}}
-    for k in DATASETS:
-        train_ds = [d for d in DATASETS if d != k]
+    # "all4" is not a leave-one-out fold: it trains on every dataset's trainable pool and
+    # is the model the uniform 747-question comparison needs. The held-in 10% of every
+    # dataset is still excluded, so it is unseen for this model exactly as for the folds.
+    for k in DATASETS + ["all4"]:
+        train_ds = [d for d in DATASETS if d != k] if k in DATASETS else list(DATASETS)
         train_rows, dev_rows = [], []
         for d in train_ds:
             for ex in examples[d]:
@@ -206,14 +209,16 @@ def main() -> int:
         for d in train_ds:
             heldin_qids = {f"{d}/{r['id']}" for r in read_jsonl(tests_dir / f"heldin_{d}_questions.jsonl")}
             overlaps[f"heldin_{d}"] = len(train_qids & heldin_qids)
-        unseen_qids = {f"{k}/{r['id']}" for r in read_jsonl(tests_dir / f"unseen_{k}_questions.jsonl")}
-        overlaps[f"unseen_{k}"] = len(train_qids & unseen_qids)
+        if k in DATASETS:
+            unseen_qids = {f"{k}/{r['id']}" for r in read_jsonl(tests_dir / f"unseen_{k}_questions.jsonl")}
+            overlaps[f"unseen_{k}"] = len(train_qids & unseen_qids)
 
         manifest = {
             "fold": k, "held_out_dataset": k, "train_datasets": train_ds,
             "train_examples": len(train_rows), "dev_examples": len(dev_rows),
             "train_questions": len(train_qids),
-            "test_sets": [f"heldin_{d}" for d in train_ds] + [f"unseen_{k}"],
+            "test_sets": [f"heldin_{d}" for d in train_ds]
+                         + ([f"unseen_{k}"] if k in DATASETS else []),
             "train_test_overlap": overlaps,
             "per_dataset_examples": {d: len(examples[d]) for d in train_ds},
         }
