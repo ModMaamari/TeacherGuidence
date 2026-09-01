@@ -1,0 +1,62 @@
+id: tarm_heldin_strategyqa_s2
+name: FAU gpt-oss-120b teacher (edenchat/flexai/DeepSeek-V4-Flash-0731 student, b=3)
+mode: standard
+teacher_models:
+- name: student
+  model_id: edenchat/flexai/DeepSeek-V4-Flash-0731
+  role: teacher
+  temperature: 0.2
+consultant_models: []
+workflows:
+- hotpot_teacher_guided_b3_plan_review
+datasets:
+- name: hotpot_questions
+  path: ./training_methods/m1_lodo/data/teacher_arm/heldin_strategyqa_s2.jsonl
+  num_samples: 46
+  sample_strategy: sequential
+max_iterations: 1
+similarity_metric: token_overlap
+similarity_threshold: 0.0
+verification:
+  enabled: false
+mode_config:
+  budget: 3
+  student_model: edenchat/flexai/DeepSeek-V4-Flash-0731
+  teacher_model: edenchat/flexai/DeepSeek-V4-Flash-0731
+  teacher_router:
+  - edenchat/flexai/DeepSeek-V4-Flash-0731
+  student_use_response_schema: false
+  disclose_budget: false
+  wiki_enabled: false
+  wiki_mode: tools
+  corpus_path: ./data/datasets/tg_v1/strategyqa/strategyqa_train_corpus.jsonl
+  retrieval_backend: hotpot_local
+  skip_teacher: true
+  teacher_max_tokens: 2500
+  teacher_max_tokens_retry: 4000
+  guidance:
+    level: 3
+    name: diagnostic_feedback
+    score_mode: continuous
+    max_feedback_words: 60
+    expose_next_action_hint: false
+    expose_tool_hint: false
+    expose_query_hint: false
+    expose_doc_title_hint: false
+    expose_gold_answer_hint: false
+    leak_policy: strict
+  plan_review:
+    enabled: true
+    planner: student
+    planning_steps: 3
+    formal_plan: false
+    review_guidance_level: 3
+    max_initial_plan_steps: 6
+    max_revised_plan_steps: 6
+    consume_budget: false
+    include_revised_plan_in_student_context: true
+    allow_teacher_to_suggest_tools: true
+    allow_teacher_to_suggest_queries: false
+    allow_teacher_to_reveal_gold_titles: false
+    allow_teacher_to_reveal_gold_answer: false
+output_dir: ./data/simulation_output/teacher_arm/tarm_heldin_strategyqa_s2

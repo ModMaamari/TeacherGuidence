@@ -175,23 +175,60 @@ def start_servers(out: Path, gpus: List[str], args) -> List[Dict[str, Any]]:
     return servers
 
 
-def wait_servers(servers: List[Dict[str, Any]], out: Path, timeout: int = 1800) -> None:
+def wait_servers(servers: List[Dict[str, Any]], out: Path,
+                 timeout: int = 5400) -> List[Dict[str, Any]]:
+    """Poll every server round-robin until all are serving.
+
+    Returns the servers that became ready. A GPU allocation is scarce and was already lost
+    once to this function raising: if two of three servers are serving, the right move is to
+    run on two and log the third as degraded, not to throw away the whole allocation. Only a
+    complete failure (nothing serving) is fatal.
+
+    Servers are polled together rather than one after another: they start simultaneously
+    and contend for CPU and the shared filesystem while loading weights and capturing CUDA
+    graphs, so a sequential wait spends the whole budget on whichever happens to be slowest
+    and reports nothing about the others. Startup was measured at 745s for two concurrent
+    servers and longer for three, so the budget is generous by design -- being slow to
+    start is normal, and killing a healthy run for it is not.
+    """
     import urllib.request
     t0 = time.time()
-    for s in servers:
-        while True:
+    pending = {s["port"]: s for s in servers}
+    while pending:
+        for port, s in list(pending.items()):
             if s["proc"].poll() is not None:
-                raise SystemExit(f"vLLM on gpu {s['gpu']} exited rc={s['proc'].returncode}; "
-                                 f"see {out/'logs'}/vllm_gpu{s['gpu']}_{s['port']}.log")
+                log(f"DEGRADED: vLLM on gpu {s['gpu']} exited rc={s['proc'].returncode}; "
+                    f"see {out/'logs'}/vllm_gpu{s['gpu']}_{s['port']}.log", out / "run.log")
+                del pending[port]
+                continue
             try:
                 urllib.request.urlopen(s["url"] + "/v1/models", timeout=5)
-                log(f"vllm ready gpu={s['gpu']} port={s['port']} "
-                    f"({time.time()-t0:.0f}s)", out / "run.log")
-                break
             except Exception:
-                if time.time() - t0 > timeout:
-                    raise SystemExit(f"vLLM on gpu {s['gpu']} not ready after {timeout}s")
-                time.sleep(5)
+                continue
+            log(f"vllm ready gpu={s['gpu']} port={port} ({time.time()-t0:.0f}s)",
+                out / "run.log")
+            del pending[port]
+        if not pending:
+            break
+        waited = time.time() - t0
+        if waited > timeout:
+            log("DEGRADED: giving up on gpu(s) %s after %ds; continuing with %d server(s)"
+                % ([x["gpu"] for x in pending.values()], timeout, len(servers) - len(pending)),
+                out / "run.log")
+            for x in pending.values():
+                try:
+                    x["proc"].terminate()
+                except Exception:
+                    pass
+            break
+        if int(waited) % 120 < 6:
+            log(f"waiting for {len(pending)} server(s) ({waited:.0f}s elapsed)",
+                out / "run.log")
+        time.sleep(6)
+    ready = [x for x in servers if x["port"] not in pending]
+    if not ready:
+        raise SystemExit("no vLLM server became ready")
+    return ready
 
 
 # ------------------------------------------------------------------------ scheduler
@@ -271,6 +308,8 @@ def main() -> int:
     ap.add_argument("--vllm-base-port", type=int, default=8400)
     ap.add_argument("--vllm-mem-util", type=float, default=0.85)
     ap.add_argument("--max-model-len", type=int, default=16384)
+    ap.add_argument("--eval-attempts", type=int, default=3,
+                    help="in-allocation retries of the eval stage before giving up")
     ap.add_argument("--smoke", action="store_true")
     args = ap.parse_args()
 
@@ -292,18 +331,34 @@ def main() -> int:
 
     if args.stage in ("eval", "all"):
         log("== EVAL == starting vLLM servers", out / "run.log")
-        servers = start_servers(out, gpus, args)
-        try:
-            wait_servers(servers, out)
-            slots = [{"gpu": s["gpu"], "url": s["url"]}
-                     for s in servers for _ in range(args.clients_per_server)]
-            log(f"{len(slots)} eval client slots", out / "run.log")
-            rc |= run_pool(eval_jobs(out, args, {}), slots, out, status)
-        finally:
-            for s in servers:
-                s["proc"].terminate()
-                s["log"].close()
-            log("vLLM servers stopped", out / "run.log")
+        # Retry inside the allocation: a crashed attempt must not hand the GPUs back,
+        # and every finished shard is skipped on the next pass, so a retry is cheap.
+        for attempt in range(1, args.eval_attempts + 1):
+            servers = start_servers(out, gpus, args)
+            try:
+                ready = wait_servers(servers, out)
+                slots = [{"gpu": s["gpu"], "url": s["url"]}
+                         for s in ready for _ in range(args.clients_per_server)]
+                log(f"attempt {attempt}: {len(ready)} server(s), {len(slots)} client slots",
+                    out / "run.log")
+                rc = run_pool(eval_jobs(out, args, {}), slots, out, status)
+            except SystemExit as exc:
+                log(f"attempt {attempt} failed: {exc}", out / "run.log")
+                rc = 1
+            finally:
+                for s in servers:
+                    try:
+                        s["proc"].terminate()
+                    except Exception:
+                        pass
+                    s["log"].close()
+                log("vLLM servers stopped", out / "run.log")
+            if rc == 0:
+                break
+            if attempt < args.eval_attempts:
+                log(f"retrying eval stage ({attempt+1}/{args.eval_attempts}) in 60s",
+                    out / "run.log")
+                time.sleep(60)
 
     status["finished"] = utc()
     (out / "status.json").write_text(json.dumps(status, indent=2), encoding="utf-8")

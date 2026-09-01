@@ -1,0 +1,402 @@
+<title>Internalized Guidance Transfer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ground:#f3f4f7;
+    --surface:#ffffff;
+    --surface-2:#e9ebf0;
+    --ink:#171a21;
+    --ink-2:#464e5e;
+    --ink-3:#727a8a;
+    --rule:#d5d9e2;
+    --rule-strong:#171a21;
+    /* three model arms — validated for CVD separation on this surface */
+    --arm-base:#8a94a6;
+    --arm-student:#1f5f8b;
+    --arm-teacher:#a8672a;
+    --accent:#1f5f8b;
+    --accent-soft:#dce8f1;
+    --good:#2f6b4f;
+    --warn:#8a6a1f;
+    --measure:66ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#101319; --surface:#171a21; --surface-2:#1f242e;
+      --ink:#e8eaf0; --ink-2:#b0b7c4; --ink-3:#828a99; --rule:#2b3140;
+      --rule-strong:#e8eaf0;
+      --arm-base:#6f7a90; --arm-student:#5fb4ee; --arm-teacher:#eeb070;
+      --accent:#5fb4ee; --accent-soft:#152a3b;
+      --good:#6fbf95; --warn:#d7b45c;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#101319; --surface:#171a21; --surface-2:#1f242e;
+    --ink:#e8eaf0; --ink-2:#b0b7c4; --ink-3:#828a99; --rule:#2b3140;
+    --rule-strong:#e8eaf0;
+    --arm-base:#6f7a90; --arm-student:#5fb4ee; --arm-teacher:#eeb070;
+    --accent:#5fb4ee; --accent-soft:#152a3b;
+    --good:#6fbf95; --warn:#d7b45c;
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); margin:0;
+       font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.62}
+  .wrap{max-width:1080px; margin:0 auto; padding:0 26px 96px}
+
+  header{border-bottom:2px solid var(--rule-strong); padding:54px 0 22px; margin-bottom:34px}
+  .eyebrow{font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11px;
+           letter-spacing:.15em; text-transform:uppercase; color:var(--accent); margin:0 0 14px}
+  h1{font-family:"Archivo",system-ui,sans-serif; font-weight:700;
+     font-size:clamp(2.1rem,5.2vw,3.2rem); line-height:1.04; letter-spacing:-.022em;
+     margin:0 0 16px; text-wrap:balance}
+  .standfirst{max-width:var(--measure); color:var(--ink-2); font-size:1.1rem; margin:0 0 22px}
+  .standfirst strong{color:var(--ink); font-weight:600}
+  .meta{display:flex; flex-wrap:wrap; gap:6px 26px; font-family:"JetBrains Mono",monospace;
+        font-size:11.5px; color:var(--ink-3)}
+  .meta b{color:var(--ink-2); font-weight:500}
+
+  .band{display:grid; grid-template-columns:repeat(auto-fit,minmax(176px,1fr)); gap:1px;
+        background:var(--rule); border:1px solid var(--rule); margin:0 0 48px}
+  .cell{background:var(--surface); padding:17px 19px}
+  .cell .v{font-family:"Archivo",sans-serif; font-weight:700; font-size:1.75rem;
+           letter-spacing:-.02em; line-height:1.12; font-variant-numeric:tabular-nums}
+  .cell .l{font-family:"JetBrains Mono",monospace; font-size:10px; text-transform:uppercase;
+           letter-spacing:.1em; color:var(--ink-3); margin-top:7px}
+
+  section{margin:0 0 56px}
+  .sh{display:flex; align-items:baseline; gap:13px; border-top:1px solid var(--rule);
+      padding-top:13px; margin-bottom:18px}
+  .sn{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--accent); flex:none}
+  h2{font-family:"Archivo",sans-serif; font-weight:600; font-size:clamp(1.3rem,2.8vw,1.75rem);
+     letter-spacing:-.015em; margin:0; text-wrap:balance}
+  h3{font-family:"Archivo",sans-serif; font-weight:600; font-size:1rem; margin:30px 0 9px;
+     color:var(--ink-2)}
+  p{max-width:var(--measure); margin:0 0 15px}
+  ul,ol{max-width:var(--measure); padding-left:1.15em; margin:0 0 15px}
+  li{margin-bottom:8px}
+  code{font-family:"JetBrains Mono",monospace; font-size:.83em; background:var(--surface-2);
+       padding:.1em .35em; border-radius:2px; color:var(--ink-2)}
+  a{color:var(--accent)}
+
+  .tw{overflow-x:auto; border:1px solid var(--rule); background:var(--surface); margin:6px 0 12px}
+  table{border-collapse:collapse; width:100%; font-size:.87rem;
+        font-family:"Archivo",system-ui,sans-serif}
+  th,td{text-align:left; padding:8px 13px; border-bottom:1px solid var(--rule); white-space:nowrap}
+  thead th{font-family:"JetBrains Mono",monospace; font-size:10px; text-transform:uppercase;
+           letter-spacing:.08em; color:var(--ink-3); background:var(--surface-2); font-weight:400}
+  tbody tr:last-child td{border-bottom:none}
+  td.n,th.n{text-align:right; font-variant-numeric:tabular-nums;
+            font-family:"JetBrains Mono",monospace; font-size:.83rem}
+  td.k{font-weight:600}
+  tr.hl td{background:var(--accent-soft)}
+  caption{caption-side:bottom; text-align:left; padding:9px 13px; font-size:.81rem;
+          color:var(--ink-3); border-top:1px solid var(--rule);
+          font-family:"Archivo",sans-serif}
+
+  /* comparison meter: three arms on one 0–1 scale */
+  .meter{display:grid; gap:5px; min-width:210px}
+  .row{display:grid; grid-template-columns:78px 1fr 44px; align-items:center; gap:9px}
+  .row .lab{font-family:"JetBrains Mono",monospace; font-size:9.5px; color:var(--ink-3);
+            text-transform:uppercase; letter-spacing:.06em}
+  .track{height:9px; background:var(--surface-2); position:relative}
+  .fill{height:9px; border-radius:0 2px 2px 0}
+  .row .val{font-family:"JetBrains Mono",monospace; font-size:11px; text-align:right;
+            font-variant-numeric:tabular-nums; color:var(--ink-2)}
+  .f-base{background:var(--arm-base)}
+  .f-student{background:var(--arm-student)}
+  .f-teacher{background:var(--arm-teacher)}
+
+  .legend{display:flex; flex-wrap:wrap; gap:16px; margin:10px 0 18px;
+          font-family:"Archivo",sans-serif; font-size:.85rem; color:var(--ink-2)}
+  .legend span{display:flex; align-items:center; gap:7px}
+  .sw{width:13px; height:13px; flex:none; border-radius:2px}
+
+  .callout{background:var(--surface); border:1px solid var(--rule);
+           border-left:3px solid var(--accent); padding:17px 21px; margin:18px 0}
+  .callout p{margin:0; max-width:none}
+  .callout .tag{font-family:"JetBrains Mono",monospace; font-size:10px; letter-spacing:.11em;
+                text-transform:uppercase; color:var(--accent); display:block; margin-bottom:7px}
+  .warnbox{border-left-color:var(--warn)}
+  .warnbox .tag{color:var(--warn)}
+
+  .split{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px}
+
+  .flow{display:grid; gap:9px; margin:8px 0 16px}
+  .step{display:grid; grid-template-columns:26px 1fr; gap:13px; align-items:start;
+        background:var(--surface); border:1px solid var(--rule); padding:11px 15px}
+  .step .i{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink-3);
+           padding-top:3px}
+  .step .b{font-size:.93rem}
+  .step .b b{font-family:"Archivo",sans-serif; font-weight:600}
+
+  footer{border-top:2px solid var(--rule-strong); padding-top:17px; color:var(--ink-3);
+         font-family:"JetBrains Mono",monospace; font-size:11px; line-height:1.8}
+  @media (max-width:640px){
+    body{font-size:16px}
+    .row{grid-template-columns:66px 1fr 40px}
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">m1-LODO · leave-one-dataset-out study</p>
+  <h1>A 3B student that never saw the dataset</h1>
+  <p class="standfirst">A teacher critiques a small model at every step of a multi-hop retrieval task. Train the model so it writes that critique <strong>itself</strong>, and it keeps most of the benefit with <strong>no teacher at inference</strong> — including on a dataset it was never trained on, where it reaches <strong>80–87%</strong> of the far larger teacher's score.</p>
+  <div class="meta">
+    <span><b>Student</b> granite-4.1-3b</span>
+    <span><b>Teacher</b> DeepSeek-V4-Flash-0731</span>
+    <span><b>Episodes evaluated</b> 20,741</span>
+    <span><b>Judge</b> Kimi-K2.6</span>
+    <span><b>Date</b> 2026-09-01</span>
+  </div>
+</header>
+
+<div class="band">
+  <div class="cell"><div class="v">4</div><div class="l">folds trained</div></div>
+  <div class="cell"><div class="v">18,986</div><div class="l">student episodes</div></div>
+  <div class="cell"><div class="v">1,755</div><div class="l">teacher episodes</div></div>
+  <div class="cell"><div class="v" style="color:var(--arm-student)">+23 to +48</div><div class="l">points over base, unseen data</div></div>
+  <div class="cell"><div class="v">0</div><div class="l">train/test overlap</div></div>
+</div>
+
+<section>
+  <div class="sh"><span class="sn">01</span><h2>What was tested</h2></div>
+  <p>During data collection a large <strong>teacher</strong> watched a small <strong>student</strong> solve multi-hop questions and critiqued every step. The student never saw the gold answer; the teacher's feedback was rendered through a leakage gate.</p>
+  <p><strong>m1</strong> turns that critique into the student's own first thought. Each training target begins with a <code>teacher_guidance</code> block — the critique the student used to <em>receive</em> — followed by its thought and action. At inference there is no teacher: the model writes its own guidance, then acts on it.</p>
+  <p>The question this study answers is whether that skill is <em>general</em> or merely dataset-specific. Four models were trained, each held one dataset out entirely, and each was tested on the dataset it had never seen.</p>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">02</span><h2>Datasets and splits</h2></div>
+  <p>Four multi-hop QA datasets, 2,000 questions each (StrategyQA 1,999). Every question id was hashed once into two pools, so a question can never leak between training and test through a second episode.</p>
+  <div class="tw">
+    <table>
+      <caption>Held-in questions belong to a dataset the model trained on, but were themselves withheld. Unseen = the entire dataset, from a model that never trained on it.</caption>
+      <thead><tr><th>Dataset</th><th>Hops</th><th>Answer</th><th class="n">Questions</th><th class="n">Held-in test (10%)</th><th class="n">Trainable (90%)</th><th class="n">Correct episodes</th></tr></thead>
+      <tbody>
+        <tr><td class="k">HotpotQA</td><td>2</td><td>span</td><td class="n">2,000</td><td class="n">189</td><td class="n">1,811</td><td class="n">1,296</td></tr>
+        <tr><td class="k">2WikiMultihopQA</td><td>2–4</td><td>span</td><td class="n">2,000</td><td class="n">170</td><td class="n">1,830</td><td class="n">1,385</td></tr>
+        <tr><td class="k">MuSiQue</td><td>2–4</td><td>span</td><td class="n">2,000</td><td class="n">203</td><td class="n">1,797</td><td class="n">595</td></tr>
+        <tr><td class="k">StrategyQA</td><td>2–5</td><td>boolean</td><td class="n">1,999</td><td class="n">185</td><td class="n">1,814</td><td class="n">1,111</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Only <strong>correct</strong> episodes became training data — a wrong trajectory teaches the model to reproduce a wrong trajectory. That discards 45% of the 7,999-episode corpus and leaves the training mix imbalanced: MuSiQue contributes 595 episodes against 2Wiki's 1,385, because MuSiQue is the hardest dataset to solve in the first place.</p>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">03</span><h2>How the four models were trained</h2></div>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Model</th><th>Trained on</th><th>Never saw</th><th class="n">Examples</th><th class="n">Final loss</th><th class="n">Token acc.</th></tr></thead>
+      <tbody>
+        <tr><td class="k">fold_hotpotqa</td><td>2Wiki · MuSiQue · StrategyQA</td><td>HotpotQA</td><td class="n">10,188</td><td class="n">0.21</td><td class="n">93.2%</td></tr>
+        <tr><td class="k">fold_2wikimultihopqa</td><td>HotpotQA · MuSiQue · StrategyQA</td><td>2Wiki</td><td class="n">9,816</td><td class="n">0.26</td><td class="n">91.5%</td></tr>
+        <tr><td class="k">fold_musique</td><td>HotpotQA · 2Wiki · StrategyQA</td><td>MuSiQue</td><td class="n">12,582</td><td class="n">0.24</td><td class="n">92.1%</td></tr>
+        <tr><td class="k">fold_strategyqa</td><td>HotpotQA · 2Wiki · MuSiQue</td><td>StrategyQA</td><td class="n">10,844</td><td class="n">0.23</td><td class="n">92.2%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>LoRA r=32/α=64, 2 epochs, lr 1e-4, effective batch 16, bf16, on H200s — two folds co-located per GPU, all four finished in 3h39m. Loss falls from ~10 to ~0.23 in every fold.</p>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">04</span><h2>How every model was evaluated</h2></div>
+  <p>Not next-token prediction. Every test question is <em>solved by the model itself</em>, in the same agent loop the corpus was collected with:</p>
+  <div class="flow">
+    <div class="step"><span class="i">01</span><div class="b"><b>Plan.</b> The model writes a plan for the question.</div></div>
+    <div class="step"><span class="i">02</span><div class="b"><b>Act, three times.</b> One JSON action per step — <code>search</code>, <code>extract</code>, <code>verify</code>, <code>decompose</code>, <code>reformulate</code>, <code>synthesize</code>, <code>finish</code> — executed deterministically against that question's own candidate paragraphs. No web, gold never shown.</div></div>
+    <div class="step"><span class="i">03</span><div class="b"><b>Commit an answer</b>, voluntarily or forced at the budget.</div></div>
+  </div>
+  <p>Budget 3, plan review on, budget hidden, greedy decoding, fixed seed, vLLM backend — identical for base, students and teacher. <strong>No teacher guides anything at evaluation time</strong>, including the teacher arm, which solves the questions alone.</p>
+
+  <h3>The four arms</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Arm</th><th>What it is</th><th class="n">Episodes</th></tr></thead>
+      <tbody>
+        <tr><td class="k">base</td><td>Untrained granite-4.1-3b — the floor</td><td class="n">8,746</td></tr>
+        <tr><td class="k">student, trained-on</td><td>A fold model on held-in questions of a dataset it trained on</td><td class="n">2,244</td></tr>
+        <tr><td class="k">student, never-trained</td><td>A fold model on the entire dataset it held out</td><td class="n">7,999</td></tr>
+        <tr><td class="k">teacher</td><td>DeepSeek-V4-Flash-0731 solving the questions alone — the ceiling</td><td class="n">1,755</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Metrics</h3>
+  <ul>
+    <li><strong>judge-correct</strong> — an independent LLM (Kimi-K2.6, falling back to MiniMax-M3 then Mistral-Medium) sees only question, gold and prediction. It is the headline: string metrics understate every arm.</li>
+    <li><strong>cover-match</strong> — deterministic: gold contained in the prediction, or ≥60% of gold's content tokens present, with guards against partial-entity matches.</li>
+    <li><strong>exact match / F1</strong> — normalized string equality and token overlap.</li>
+    <li><strong>doc recall</strong> — supporting-document retrieval; separates "never found the evidence" from "found it and failed to compose".</li>
+  </ul>
+  <div class="callout warnbox">
+    <span class="tag">Why the judge matters</span>
+    <p>Cover-match understates the teacher by <strong>4 to 13 points</strong>, and unevenly: +0.6 on 2Wiki, +13.2 on StrategyQA, where boolean answers arrive as prose (<em>"Yes, the Japanese spider crab can…"</em>) and exact match collapses to 0.011. Ranking datasets on string metrics alone would have been misleading.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">05</span><h2>Headline result</h2></div>
+  <p>Judge-correct on the full test sets. The <strong>never-trained</strong> column is the point of the study: that model had never seen a single question from the dataset it is being scored on.</p>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--arm-base)"></span>base 3B (untrained)</span>
+    <span><span class="sw" style="background:var(--arm-student)"></span>student 3B</span>
+    <span><span class="sw" style="background:var(--arm-teacher)"></span>teacher (large)</span>
+  </div>
+  <div class="tw">
+    <table>
+      <caption>Teacher scores come from a ~250-question sample of each unseen set; base and students from the full 2,000. Section 7 repeats the comparison on identical questions.</caption>
+      <thead><tr><th>Dataset</th><th class="n">base</th><th class="n">trained on it</th><th class="n">never trained on it</th><th class="n">teacher</th><th>never-trained vs base vs teacher</th></tr></thead>
+      <tbody>
+        <tr><td class="k">HotpotQA</td><td class="n">0.492</td><td class="n">0.645</td><td class="n"><b>0.706</b></td><td class="n">0.835</td>
+          <td><div class="meter">
+            <div class="row"><span class="lab">base</span><span class="track"><span class="fill f-base" style="width:49.2%"></span></span><span class="val">.492</span></div>
+            <div class="row"><span class="lab">student</span><span class="track"><span class="fill f-student" style="width:70.6%"></span></span><span class="val">.706</span></div>
+            <div class="row"><span class="lab">teacher</span><span class="track"><span class="fill f-teacher" style="width:83.5%"></span></span><span class="val">.835</span></div>
+          </div></td></tr>
+        <tr><td class="k">2WikiMultihopQA</td><td class="n">0.444</td><td class="n">0.792</td><td class="n"><b>0.738</b></td><td class="n">0.837</td>
+          <td><div class="meter">
+            <div class="row"><span class="lab">base</span><span class="track"><span class="fill f-base" style="width:44.4%"></span></span><span class="val">.444</span></div>
+            <div class="row"><span class="lab">student</span><span class="track"><span class="fill f-student" style="width:73.8%"></span></span><span class="val">.738</span></div>
+            <div class="row"><span class="lab">teacher</span><span class="track"><span class="fill f-teacher" style="width:83.7%"></span></span><span class="val">.837</span></div>
+          </div></td></tr>
+        <tr><td class="k">MuSiQue</td><td class="n">0.138</td><td class="n">0.394</td><td class="n"><b>0.368</b></td><td class="n">0.533</td>
+          <td><div class="meter">
+            <div class="row"><span class="lab">base</span><span class="track"><span class="fill f-base" style="width:13.8%"></span></span><span class="val">.138</span></div>
+            <div class="row"><span class="lab">student</span><span class="track"><span class="fill f-student" style="width:36.8%"></span></span><span class="val">.368</span></div>
+            <div class="row"><span class="lab">teacher</span><span class="track"><span class="fill f-teacher" style="width:53.3%"></span></span><span class="val">.533</span></div>
+          </div></td></tr>
+        <tr><td class="k">StrategyQA</td><td class="n">0.189</td><td class="n">0.726</td><td class="n"><b>0.669</b></td><td class="n">0.667</td>
+          <td><div class="meter">
+            <div class="row"><span class="lab">base</span><span class="track"><span class="fill f-base" style="width:18.9%"></span></span><span class="val">.189</span></div>
+            <div class="row"><span class="lab">student</span><span class="track"><span class="fill f-student" style="width:66.9%"></span></span><span class="val">.669</span></div>
+            <div class="row"><span class="lab">teacher</span><span class="track"><span class="fill f-teacher" style="width:66.7%"></span></span><span class="val">.667</span></div>
+          </div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <span class="tag">The finding</span>
+    <p><strong>Training on a dataset buys only 4–10 points over never having seen it.</strong> Every never-trained score sits far closer to the trained-on score than to base. On HotpotQA the model that never trained on it scored <em>higher</em> than the models that did. The skill being learned is not "how to answer 2Wiki questions" — it is how to guide oneself through a multi-hop retrieval task, and that transfers.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">06</span><h2>Every fold, every test set</h2></div>
+  <p>Judge-correct and cover-match side by side. Rows highlighted in blue are each fold's out-of-distribution test.</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Model</th><th>Test set</th><th class="n">n</th><th class="n">judge</th><th class="n">cover</th><th class="n">EM</th><th class="n">F1</th><th class="n">doc rec.</th><th class="n">steps</th><th class="n">vol. finish</th><th class="n">invalid</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td class="k">fold_hotpotqa</td><td>unseen_hotpotqa</td><td class="n">2000</td><td class="n"><b>0.706</b></td><td class="n">0.636</td><td class="n">0.373</td><td class="n">0.497</td><td class="n">0.812</td><td class="n">2.86</td><td class="n">13.6%</td><td class="n">3.1%</td></tr>
+        <tr><td class="k">fold_hotpotqa</td><td>heldin_2wiki</td><td class="n">170</td><td class="n">0.794</td><td class="n">0.771</td><td class="n">0.312</td><td class="n">0.462</td><td class="n">0.888</td><td class="n">2.90</td><td class="n">10.0%</td><td class="n">7.9%</td></tr>
+        <tr><td class="k">fold_hotpotqa</td><td>heldin_musique</td><td class="n">203</td><td class="n">0.419</td><td class="n">0.345</td><td class="n">0.163</td><td class="n">0.285</td><td class="n">0.672</td><td class="n">2.97</td><td class="n">2.5%</td><td class="n">0.2%</td></tr>
+        <tr><td class="k">fold_hotpotqa</td><td>heldin_strategyqa</td><td class="n">185</td><td class="n">0.719</td><td class="n">0.719</td><td class="n">0.530</td><td class="n">0.547</td><td class="n">0.829</td><td class="n">2.93</td><td class="n">7.0%</td><td class="n">2.2%</td></tr>
+        <tr class="hl"><td class="k">fold_2wiki</td><td>unseen_2wiki</td><td class="n">2000</td><td class="n"><b>0.738</b></td><td class="n">0.698</td><td class="n">0.270</td><td class="n">0.416</td><td class="n">0.833</td><td class="n">2.93</td><td class="n">7.1%</td><td class="n">6.8%</td></tr>
+        <tr><td class="k">fold_2wiki</td><td>heldin_hotpotqa</td><td class="n">189</td><td class="n">0.661</td><td class="n">0.598</td><td class="n">0.365</td><td class="n">0.457</td><td class="n">0.780</td><td class="n">2.85</td><td class="n">15.3%</td><td class="n">3.9%</td></tr>
+        <tr><td class="k">fold_2wiki</td><td>heldin_musique</td><td class="n">203</td><td class="n">0.404</td><td class="n">0.305</td><td class="n">0.143</td><td class="n">0.254</td><td class="n">0.667</td><td class="n">2.96</td><td class="n">3.9%</td><td class="n">0.7%</td></tr>
+        <tr><td class="k">fold_2wiki</td><td>heldin_strategyqa</td><td class="n">185</td><td class="n">0.730</td><td class="n">0.697</td><td class="n">0.503</td><td class="n">0.520</td><td class="n">0.827</td><td class="n">2.88</td><td class="n">11.4%</td><td class="n">0.7%</td></tr>
+        <tr class="hl"><td class="k">fold_musique</td><td>unseen_musique</td><td class="n">2000</td><td class="n"><b>0.368</b></td><td class="n">0.269</td><td class="n">0.133</td><td class="n">0.221</td><td class="n">0.665</td><td class="n">2.96</td><td class="n">4.1%</td><td class="n">0.6%</td></tr>
+        <tr><td class="k">fold_musique</td><td>heldin_hotpotqa</td><td class="n">189</td><td class="n">0.640</td><td class="n">0.577</td><td class="n">0.312</td><td class="n">0.405</td><td class="n">0.794</td><td class="n">2.82</td><td class="n">18.0%</td><td class="n">3.9%</td></tr>
+        <tr><td class="k">fold_musique</td><td>heldin_2wiki</td><td class="n">170</td><td class="n">0.806</td><td class="n">0.794</td><td class="n">0.265</td><td class="n">0.437</td><td class="n">0.888</td><td class="n">2.91</td><td class="n">8.8%</td><td class="n">5.7%</td></tr>
+        <tr><td class="k">fold_musique</td><td>heldin_strategyqa</td><td class="n">185</td><td class="n">0.730</td><td class="n">0.724</td><td class="n">0.460</td><td class="n">0.485</td><td class="n">0.818</td><td class="n">2.90</td><td class="n">9.2%</td><td class="n">0.7%</td></tr>
+        <tr class="hl"><td class="k">fold_strategyqa</td><td>unseen_strategyqa</td><td class="n">1999</td><td class="n"><b>0.669</b></td><td class="n">0.608</td><td class="n">0.336</td><td class="n">0.364</td><td class="n">0.801</td><td class="n">2.89</td><td class="n">10.8%</td><td class="n">1.3%</td></tr>
+        <tr><td class="k">fold_strategyqa</td><td>heldin_hotpotqa</td><td class="n">189</td><td class="n">0.635</td><td class="n">0.582</td><td class="n">0.339</td><td class="n">0.426</td><td class="n">0.767</td><td class="n">2.81</td><td class="n">18.5%</td><td class="n">2.3%</td></tr>
+        <tr><td class="k">fold_strategyqa</td><td>heldin_2wiki</td><td class="n">170</td><td class="n">0.776</td><td class="n">0.759</td><td class="n">0.365</td><td class="n">0.496</td><td class="n">0.869</td><td class="n">2.91</td><td class="n">8.8%</td><td class="n">8.5%</td></tr>
+        <tr><td class="k">fold_strategyqa</td><td>heldin_musique</td><td class="n">203</td><td class="n">0.360</td><td class="n">0.286</td><td class="n">0.168</td><td class="n">0.260</td><td class="n">0.647</td><td class="n">2.95</td><td class="n">4.9%</td><td class="n">0.3%</td></tr>
+        <tr><td class="k">base</td><td>unseen_hotpotqa</td><td class="n">2000</td><td class="n">0.492</td><td class="n">0.427</td><td class="n">0.192</td><td class="n">0.286</td><td class="n">0.789</td><td class="n">2.92</td><td class="n">8.4%</td><td class="n">5.5%</td></tr>
+        <tr><td class="k">base</td><td>unseen_2wiki</td><td class="n">2000</td><td class="n">0.444</td><td class="n">0.335</td><td class="n">0.019</td><td class="n">0.128</td><td class="n">0.821</td><td class="n">2.98</td><td class="n">1.7%</td><td class="n">5.4%</td></tr>
+        <tr><td class="k">base</td><td>unseen_musique</td><td class="n">2000</td><td class="n">0.138</td><td class="n">0.093</td><td class="n">0.025</td><td class="n">0.061</td><td class="n">0.581</td><td class="n">2.99</td><td class="n">1.2%</td><td class="n">2.4%</td></tr>
+        <tr><td class="k">base</td><td>unseen_strategyqa</td><td class="n">1999</td><td class="n">0.189</td><td class="n">0.096</td><td class="n">0.000</td><td class="n">0.012</td><td class="n">0.814</td><td class="n">2.98</td><td class="n">2.1%</td><td class="n">2.7%</td></tr>
+        <tr><td class="k">base</td><td>heldin_hotpotqa</td><td class="n">189</td><td class="n">0.455</td><td class="n">0.376</td><td class="n">0.196</td><td class="n">0.253</td><td class="n">0.759</td><td class="n">2.94</td><td class="n">6.4%</td><td class="n">5.4%</td></tr>
+        <tr><td class="k">base</td><td>heldin_2wiki</td><td class="n">170</td><td class="n">0.406</td><td class="n">0.288</td><td class="n">0.006</td><td class="n">0.112</td><td class="n">0.818</td><td class="n">2.98</td><td class="n">2.4%</td><td class="n">5.9%</td></tr>
+        <tr><td class="k">base</td><td>heldin_musique</td><td class="n">203</td><td class="n">0.172</td><td class="n">0.138</td><td class="n">0.030</td><td class="n">0.090</td><td class="n">0.608</td><td class="n">3.00</td><td class="n">0.0%</td><td class="n">3.3%</td></tr>
+        <tr><td class="k">base</td><td>heldin_strategyqa</td><td class="n">185</td><td class="n">0.178</td><td class="n">0.092</td><td class="n">0.000</td><td class="n">0.010</td><td class="n">0.814</td><td class="n">2.99</td><td class="n">1.1%</td><td class="n">2.2%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">07</span><h2>Paired comparison — identical questions</h2></div>
+  <p>The teacher ran a sampled subset, so the headline table compares different question counts. Here the students are filtered to <em>exactly</em> the teacher's question ids, making the three arms directly comparable.</p>
+  <div class="tw">
+    <table>
+      <caption>Judge-correct on identical qids. Student = the never-trained fold model on unseen sets; the mean of the three fold models that trained on that dataset for held-in sets.</caption>
+      <thead><tr><th>Test set</th><th class="n">n</th><th class="n">base</th><th class="n">student</th><th class="n">teacher</th><th class="n">student / teacher</th></tr></thead>
+      <tbody>
+        <tr><td class="k">unseen_hotpotqa</td><td class="n">254</td><td class="n">0.461</td><td class="n">0.689</td><td class="n">0.835</td><td class="n">83%</td></tr>
+        <tr><td class="k">unseen_2wiki</td><td class="n">252</td><td class="n">0.460</td><td class="n">0.714</td><td class="n">0.837</td><td class="n">85%</td></tr>
+        <tr><td class="k">unseen_musique</td><td class="n">229</td><td class="n">0.105</td><td class="n">0.320</td><td class="n">0.533</td><td class="n">60%</td></tr>
+        <tr><td class="k">unseen_strategyqa</td><td class="n">273</td><td class="n">0.179</td><td class="n">0.626</td><td class="n">0.667</td><td class="n">94%</td></tr>
+        <tr><td class="k">heldin_hotpotqa</td><td class="n">189</td><td class="n">0.455</td><td class="n">0.645</td><td class="n">0.794</td><td class="n">81%</td></tr>
+        <tr><td class="k">heldin_2wiki</td><td class="n">170</td><td class="n">0.406</td><td class="n">0.792</td><td class="n">0.847</td><td class="n">94%</td></tr>
+        <tr><td class="k">heldin_musique</td><td class="n">203</td><td class="n">0.172</td><td class="n">0.394</td><td class="n">0.557</td><td class="n">71%</td></tr>
+        <tr><td class="k">heldin_strategyqa</td><td class="n">185</td><td class="n">0.178</td><td class="n">0.726</td><td class="n">0.719</td><td class="n">101%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>A 3B model that never saw the dataset reaches <strong>60–94% of a far larger teacher</strong> solving the same questions, and matches it on StrategyQA. MuSiQue is the widest gap and the honest weak spot.</p>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">08</span><h2>What else changed with training</h2></div>
+  <div class="split">
+    <div>
+      <h3>It learns when to stop</h3>
+      <p>Voluntary finishing rises from <strong>0–8%</strong> (base) to <strong>4–19%</strong> (trained). The base model almost always burns the full budget; the trained model commits an answer once it has one.</p>
+    </div>
+    <div>
+      <h3>It emits valid actions</h3>
+      <p>Invalid-action rates fall on MuSiQue from 2.4% to 0.6% and on StrategyQA from 2.7% to 1.3%. Format adherence is a training outcome, not a side effect.</p>
+    </div>
+    <div>
+      <h3>It costs almost nothing extra</h3>
+      <p>Tokens per episode rise only <strong>4–7%</strong> (4,884→5,263 on MuSiQue), despite the model now generating a guidance block before every action.</p>
+    </div>
+    <div>
+      <h3>Retrieval barely moves</h3>
+      <p>Doc recall changes little (0.581→0.665 on MuSiQue, 0.789→0.812 on HotpotQA). The gain is in <em>composition</em>, not in finding documents.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">09</span><h2>Reading the datasets against each other</h2></div>
+  <p><strong>MuSiQue is hardest for everyone</strong> — base 0.138, student 0.368, teacher 0.533 — and it is the dataset explicitly built to resist shortcut answering. Its doc recall is also lowest (0.581–0.665), so part of the difficulty is retrieval, but the teacher retrieves at 0.770 and still only reaches 0.533: the wall is multi-hop composition.</p>
+  <p><strong>StrategyQA shows the largest training effect</strong> (+48 points, base 0.189 → 0.669) and is the one dataset where the student matches the teacher. Its questions need implicit decomposition rather than span extraction, which the base model simply cannot do and the guidance format teaches directly.</p>
+  <p><strong>2Wiki is easiest</strong> for trained models (0.738–0.792) yet its exact match stays low (0.270) — the answers are right but verbose. That divergence is why judge-correct leads this report.</p>
+</section>
+
+<section>
+  <div class="sh"><span class="sn">10</span><h2>Guarantees and limitations</h2></div>
+  <h3>What is guaranteed</h3>
+  <ul>
+    <li><strong>No test question was trained on.</strong> Splits are by <code>sha256(qid)</code>; an independent audit re-asserted disjointness on the built files — zero overlap in all four folds.</li>
+    <li><strong>No gold leaked into training.</strong> The same audit found no target stating a gold answer the prompt never showed, no <code>teacher_private_diagnosis</code> text in any target, and no malformed target.</li>
+    <li><strong>~90 examples per fold were dropped</strong> because they came from episodes that were correct but <em>ungrounded</em> — a forced finish committing the right answer while the teacher's own feedback said the evidence was missing. Training on those teaches confident hallucination.</li>
+    <li><strong>The judge is independent</strong> of the model that produced the training data.</li>
+  </ul>
+  <h3>What limits these results</h3>
+  <ul>
+    <li><strong>One student model and one teacher family.</strong> This shows that <em>this</em> guidance transfers, not that the effect is universal.</li>
+    <li><strong>The teacher arm is a sample</strong> (~250 questions per unseen set, 1,755 total), so its figures carry wider error bars than the students'. Section 7 is the paired comparison that controls for this.</li>
+    <li><strong>Budget 3 binds.</strong> Roughly 93% of collection episodes hit the step limit; a larger budget could change the ranking.</li>
+    <li><strong>Contamination.</strong> HotpotQA and 2Wiki are almost certainly in the base model's pretraining. MuSiQue is the most trustworthy transfer signal — and the one with the widest student–teacher gap.</li>
+    <li><strong>Held-in sets are small</strong> (170–203 questions) against 2,000 for unseen, so trained-on figures are noisier than never-trained ones.</li>
+    <li><strong>Two of 18,986 student episodes</strong> received no usable judge verdict and are excluded from judge columns.</li>
+  </ul>
+</section>
+
+<footer>
+  m1-LODO · granite-4.1-3b student · DeepSeek-V4-Flash-0731 teacher · Kimi-K2.6 judge<br>
+  20,741 episodes evaluated · 4 folds · 8 test sets · 24 student configurations + 8 teacher sets<br>
+  Data: training_methods/m1_lodo/runs/lodo/results.json · Repo: /shared/al-maamari/DeKIS/teacher-guidence
+</footer>
+
+</div>

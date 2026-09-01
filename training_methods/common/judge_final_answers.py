@@ -33,6 +33,15 @@ from training_methods.common.tm_logging import setup_logger, write_json  # noqa:
 from agentsim.clients.llm_client import LLMClient  # noqa: E402
 from scripts.gen_fau_smoke_template import TEACHER_ROUTER  # noqa: E402
 
+#: Default judge chain. Deliberately NOT the model that generated the training data --
+#: a judge scoring its own phrasing favourably would inflate every result -- and
+#: deliberately not gpt-oss (excluded by standing instruction, and its FAU host is down).
+#: Both entries were probed answering a real verdict prompt cleanly.
+DEFAULT_JUDGE_ROUTER = [
+    "fau/MiniMaxAI/MiniMax-M3-MXFP8",
+    "fau/moonshotai/Kimi-K2.6",
+]
+
 JUDGE_PROMPT = """You are grading a question-answering system.
 
 Question: {question}
@@ -83,7 +92,8 @@ async def judge_one(client: LLMClient, sem: asyncio.Semaphore, row: Dict[str, An
         for attempt in (1, 2):
             try:
                 result, used_model = await client.get_completion_with_fallback(
-                    list(TEACHER_ROUTER), prompt=prompt, temperature=0.0,
+                    list(row.get("_judge_router") or DEFAULT_JUDGE_ROUTER),
+                    prompt=prompt, temperature=0.0,
                     max_tokens=1500, return_raw=True,
                 )
                 text = result.get("text", "") if isinstance(result, dict) else result
@@ -95,6 +105,12 @@ async def judge_one(client: LLMClient, sem: asyncio.Semaphore, row: Dict[str, An
                 log.warning(f"qid={row['qid']} judge call failed (attempt {attempt}): {exc}")
                 await asyncio.sleep(2 * attempt)
     return {**row, "verdict": None, "judge_model": None}
+
+
+def _attach_router(rows, router):
+    for r in rows:
+        r["_judge_router"] = router
+    return rows
 
 
 async def run(args, log) -> None:
@@ -110,12 +126,16 @@ async def run(args, log) -> None:
                 "source": str(src), "qid": e["qid"], "query": e["query"],
                 "gold_answer": e["gold_answer"], "final_answer": e.get("final_answer", ""),
             })
+    router = [m.strip() for m in args.judge_router.split(",") if m.strip()]
+    _attach_router(rows, router)
     log.info(f"judging {len(rows)} final answers from {len(args.episodes)} files "
-             f"(concurrency {args.concurrency})")
+             f"(concurrency {args.concurrency}, router {router})")
     t0 = time.time()
     results = await asyncio.gather(*(judge_one(client, sem, r, log) for r in rows))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    for r in results:
+        r.pop("_judge_router", None)
     with open(out / "verdicts.jsonl", "w") as w:
         for r in results:
             w.write(json.dumps(r, ensure_ascii=False) + "\n")
@@ -142,6 +162,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", required=True)
     ap.add_argument("--concurrency", type=int, default=8)
+    ap.add_argument("--judge-router", default=",".join(DEFAULT_JUDGE_ROUTER),
+                    help="comma-separated model chain; each is tried in order per call")
     ap.add_argument("episodes", nargs="+")
     args = ap.parse_args()
     log = setup_logger("judge", Path(args.out) / "judge.log")
