@@ -36,7 +36,7 @@ import yaml
 
 import tgd  # noqa: F401
 from tgd import DATASETS, ROOT
-from tgd.io import corpus_file, question_file
+from tgd.io import corpus_file, question_file, read_jsonl, write_jsonl
 
 TEMPLATE_DIR = ROOT / "templates" / "simulations"
 
@@ -133,24 +133,22 @@ def main() -> int:
 
     plans: List[Dict] = []
     for ds in args.datasets:
-        qpath = question_file(args.questions, ds)
-        lines = [l for l in qpath.read_text(encoding="utf-8").splitlines() if l.strip()][:args.num_samples]
+        rows = list(read_jsonl(question_file(args.questions, ds), args.num_samples))
         for s in range(shards):
-            shard_lines = lines[s::shards]
-            sq = shard_root / ds / f"{ds}_s{s}.jsonl"
-            sq.parent.mkdir(parents=True, exist_ok=True)
-            sq.write_text("\n".join(shard_lines) + "\n", encoding="utf-8")
+            shard_rows = rows[s::shards]          # round-robin, so no worker gets a
+            sq = shard_root / ds / f"{ds}_s{s}.jsonl"   # contiguous (easier or harder) block
+            write_jsonl(sq, shard_rows)
             tid = f"{tag}_{ds}_s{s}"
             out_dir = out_root / ds / tid
             tpl = build_template(
                 template_id=tid, student=args.student, teacher=args.teacher,
                 questions_path=str(sq), corpus_path=str(corpus_file(args.questions, ds)),
-                output_dir=str(out_dir), num_samples=len(shard_lines), budget=args.budget,
+                output_dir=str(out_dir), num_samples=len(shard_rows), budget=args.budget,
                 disclose_budget=args.disclose_budget, planning_steps=args.planning_steps,
                 max_plan_steps=args.max_plan_steps, teacher_max_tokens=args.teacher_max_tokens,
                 teacher_temperature=args.teacher_temperature, student_temperature=args.student_temperature)
             (TEMPLATE_DIR / f"{tid}.yaml").write_text(yaml.safe_dump(tpl, sort_keys=False), encoding="utf-8")
-            plans.append({"dataset": ds, "template": tid, "questions": len(shard_lines), "out_dir": out_dir})
+            plans.append({"dataset": ds, "template": tid, "questions": len(shard_rows), "out_dir": out_dir})
     total = sum(p["questions"] for p in plans)
     print(f"planned {len(plans)} worker(s) over {len(args.datasets)} dataset(s): {total} episodes -> {out_root}")
     if args.plan_only:

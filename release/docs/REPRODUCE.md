@@ -11,15 +11,27 @@ provider; with a low-priced teacher the whole four-arm comparison cost well unde
 bash setup_env.sh                     # on a machine that sees the GPU driver
 cp .env.example .env                  # fill in OAI_TEACHER_* and OAI_JUDGE_* (docs/PROVIDERS.md)
 .venv/bin/python -m pytest tests -q   # 6 unit tests
-bash tests/smoke_offline.sh           # ~3 min, no GPU, no API: whole pipeline with mock models
-sbatch -p <gpu-partition> tests/smoke_gpu.sbatch   # ~25 min: real student, tiny run
+bash tests/smoke_offline.sh           # ~1 min, no GPU, no API: whole pipeline with mock models
 ```
 
-## 1. Data (shipped; rebuild is optional)
+## 1. Data — build the SFT files before anything trains
+
+Questions, corpora, episodes and test sets ship with the repository. The SFT train/dev
+files do NOT: they are large and derived, so you build them once. They come out
+byte-identical on every machine, from a salted hash of the question ids.
 
 ```bash
-.venv/bin/python scripts/build_splits.py            # data/splits (12 s)
-.venv/bin/python scripts/check_leakage.py           # must print "no leakage found"
+make data                                           # build_splits + check_leakage (~2 min)
+# or the two steps separately:
+.venv/bin/python scripts/build_splits.py            # data/splits/{uniform,lodo} (13 s)
+.venv/bin/python scripts/check_leakage.py           # must print "no leakage found" (~100 s)
+```
+
+Every stage that trains a student reads `data/splits/*/train.jsonl`, so run the above
+before the GPU smoke test and before the pipeline in section 2:
+
+```bash
+sbatch -p <gpu-partition> tests/smoke_gpu.sbatch   # ~25 min: real student, tiny run
 ```
 
 To regenerate the episodes themselves with your own student/teacher, see
@@ -107,4 +119,5 @@ runs/vllm_<port>_<job>.log            server logs
 | judge/teacher calls fall through to the last model and fail | credentials, or the model name is wrong for that provider; test with the snippet in `docs/PROVIDERS.md` |
 | `eval.py` exits with code 3 | some questions failed after retries; re-run the same command to retry only those |
 | trainer errors about `SFTConfig` arguments | wrong TRL version; install `requirements/train.txt` as pinned |
+| harness logs are too quiet / too loud | the default log level is INFO; `AGENTSIM_LOG_LEVEL=DEBUG` restores the per-component registration lines, `=WARNING` silences progress |
 | `ModuleNotFoundError: sentence_transformers` in the train env | run `setup_env.sh` again or `pip install -r requirements/base.txt` into `.venv_train` |

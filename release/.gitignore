@@ -1,11 +1,23 @@
-.env
+# environments and caches
 .venv/
 .venv_train/
 .venv_vllm/
 .cache/
 __pycache__/
 *.pyc
+.pytest_cache/
+.env
+
+# run artifacts
 runs/*
 !runs/.gitkeep
 templates/simulations/*
 !templates/simulations/.gitkeep
+
+# SFT train/dev files: large and rebuilt deterministically from data/episodes
+# with `make data` (~2 min; scripts/build_splits.py). The test question files,
+# the pool assignment, the stats and the leakage report ARE tracked.
+data/splits/uniform/train.jsonl
+data/splits/uniform/dev.jsonl
+data/splits/lodo/*/train.jsonl
+data/splits/lodo/*/dev.jsonl

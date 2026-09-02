@@ -67,17 +67,17 @@ scripts/serve_vllm.sh --lora uniform=runs/train/uniform/adapter &
 T=data/splits/test; Q=data/questions
 for ds in hotpotqa 2wikimultihopqa musique strategyqa; do
   .venv_train/bin/python scripts/eval.py --arm student --served-model student \
-      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl --out runs/eval/base/heldout_$ds
+      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl.gz --out runs/eval/base/heldout_$ds
   .venv_train/bin/python scripts/eval.py --arm student --served-model uniform \
-      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl --out runs/eval/trained_uniform/heldout_$ds
+      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl.gz --out runs/eval/trained_uniform/heldout_$ds
   .venv_train/bin/python scripts/eval.py --arm guided --served-model student --teacher oai-teacher/<model> --concurrency 6 \
-      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl --out runs/eval/guided_base/heldout_$ds
+      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl.gz --out runs/eval/guided_base/heldout_$ds
 done
 
 # 3. the teacher alone (no GPU; runs anywhere)
 for ds in hotpotqa 2wikimultihopqa musique strategyqa; do
   .venv/bin/python scripts/eval.py --arm teacher --agent-model oai-teacher/<model> --concurrency 4 \
-      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl --out runs/eval/teacher/heldout_$ds
+      --questions $T/heldout_${ds}_questions.jsonl --corpus $Q/$ds/${ds}_corpus.jsonl.gz --out runs/eval/teacher/heldout_$ds
 done
 
 # 4. judge everything, then tables
@@ -97,7 +97,7 @@ held-out sets of its three training datasets:
 ```bash
 scripts/serve_vllm.sh --lora fold_hotpotqa=runs/train/fold_hotpotqa/adapter --lora fold_musique=... &
 .venv_train/bin/python scripts/eval.py --arm student --served-model fold_musique \
-    --questions data/splits/test/full_musique_questions.jsonl --corpus data/questions/musique/musique_corpus.jsonl \
+    --questions data/splits/test/full_musique_questions.jsonl --corpus data/questions/musique/musique_corpus.jsonl.gz \
     --out runs/eval/fold_musique/full_musique
 # + heldout_hotpotqa / heldout_2wikimultihopqa / heldout_strategyqa for the same adapter
 ```

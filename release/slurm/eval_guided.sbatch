@@ -24,7 +24,7 @@ for t in $TESTS; do
   [ -f "runs/eval/$NAME/$t/.done" ] && { echo "skip $NAME/$t (done)"; continue; }
   $PY_TRAIN scripts/eval.py --arm guided --student vllm --server-url "http://127.0.0.1:$PORT" \
     --served-model "$served" --teacher "$TEACHER" --concurrency "${CONCURRENCY:-6}" \
-    --questions "data/splits/test/${t}_questions.jsonl" --corpus "data/questions/$ds/${ds}_corpus.jsonl" \
+    --questions "data/splits/test/${t}_questions.jsonl" --corpus "data/questions/$ds/${ds}_corpus.jsonl.gz" \
     --out "runs/eval/$NAME/$t" "$@" || echo "!! $NAME/$t incomplete (rc=$?) - resubmit to retry"
 done
 echo "== done $(date -u +%FT%TZ)"

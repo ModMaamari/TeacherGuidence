@@ -25,7 +25,7 @@ if want base && [ ! -x .venv/bin/python ]; then
   .venv/bin/pip -q install torch --index-url https://download.pytorch.org/whl/cpu
   .venv/bin/pip -q install -r requirements/base.txt
 fi
-want base && .venv/bin/python -c "import agentsim, tgd; print('base env ok')"
+if want base; then .venv/bin/python -c "import agentsim, tgd; print('base env ok')"; fi
 
 if want train && [ ! -x .venv_train/bin/python ]; then
   $PY -m venv .venv_train
@@ -33,15 +33,20 @@ if want train && [ ! -x .venv_train/bin/python ]; then
   .venv_train/bin/pip -q install "torch==2.6.*" --index-url "$TORCH_INDEX" || .venv_train/bin/pip -q install torch
   .venv_train/bin/pip -q install -r requirements/train.txt
 fi
-want train && .venv_train/bin/python - <<'PYEOF'
+if want train; then .venv_train/bin/python - <<'PYEOF'
 import torch, transformers, trl, peft
 print(f"train env ok | torch {torch.__version__} | cuda {torch.cuda.is_available()} | "
       f"transformers {transformers.__version__} | trl {trl.__version__} | peft {peft.__version__}")
 PYEOF
+fi
 
 if want serve && [ ! -x .venv_vllm/bin/python ]; then
   $PY -m venv .venv_vllm
   .venv_vllm/bin/pip -q install -U pip wheel
   .venv_vllm/bin/pip -q install -r requirements/serve.txt || echo "vLLM install failed: use --student hf for evaluation"
 fi
-want serve && (.venv_vllm/bin/python -c "import vllm; print('serve env ok | vllm', vllm.__version__)" || true)
+if want serve; then .venv_vllm/bin/python -c "import vllm; print('serve env ok | vllm', vllm.__version__)" || true; fi
+
+echo
+echo "environments ready. Next: 'make data' to build the SFT train/dev files, then 'make smoke'."
+exit 0

@@ -9,7 +9,7 @@ PY=${PY:-.venv/bin/python}
 W=${1:-runs/smoke_offline}
 rm -rf "$W"; mkdir -p "$W"
 Q=data/splits/test/heldout_musique_questions.jsonl
-C=data/questions/musique/musique_corpus.jsonl
+C=data/questions/musique/musique_corpus.jsonl.gz
 [ -f "$Q" ] || { echo "run scripts/build_splits.py first (data/splits/test missing)"; exit 1; }
 step() { echo; echo "=== $* ==="; }
 

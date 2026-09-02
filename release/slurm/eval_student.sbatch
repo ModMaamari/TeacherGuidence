@@ -35,7 +35,7 @@ for spec in $ARMS; do
     [ -f "runs/eval/$name/$t/.done" ] && { echo "skip $name/$t (done)"; continue; }
     $PY_TRAIN scripts/eval.py --arm student --student vllm --server-url "http://127.0.0.1:$PORT" \
       --served-model "$served" --questions "data/splits/test/${t}_questions.jsonl" \
-      --corpus "data/questions/$ds/${ds}_corpus.jsonl" --out "runs/eval/$name/$t" "$@" || echo "!! $name/$t incomplete (rc=$?) - resubmit to retry"
+      --corpus "data/questions/$ds/${ds}_corpus.jsonl.gz" --out "runs/eval/$name/$t" "$@" || echo "!! $name/$t incomplete (rc=$?) - resubmit to retry"
   done
 done
 echo "== done $(date -u +%FT%TZ)"

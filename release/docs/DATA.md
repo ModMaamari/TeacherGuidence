@@ -12,7 +12,7 @@
 Each dataset was shuffled with seed 13 and truncated to 2,000 questions. One StrategyQA
 question could not be converted (no gold paragraphs), hence 1,999.
 
-`<dataset>_questions.jsonl` — one question per line:
+`<dataset>_questions.jsonl.gz` — one question per line:
 
 ```json
 {"id": "5ae11c0d55429920d52342c8", "query": "...", "answer": "Angelina Jolie Pitt",
@@ -23,12 +23,17 @@ question could not be converted (no gold paragraphs), hence 1,999.
  "retrieval_scope": {"backend": "hotpot_local", "doc_ids": [...]}}
 ```
 
-`<dataset>_corpus.jsonl` — the documents the agent can retrieve, one per line
+`<dataset>_corpus.jsonl.gz` — the documents the agent can retrieve, one per line
 (`doc_id`, `qid`, `title`, `text`). Retrieval is *per question*: the agent's `search`
 tool only sees the documents whose `qid` matches the question (the standard
 distractor setting), scored with BM25.
 
-`<dataset>_manifest.json` — conversion statistics, source, license, file checksums.
+`<dataset>_manifest.json` — conversion statistics, source, license, file checksums (the
+checksums are of the uncompressed content: `gunzip -c <file>.gz | sha256sum`).
+
+Question and corpus files ship gzipped. Every reader in this project opens either form,
+so `--questions .../x_questions.jsonl` and `.../x_questions.jsonl.gz` both work; the
+documented commands use the `.gz` names that are actually on disk.
 
 ## 2. Episodes — `data/episodes/`
 

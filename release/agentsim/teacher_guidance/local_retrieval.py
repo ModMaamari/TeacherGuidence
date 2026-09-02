@@ -12,6 +12,7 @@ full document text available via :meth:`get_doc` for the tool executor.
 
 from __future__ import annotations
 
+import gzip
 import json
 import re
 from pathlib import Path
@@ -49,8 +50,15 @@ class HotpotLocalRetriever:
     def _load(self) -> None:
         path = Path(self.corpus_path)
         if not path.exists():
-            raise FileNotFoundError(f"Corpus not found: {path}")
-        with open(path, encoding="utf-8") as f:
+            # accept either the plain or the gzipped form of the same corpus
+            alt = path.with_suffix(path.suffix + ".gz") if path.suffix != ".gz" else path.with_suffix("")
+            if alt.exists():
+                path = alt
+                self.corpus_path = str(alt)
+            else:
+                raise FileNotFoundError(f"Corpus not found: {path}")
+        opener = gzip.open if path.suffix == ".gz" else open
+        with opener(path, "rt", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:

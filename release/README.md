@@ -24,11 +24,14 @@ skips finished work on re-run, and keeps a `status.json` you can watch.
 ## What is in the box
 
 ```
-data/questions/<ds>/     2,000 questions + per-question document sets for HotpotQA,
-                         2WikiMultihopQA, MuSiQue, StrategyQA (with provenance manifests)
+data/questions/<ds>/     2,000 questions each for HotpotQA, 2WikiMultihopQA and MuSiQue,
+                         1,999 for StrategyQA, with their per-question document sets
+                         (gzipped, with provenance manifests)
 data/episodes/           7,999 teacher-guided episodes (student granite-4.1-3b,
                          teacher DeepSeek-V4-Flash), gzipped, plus an index
-data/splits/             the two split groups, test question files, pools, leakage report
+data/splits/             test question files, pool assignment, stats, leakage report.
+                         The SFT train/dev files are NOT shipped: build them once with
+                         `make data` (~2 min, byte-identical on every machine)
 agentsim/                the simulation harness (prompts, tools, teacher critic, metrics)
 tgd/                     library code shared by the scripts
 scripts/                 the stage commands above
@@ -66,9 +69,10 @@ hash consistency). See `docs/DATA.md`.
 
 ```bash
 bash setup_env.sh                      # .venv (CPU), .venv_train (GPU), .venv_vllm (GPU)
+make data                              # build the SFT train/dev files (~2 min; required before training)
 cp .env.example .env                   # add your teacher / judge endpoint + key
 .venv/bin/python -m pytest tests -q    # unit tests, seconds
-bash tests/smoke_offline.sh            # whole pipeline with mock models, no GPU/API, ~3 min
+bash tests/smoke_offline.sh            # whole pipeline with mock models, no GPU/API, ~1 min
 
 # reproduce the four-arm comparison on the uniform split (Slurm):
 TEACHER=oai-teacher/<model> JUDGE=oai-judge/<model> bash slurm/run_pipeline.sh -p <gpu-partition>
@@ -100,9 +104,17 @@ Python ≥ 3.11. One GPU with ≥ 40 GB for the 3B student (training with LoRA a
 sequences peaks around 26 GB; smaller students need less). The CPU environment is enough
 for data building, the teacher-alone arm, judging and results.
 
+Disk: about 30 GB. The three virtual environments take ~15 GB (the CUDA and vLLM wheels
+dominate), the model cache ~7 GB for a 3B student, the repository ~230 MB, and the built
+SFT files ~1.5 GB. Set `HF_HOME` if your home directory is small or quota'd.
+
 ## License and attribution
 
-Question data derive from HotpotQA (CC BY-SA 4.0), 2WikiMultihopQA (Apache 2.0), MuSiQue
-(CC BY 4.0) and StrategyQA (MIT); see the manifest next to each question file. Episodes
-were generated with the models named in each record's `student_model` /
-`teacher_models_used` fields.
+The code in this repository is licensed under the **Apache License 2.0** (`LICENSE`),
+which includes the `agentsim/` harness vendored here.
+
+The data keeps its own terms. Question sets and corpora derive from HotpotQA
+(CC BY-SA 4.0), 2WikiMultihopQA (Apache-2.0), MuSiQue (CC BY 4.0) and StrategyQA (MIT);
+each dataset's manifest next to its question file records source, homepage and license.
+The episodes were generated with the models named in every record's `student_model` and
+`teacher_models_used` fields. `NOTICE` summarises all of it.

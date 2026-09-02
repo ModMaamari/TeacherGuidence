@@ -1,7 +1,10 @@
 # Convenience targets; every one maps to a documented command.
 PY ?= .venv/bin/python
 
-.PHONY: env test smoke data leakage clean-runs
+.DEFAULT_GOAL := help
+.PHONY: help env test smoke data leakage clean-runs
+help:           ## show this help
+	@grep -hE '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | expand -t16
 env:            ## build the three virtual environments
 	bash setup_env.sh
 test:           ## unit tests (CPU, seconds after the first cold import)

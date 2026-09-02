@@ -21,7 +21,7 @@
 
 | Path | Role |
 |---|---|
-| `agentsim/` | the simulation harness: prompt renderer (`teacher_guidance/prompts.py`), tool executor and per-question BM25 retrieval (`tool_executor.py`, `local_retrieval.py`), teacher critic and plan review components (`components/control/`), leakage gate (`leakage.py`), metrics, the provider client (`clients/llm_client.py`, `config.py`), the `simulate` CLI used for collection |
+| `agentsim/` | the simulation harness: prompt renderer (`teacher_guidance/prompts.py`), tool executor and per-question BM25 retrieval (`teacher_guidance/tool_executor.py`, `teacher_guidance/local_retrieval.py`), teacher critic and plan review components (`components/control/`), leakage gate (`teacher_guidance/leakage.py`), metrics, the provider client (`clients/llm_client.py`, `config.py`), the `simulate` CLI used for collection |
 | `tgd/hf_agent_loop.py` | the teacherless student loop (used by the student arms), batched over episodes |
 | `tgd/guided_loop.py` | the guided and teacher-alone arms, driving the harness components with a hybrid client |
 | `tgd/vllm_backend.py`, `tgd/mock_policy.py` | student policies: a vLLM server client; an offline mock |

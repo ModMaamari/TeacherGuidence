@@ -90,6 +90,12 @@ async def main_async(args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     vpath = out / "verdicts.jsonl"
     prompt_tpl = Path(args.prompt_file).read_text(encoding="utf-8") if args.prompt_file else DEFAULT_PROMPT
+    try:  # fail now, not after the first API call, if the template is wrong
+        prompt_tpl.format(question="q", gold="g", answer="a")
+    except (KeyError, IndexError) as exc:
+        raise SystemExit(f"--prompt-file template is invalid: unknown placeholder {exc}. "
+                         "It may use only {question}, {gold} and {answer}; escape any other "
+                         "brace as {{ or }}.")
 
     done = set()
     if vpath.exists():

@@ -28,7 +28,7 @@ Examples::
     # arm 1 -- base student on the held-out set of one dataset
     python scripts/eval.py --arm student --student vllm --served-model student \
         --questions data/splits/test/heldout_musique_questions.jsonl \
-        --corpus data/questions/musique/musique_corpus.jsonl --out runs/eval/base/musique
+        --corpus data/questions/musique/musique_corpus.jsonl.gz --out runs/eval/base/musique
 
     # arm 4 -- trained student (adapter served as "uniform")
     python scripts/eval.py --arm student --student vllm --served-model uniform ...
@@ -117,7 +117,10 @@ def main() -> int:
         ap.error("--arm teacher needs --agent-model")
     log.info(f"args: {vars(args)}")
 
-    questions = load_jsonl(args.questions, args.limit)
+    qpath = Path(args.questions)
+    if not qpath.exists() and Path(str(qpath) + ".gz").exists():
+        qpath = Path(str(qpath) + ".gz")
+    questions = load_jsonl(qpath, args.limit)
     if args.shard:
         i, n = (int(x) for x in args.shard.split("/"))
         questions = [q for j, q in enumerate(questions) if j % n == i]

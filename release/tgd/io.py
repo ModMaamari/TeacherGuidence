@@ -55,10 +55,21 @@ def read_json(path: str | Path) -> Any:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def _resolve(base: Path) -> Path:
+    """Return ``base`` or its ``.gz`` twin, whichever exists (``.gz`` preferred)."""
+    gz = base.with_suffix(base.suffix + ".gz")
+    if gz.exists():
+        return gz
+    return base
+
+
 def question_file(root: str | Path, dataset: str) -> Path:
-    """Canonical location of a dataset's question file under ``data/questions``."""
-    return Path(root) / dataset / f"{dataset}_questions.jsonl"
+    """Canonical location of a dataset's question file under ``data/questions``.
+
+    Either ``<ds>_questions.jsonl`` or ``<ds>_questions.jsonl.gz`` is accepted; the
+    shipped data is gzipped and every reader in this project handles both."""
+    return _resolve(Path(root) / dataset / f"{dataset}_questions.jsonl")
 
 
 def corpus_file(root: str | Path, dataset: str) -> Path:
-    return Path(root) / dataset / f"{dataset}_corpus.jsonl"
+    return _resolve(Path(root) / dataset / f"{dataset}_corpus.jsonl")

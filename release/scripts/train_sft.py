@@ -82,6 +82,13 @@ def main() -> int:
     log = setup_logger("train_sft", out / "train.log")
     log.info(f"args: {vars(args)}")
 
+    for f in [args.train_file] + ([args.dev_file] if args.dev_file else []):
+        if not Path(f).exists():
+            log.error(f"{f} not found. The SFT train/dev files are not shipped; they are "
+                      f"built from the episodes in data/episodes: run 'make data' "
+                      f"(or scripts/build_splits.py) first.")
+            return 2
+
     import torch
     from datasets import Dataset
     from peft import LoraConfig

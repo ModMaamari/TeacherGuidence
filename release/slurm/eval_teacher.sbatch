@@ -16,7 +16,7 @@ for t in $TESTS; do
   ds=${t#*_}
   [ -f "runs/eval/$NAME/$t/.done" ] && { echo "skip $NAME/$t (done)"; continue; }
   $PY_BASE scripts/eval.py --arm teacher --agent-model "$AGENT" --concurrency "${CONCURRENCY:-4}" \
-    --questions "data/splits/test/${t}_questions.jsonl" --corpus "data/questions/$ds/${ds}_corpus.jsonl" \
+    --questions "data/splits/test/${t}_questions.jsonl" --corpus "data/questions/$ds/${ds}_corpus.jsonl.gz" \
     --out "runs/eval/$NAME/$t" "$@" || echo "!! $NAME/$t incomplete (rc=$?) - rerun to retry"
 done
 echo "== done $(date -u +%FT%TZ)"
