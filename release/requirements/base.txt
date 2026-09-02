@@ -1,0 +1,14 @@
+# Harness + data + evaluation clients (CPU is enough for: data building, leakage checks,
+# the teacher-alone arm, judging, results). Python >= 3.11.
+pyyaml==6.0.3
+loguru==0.7.3
+python-dotenv==1.2.3
+httpx==0.28.1
+pydantic==2.13.5
+json-repair>=0.61
+rank-bm25==0.2.2
+numpy>=2.0
+scikit-learn>=1.5
+scipy>=1.13
+sentence-transformers>=3.0
+pytest>=8

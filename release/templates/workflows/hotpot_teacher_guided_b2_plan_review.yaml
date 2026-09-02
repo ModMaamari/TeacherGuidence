@@ -1,0 +1,15 @@
+id: hotpot_teacher_guided_b2_plan_review
+name: "HotpotQA Teacher-Guided Agent, B=2 + plan review"
+description: "Optional preflight plan review, then 2 teacher-guided action steps."
+reasoning_style: teacher_guided
+
+components:
+  - type: teacher_guided_plan_review
+    config: {enabled: true}
+  - type: teacher_guided_agent_step
+    config: {step_index: 1, budget: 2, force_finish: false}
+  - type: teacher_guided_agent_step
+    config: {step_index: 2, budget: 2, force_finish: true}
+
+config:
+  max_steps: 3  # plan review + 2 action steps

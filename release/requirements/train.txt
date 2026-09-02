@@ -1,0 +1,11 @@
+# Training + in-process HF evaluation (GPU). Install torch first for your CUDA version:
+#   pip install "torch==2.6.*" --index-url https://download.pytorch.org/whl/cu124
+# TRL's SFTConfig surface changes between minors; these pins are the tested stack.
+-r base.txt
+transformers==5.13.1
+trl==1.8.0
+peft==0.19.1
+datasets==5.0.1
+accelerate>=1.2
+sentencepiece
+protobuf

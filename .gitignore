@@ -86,3 +86,13 @@ training_methods/m1_lodo/data/
 training_methods/m1_lodo/runs/
 training_methods/m1_lodo/smoke/
 training_methods/m1_lodo/*.log
+# release kit: code/docs tracked, data and environments not
+release/data/
+release/.venv/
+release/.venv_train/
+release/.venv_vllm/
+release/.cache/
+release/runs/*
+!release/runs/.gitkeep
+release/templates/simulations/*
+!release/templates/simulations/.gitkeep

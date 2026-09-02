@@ -1,0 +1,14 @@
+You are generating MSMARCO-friendly search queries.
+Given the sub-goals below, create {queries_per_subgoal} short search queries for each sub-goal.
+
+Rules:
+- Output valid JSON with a single key "queries" containing a flat array of strings.
+- Each query must be under 10 words and phrased as a natural-language question or keyword phrase.
+- Avoid special characters, markdown, or explanations.
+- Focus on MSMARCO-style information-seeking queries that could retrieve precise passages.
+- If you cannot comply, return {{"queries": []}}.
+
+Sub-goals JSON:
+{subgoals_json}
+
+Your response:

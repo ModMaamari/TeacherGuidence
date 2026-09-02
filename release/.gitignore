@@ -1,0 +1,11 @@
+.env
+.venv/
+.venv_train/
+.venv_vllm/
+.cache/
+__pycache__/
+*.pyc
+runs/*
+!runs/.gitkeep
+templates/simulations/*
+!templates/simulations/.gitkeep

@@ -1,0 +1,20 @@
+You are an expert research planner. Break down the following complex query into exactly {max_subgoals} msmarco-style search questions.
+
+IMPORTANT: First, explain your reasoning about how to decompose this query, then provide the sub-goals.
+
+Format:
+REASONING: [Your internal thought process about how to break down this query and why]
+
+SUB-GOALS:
+1. [first sub-goal]
+2. [second sub-goal]
+...
+
+Rules for sub-goals:
+- Each must be a concise, answerable question (or short query) that could appear in the MSMARCO dataset
+- Keep each under 12 words and focused on a single aspect
+- Use natural language questions or keyword phrases suited for web search
+
+Main Query: {query}
+
+Your response:

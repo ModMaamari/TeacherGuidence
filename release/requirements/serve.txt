@@ -1,0 +1,2 @@
+# vLLM server for the student (kept in its own virtualenv: vLLM pins its own torch).
+vllm==0.28.0
