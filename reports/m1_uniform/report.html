@@ -1,0 +1,275 @@
+<title>Four Arms, One Test Set</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>  :root{
+    --ground:#f3f4f7; --surface:#ffffff; --surface-2:#e9ebf0;
+    --ink:#171a21; --ink-2:#464e5e; --ink-3:#727a8a;
+    --rule:#d5d9e2; --rule-strong:#171a21;
+    /* four arms — grey / teal / blue / orange, separated in hue AND lightness */
+    --arm-base:#8a94a6; --arm-guided:#3d8c78; --arm-student:#1f5f8b; --arm-teacher:#a8672a;
+    --accent:#1f5f8b; --accent-soft:#dce8f1; --warn-bg:#fbf3df; --warn:#8a6a1f;
+    --measure:66ch;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#101319; --surface:#171a21; --surface-2:#1f242e;
+      --ink:#e8eaf0; --ink-2:#b0b7c4; --ink-3:#828a99; --rule:#2b3140; --rule-strong:#e8eaf0;
+      --arm-base:#6f7a90; --arm-guided:#6fcdb2; --arm-student:#5fb4ee; --arm-teacher:#eeb070;
+      --accent:#5fb4ee; --accent-soft:#152a3b; --warn-bg:#2a2410; --warn:#d7b45c;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#101319; --surface:#171a21; --surface-2:#1f242e;
+    --ink:#e8eaf0; --ink-2:#b0b7c4; --ink-3:#828a99; --rule:#2b3140; --rule-strong:#e8eaf0;
+    --arm-base:#6f7a90; --arm-guided:#6fcdb2; --arm-student:#5fb4ee; --arm-teacher:#eeb070;
+    --accent:#5fb4ee; --accent-soft:#152a3b; --warn-bg:#2a2410; --warn:#d7b45c;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground); color:var(--ink); margin:0;
+       font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.62}
+  .wrap{max-width:1080px; margin:0 auto; padding:0 26px 96px}
+  header{border-bottom:2px solid var(--rule-strong); padding:54px 0 22px; margin-bottom:34px}
+  .eyebrow{font-family:"JetBrains Mono",ui-monospace,monospace; font-size:11px; letter-spacing:.15em;
+           text-transform:uppercase; color:var(--accent); margin:0 0 14px}
+  h1{font-family:"Archivo",system-ui,sans-serif; font-weight:700; font-size:clamp(2.1rem,5.2vw,3.2rem);
+     line-height:1.04; letter-spacing:-.022em; margin:0 0 16px; text-wrap:balance}
+  .standfirst{max-width:var(--measure); color:var(--ink-2); font-size:1.1rem; margin:0 0 22px}
+  .standfirst strong{color:var(--ink); font-weight:600}
+  .meta{display:flex; flex-wrap:wrap; gap:6px 26px; font-family:"JetBrains Mono",monospace;
+        font-size:11.5px; color:var(--ink-3)}
+  .meta b{color:var(--ink-2); font-weight:500}
+  .notice{background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn); padding:12px 16px;
+          margin:0 0 24px; font-size:.95rem}
+  .band{display:grid; grid-template-columns:repeat(auto-fit,minmax(176px,1fr)); gap:1px;
+        background:var(--rule); border:1px solid var(--rule); margin:0 0 48px}
+  .cell{background:var(--surface); padding:17px 19px}
+  .cell .v{font-family:"Archivo",sans-serif; font-weight:700; font-size:1.9rem; letter-spacing:-.02em;
+           line-height:1.12; font-variant-numeric:tabular-nums}
+  .cell .l{font-family:"JetBrains Mono",monospace; font-size:10px; text-transform:uppercase;
+           letter-spacing:.1em; color:var(--ink-3); margin-top:7px}
+  .v.base{color:var(--arm-base)} .v.guided{color:var(--arm-guided)} .v.student{color:var(--arm-student)} .v.teacher{color:var(--arm-teacher)}
+  section{margin:0 0 56px}
+  .sh{display:flex; align-items:baseline; gap:13px; border-top:1px solid var(--rule); padding-top:13px; margin-bottom:18px}
+  .sn{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--accent); flex:none}
+  h2{font-family:"Archivo",sans-serif; font-weight:600; font-size:clamp(1.3rem,2.8vw,1.75rem);
+     letter-spacing:-.015em; margin:0; text-wrap:balance}
+  h3{font-family:"Archivo",sans-serif; font-weight:600; font-size:1rem; margin:30px 0 9px; color:var(--ink-2)}
+  p{max-width:var(--measure); margin:0 0 15px}
+  ul{max-width:var(--measure); padding-left:1.15em; margin:0 0 15px} li{margin-bottom:8px}
+  code{font-family:"JetBrains Mono",monospace; font-size:.83em; background:var(--surface-2); padding:1px 5px}
+  .tw{overflow-x:auto; margin:0 0 18px; border:1px solid var(--rule); background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-size:.92rem; font-variant-numeric:tabular-nums}
+  caption{caption-side:bottom; text-align:left; padding:10px 12px; font-size:.82rem; color:var(--ink-3);
+          border-top:1px solid var(--rule); line-height:1.5}
+  th{font-family:"JetBrains Mono",monospace; font-weight:500; font-size:10.5px; text-transform:uppercase;
+     letter-spacing:.08em; color:var(--ink-3); text-align:right; padding:10px 12px; border-bottom:1px solid var(--rule-strong); white-space:nowrap}
+  th:first-child{text-align:left}
+  td{padding:9px 12px; border-bottom:1px solid var(--rule); text-align:right; white-space:nowrap}
+  td:first-child{text-align:left}
+  tr:last-child td{border-bottom:0}
+  table.dense{font-size:.85rem} table.dense td,table.dense th{padding:6px 10px}
+  .tag{display:inline-block; font-family:"Archivo",sans-serif; font-weight:600; font-size:.8rem; padding:1px 8px;
+       border-left:4px solid; background:var(--surface-2); color:var(--ink)}
+  .tag.base{border-color:var(--arm-base)} .tag.guided{border-color:var(--arm-guided)}
+  .tag.student{border-color:var(--arm-student)} .tag.teacher{border-color:var(--arm-teacher)}
+  .mono{font-family:"JetBrains Mono",monospace; font-size:.85em} .dim{color:var(--ink-3); font-size:.85em}
+  .chart{width:100%; height:auto; display:block; background:var(--surface); border:1px solid var(--rule); margin:0 0 18px}
+  .chart .grid{stroke:var(--rule); stroke-width:1}
+  .chart .ax{font-family:"JetBrains Mono",monospace; font-size:11px; fill:var(--ink-3)}
+  .chart .ax.dim{font-size:10px}
+  .chart .val{font-family:"JetBrains Mono",monospace; font-size:10.5px; fill:var(--ink-2)}
+  .bar.base{fill:var(--arm-base)} .bar.guided{fill:var(--arm-guided)} .bar.student{fill:var(--arm-student)} .bar.teacher{fill:var(--arm-teacher)}
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--ink-2); margin:0 0 8px}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .sw{display:inline-block; width:12px; height:12px}
+  .sw.base{background:var(--arm-base)} .sw.guided{background:var(--arm-guided)} .sw.student{background:var(--arm-student)} .sw.teacher{background:var(--arm-teacher)}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important; transition:none!important}}
+</style>
+<div class="wrap">
+<header>
+  <p class="eyebrow">Teacher guidance · uniform evaluation · granite-4.1-3b</p>
+  <h1>Four arms on one test set</h1>
+  <p class="standfirst">The same <strong>747 questions</strong> — 10% of each of four multi-hop
+  datasets, never seen by any training fold — answered by the untrained student, the student with a live
+  teacher, the teacher itself, and the student fine-tuned on all four datasets. Same corpus, tools,
+  budget and decoding for every arm; correctness by an LLM judge; cost and tokens measured per call.</p>
+  <div class="meta"><span>test set <b>747</b></span><span>budget <b>3 (+hidden)</b></span>
+  <span>teacher <b>edenchat/flexai/DeepSeek-V4-Flash-0731</b></span><span>judge <b>Kimi-K2.6</b></span>
+  <span>GPU rate <b>$2.00/h A100</b></span></div>
+</header>
+
+<div class="band"><div class="cell"><div class="v base">29.8%</div><div class="l">Base · judge-correct · n=747</div></div><div class="cell"><div class="v guided">60.5%</div><div class="l">Guided · judge-correct · n=747</div></div><div class="cell"><div class="v student">65.5%</div><div class="l">Trained (all-4) · judge-correct · n=747</div></div><div class="cell"><div class="v teacher">72.3%</div><div class="l">Teacher · judge-correct · n=747</div></div></div>
+
+<section>
+<div class="sh"><span class="sn">1</span><h2>What the four arms are</h2></div>
+<div class="tw"><table class=""><thead><tr><th>Arm</th><th>Agent</th><th>Teacher at inference</th><th>Training</th><th>Where the compute runs</th></tr></thead><tbody><tr><td><span class="tag base">Base</span></td><td>granite-4.1-3b</td><td>none</td><td>none</td><td>local GPU (vLLM)</td></tr><tr><td><span class="tag guided">Guided</span></td><td>granite-4.1-3b</td><td>DeepSeek-V4-Flash-0731 reviews the plan and every step</td><td>none</td><td>local GPU + teacher API</td></tr><tr><td><span class="tag student">Trained (all-4)</span></td><td>granite-4.1-3b + LoRA</td><td>none</td><td>SFT on 14,477 guidance-as-thought examples from all four datasets (4.0 GPU-h)</td><td>local GPU (vLLM, LoRA)</td></tr><tr><td><span class="tag teacher">Teacher</span></td><td>DeepSeek-V4-Flash-0731</td><td>— (it is the agent)</td><td>none</td><td>API only</td></tr></tbody></table></div>
+<p>Arms 1 and 3 were measured earlier on exactly these questions and are reused; arms 2 and 4 were run
+in job 4049332. The trained student's adapter was fitted only on the 90% pools (dev loss 0.269),
+so no arm has seen a test question.</p>
+</section>
+
+<section>
+<div class="sh"><span class="sn">2</span><h2>Accuracy</h2></div>
+<div class="tw"><table class=""><caption>Pooled over the whole test set. Judge = Kimi-K2.6 verdict on the final answer against gold; EM/F1 are token-level; cover = gold string contained in the answer.</caption><thead><tr><th>Arm</th><th>n</th><th>EM</th><th>F1</th><th>Cover</th><th>Judge-correct</th><th>Judge (macro over datasets)</th><th>Doc recall</th></tr></thead><tbody><tr><td><span class="tag base">Base</span></td><td>747</td><td>5.9%</td><td>0.117</td><td>22.1%</td><td><b>29.8%</b></td><td>30.3%</td><td>0.745</td></tr><tr><td><span class="tag guided">Guided</span></td><td>747</td><td>26.0%</td><td>0.348</td><td>49.7%</td><td><b>60.5%</b></td><td>61.0%</td><td>0.746</td></tr><tr><td><span class="tag student">Trained (all-4)</span></td><td>747</td><td>34.3%</td><td>0.430</td><td>60.9%</td><td><b>65.5%</b></td><td>66.4%</td><td>0.787</td></tr><tr><td><span class="tag teacher">Teacher</span></td><td>747</td><td>24.9%</td><td>0.340</td><td>65.7%</td><td><b>72.3%</b></td><td>72.9%</td><td>0.844</td></tr></tbody></table></div>
+<h3>Judge-correct by dataset</h3>
+<div class="legend"><span><i class="sw base"></i>Base</span><span><i class="sw guided"></i>Guided</span><span><i class="sw student"></i>Trained (all-4)</span><span><i class="sw teacher"></i>Teacher</span></div>
+<svg viewBox="0 0 900 300" role="img" aria-label="judge-correct by dataset" class="chart">
+<line x1="44" y1="246.0" x2="892" y2="246.0" class="grid"/>
+<text x="38" y="250.0" class="ax" text-anchor="end">0.0%</text>
+<line x1="44" y1="191.0" x2="892" y2="191.0" class="grid"/>
+<text x="38" y="195.0" class="ax" text-anchor="end">25.0%</text>
+<line x1="44" y1="136.0" x2="892" y2="136.0" class="grid"/>
+<text x="38" y="140.0" class="ax" text-anchor="end">50.0%</text>
+<line x1="44" y1="81.0" x2="892" y2="81.0" class="grid"/>
+<text x="38" y="85.0" class="ax" text-anchor="end">75.0%</text>
+<line x1="44" y1="26.0" x2="892" y2="26.0" class="grid"/>
+<text x="38" y="30.0" class="ax" text-anchor="end">100.0%</text>
+<rect x="68.2" y="145.9" width="34.7" height="100.1" class="bar base"/>
+<text x="85.6" y="141.9" class="val" text-anchor="middle">46%</text>
+<rect x="108.6" y="105.2" width="34.7" height="140.8" class="bar guided"/>
+<text x="126.0" y="101.2" class="val" text-anchor="middle">64%</text>
+<rect x="149.0" y="99.3" width="34.7" height="146.7" class="bar student"/>
+<text x="166.4" y="95.3" class="val" text-anchor="middle">67%</text>
+<rect x="189.4" y="71.4" width="34.7" height="174.6" class="bar teacher"/>
+<text x="206.7" y="67.4" class="val" text-anchor="middle">79%</text>
+<text x="149.0" y="264" class="ax" text-anchor="middle">HotpotQA</text>
+<text x="149.0" y="280" class="ax dim" text-anchor="middle">n=189</text>
+<rect x="278.2" y="156.7" width="34.7" height="89.3" class="bar base"/>
+<text x="295.6" y="152.7" class="val" text-anchor="middle">41%</text>
+<rect x="318.6" y="108.8" width="34.7" height="137.2" class="bar guided"/>
+<text x="336.0" y="104.8" class="val" text-anchor="middle">62%</text>
+<rect x="359.0" y="64.8" width="34.7" height="181.2" class="bar student"/>
+<text x="376.4" y="60.8" class="val" text-anchor="middle">82%</text>
+<rect x="399.4" y="59.6" width="34.7" height="186.4" class="bar teacher"/>
+<text x="416.8" y="55.6" class="val" text-anchor="middle">85%</text>
+<text x="359.0" y="264" class="ax" text-anchor="middle">2WikiMultihopQA</text>
+<text x="359.0" y="280" class="ax dim" text-anchor="middle">n=170</text>
+<rect x="488.2" y="208.1" width="34.7" height="37.9" class="bar base"/>
+<text x="505.6" y="204.1" class="val" text-anchor="middle">17%</text>
+<rect x="528.6" y="152.8" width="34.7" height="93.2" class="bar guided"/>
+<text x="546.0" y="148.8" class="val" text-anchor="middle">42%</text>
+<rect x="569.0" y="152.8" width="34.7" height="93.2" class="bar student"/>
+<text x="586.4" y="148.8" class="val" text-anchor="middle">42%</text>
+<rect x="609.4" y="123.5" width="34.7" height="122.5" class="bar teacher"/>
+<text x="626.8" y="119.5" class="val" text-anchor="middle">56%</text>
+<text x="569.0" y="264" class="ax" text-anchor="middle">MuSiQue</text>
+<text x="569.0" y="280" class="ax dim" text-anchor="middle">n=203</text>
+<rect x="698.2" y="206.8" width="34.7" height="39.2" class="bar base"/>
+<text x="715.6" y="202.8" class="val" text-anchor="middle">18%</text>
+<rect x="738.6" y="80.7" width="34.7" height="165.3" class="bar guided"/>
+<text x="756.0" y="76.7" class="val" text-anchor="middle">75%</text>
+<rect x="779.0" y="83.1" width="34.7" height="162.9" class="bar student"/>
+<text x="796.4" y="79.1" class="val" text-anchor="middle">74%</text>
+<rect x="819.4" y="87.8" width="34.7" height="158.2" class="bar teacher"/>
+<text x="836.8" y="83.8" class="val" text-anchor="middle">72%</text>
+<text x="779.0" y="264" class="ax" text-anchor="middle">StrategyQA</text>
+<text x="779.0" y="280" class="ax dim" text-anchor="middle">n=185</text>
+</svg>
+<h3>Per dataset</h3>
+<div class="tw"><table class="dense"><thead><tr><th>Dataset</th><th>Arm</th><th>n</th><th>EM</th><th>F1</th><th>Cover</th><th>Judge</th><th>Doc recall</th><th>Steps</th><th>Voluntary finish</th></tr></thead><tbody><tr><td>HotpotQA</td><td><span class="tag base">Base</span></td><td>189</td><td>19.6%</td><td>0.253</td><td>37.6%</td><td><b>45.5%</b></td><td>0.759</td><td>2.94</td><td>6%</td></tr><tr><td></td><td><span class="tag guided">Guided</span></td><td>189</td><td>34.4%</td><td>0.425</td><td>54.0%</td><td><b>64.0%</b></td><td>0.759</td><td>2.88</td><td>12%</td></tr><tr><td></td><td><span class="tag student">Trained (all-4)</span></td><td>189</td><td>35.4%</td><td>0.431</td><td>58.2%</td><td><b>66.7%</b></td><td>0.794</td><td>2.79</td><td>21%</td></tr><tr><td></td><td><span class="tag teacher">Teacher</span></td><td>189</td><td>45.5%</td><td>0.549</td><td>73.5%</td><td><b>79.4%</b></td><td>0.839</td><td>2.67</td><td>100%</td></tr><tr><td>2WikiMultihopQA</td><td><span class="tag base">Base</span></td><td>170</td><td>0.6%</td><td>0.112</td><td>28.8%</td><td><b>40.6%</b></td><td>0.818</td><td>2.98</td><td>2%</td></tr><tr><td></td><td><span class="tag guided">Guided</span></td><td>170</td><td>25.3%</td><td>0.361</td><td>55.9%</td><td><b>62.4%</b></td><td>0.821</td><td>2.96</td><td>4%</td></tr><tr><td></td><td><span class="tag student">Trained (all-4)</span></td><td>170</td><td>35.9%</td><td>0.506</td><td>80.6%</td><td><b>82.3%</b></td><td>0.885</td><td>2.90</td><td>10%</td></tr><tr><td></td><td><span class="tag teacher">Teacher</span></td><td>170</td><td>22.4%</td><td>0.362</td><td>84.1%</td><td><b>84.7%</b></td><td>0.932</td><td>2.69</td><td>100%</td></tr><tr><td>MuSiQue</td><td><span class="tag base">Base</span></td><td>203</td><td>3.0%</td><td>0.090</td><td>13.8%</td><td><b>17.2%</b></td><td>0.608</td><td>3.00</td><td>0%</td></tr><tr><td></td><td><span class="tag guided">Guided</span></td><td>203</td><td>11.3%</td><td>0.247</td><td>31.5%</td><td><b>42.4%</b></td><td>0.605</td><td>2.98</td><td>1%</td></tr><tr><td></td><td><span class="tag student">Trained (all-4)</span></td><td>203</td><td>16.8%</td><td>0.272</td><td>36.4%</td><td><b>42.4%</b></td><td>0.661</td><td>2.96</td><td>4%</td></tr><tr><td></td><td><span class="tag teacher">Teacher</span></td><td>203</td><td>29.6%</td><td>0.392</td><td>48.3%</td><td><b>55.7%</b></td><td>0.773</td><td>2.90</td><td>100%</td></tr><tr><td>StrategyQA</td><td><span class="tag base">Base</span></td><td>185</td><td>0.0%</td><td>0.010</td><td>9.2%</td><td><b>17.8%</b></td><td>0.814</td><td>2.99</td><td>1%</td></tr><tr><td></td><td><span class="tag guided">Guided</span></td><td>185</td><td>34.1%</td><td>0.369</td><td>59.5%</td><td><b>75.1%</b></td><td>0.816</td><td>2.99</td><td>1%</td></tr><tr><td></td><td><span class="tag student">Trained (all-4)</span></td><td>185</td><td>50.8%</td><td>0.530</td><td>72.4%</td><td><b>74.1%</b></td><td>0.829</td><td>2.90</td><td>10%</td></tr><tr><td></td><td><span class="tag teacher">Teacher</span></td><td>185</td><td>1.1%</td><td>0.048</td><td>60.0%</td><td><b>71.9%</b></td><td>0.845</td><td>2.75</td><td>100%</td></tr></tbody></table></div>
+<p>Training on all four datasets lifts the student from 29.8% to <b>65.5%</b>
+judge-correct (+35.6 pts, 95% CI [+31.7, +39.4]),
+reaching 91% of the teacher's 72.3% with no teacher at inference.
+The live-teacher arm reaches 60.5% (84% of the teacher), so the trained student is 5.0 pts better than the same student helped by the teacher at every step (CI [+1.6, +8.3]), at less than half the tokens.
+On StrategyQA both student arms edge past the teacher (74.1% and 75.1% vs 71.9%); on MuSiQue, the hardest set, the trained and guided students tie at 42.4%.
+The teacher stays ahead of the trained student by +6.8 pts (CI [+3.4, +10.3]).</p>
+</section>
+
+<section>
+<div class="sh"><span class="sn">3</span><h2>Efficiency</h2></div>
+<div class="tw"><table class=""><caption>Step-phase tokens (prompt + completion) are logged by every arm and are the comparable quantity. Plan-phase tokens are logged by three arms; the guided runner trims plan-review call records, so its plan phase is not counted (an under-count for that arm of roughly one student plan, one teacher review and one revision per episode). Latency is per-episode wall time inside a batched/concurrent run, not a single-user response time.</caption><thead><tr><th>Arm</th><th>Steps / ep</th><th>Voluntary finish</th><th>Invalid steps / ep</th><th>Student tokens / ep</th><th>Teacher tokens / ep</th><th>Total tokens / ep</th><th>Plan-phase tokens / ep</th><th>Latency s / ep</th><th>Teacher API s / ep</th></tr></thead><tbody><tr><td><span class="tag base">Base</span></td><td>2.98</td><td>2.4%</td><td>0.123</td><td>4,442</td><td>0</td><td><b>4,442</b></td><td>601</td><td>11.4</td><td>0.0</td></tr><tr><td><span class="tag guided">Guided</span></td><td>2.95</td><td>4.5%</td><td>0.005</td><td>5,389</td><td>5,582</td><td><b>10,972</b></td><td>—</td><td>21.9</td><td>9.5</td></tr><tr><td><span class="tag student">Trained (all-4)</span></td><td>2.89</td><td>11.0%</td><td>0.115</td><td>4,672</td><td>0</td><td><b>4,672</b></td><td>669</td><td>17.8</td><td>0.0</td></tr><tr><td><span class="tag teacher">Teacher</span></td><td>2.76</td><td>100.0%</td><td>0.051</td><td>3,889</td><td>0</td><td><b>3,889</b></td><td>557</td><td>11.1</td><td>7.8</td></tr></tbody></table></div>
+<h3>Total tokens per episode by dataset</h3>
+<div class="legend"><span><i class="sw base"></i>Base</span><span><i class="sw guided"></i>Guided</span><span><i class="sw student"></i>Trained (all-4)</span><span><i class="sw teacher"></i>Teacher</span></div>
+<svg viewBox="0 0 900 300" role="img" aria-label="tokens per episode" class="chart">
+<line x1="44" y1="246.0" x2="892" y2="246.0" class="grid"/>
+<text x="38" y="250.0" class="ax" text-anchor="end">0</text>
+<line x1="44" y1="191.0" x2="892" y2="191.0" class="grid"/>
+<text x="38" y="195.0" class="ax" text-anchor="end">4000</text>
+<line x1="44" y1="136.0" x2="892" y2="136.0" class="grid"/>
+<text x="38" y="140.0" class="ax" text-anchor="end">8000</text>
+<line x1="44" y1="81.0" x2="892" y2="81.0" class="grid"/>
+<text x="38" y="85.0" class="ax" text-anchor="end">12000</text>
+<line x1="44" y1="26.0" x2="892" y2="26.0" class="grid"/>
+<text x="38" y="30.0" class="ax" text-anchor="end">16000</text>
+<rect x="68.2" y="183.5" width="34.7" height="62.5" class="bar base"/>
+<text x="85.6" y="179.5" class="val" text-anchor="middle">4,543</text>
+<rect x="108.6" y="88.4" width="34.7" height="157.6" class="bar guided"/>
+<text x="126.0" y="84.4" class="val" text-anchor="middle">11,459</text>
+<rect x="149.0" y="183.1" width="34.7" height="62.9" class="bar student"/>
+<text x="166.4" y="179.1" class="val" text-anchor="middle">4,574</text>
+<rect x="189.4" y="194.5" width="34.7" height="51.5" class="bar teacher"/>
+<text x="206.7" y="190.5" class="val" text-anchor="middle">3,746</text>
+<text x="149.0" y="264" class="ax" text-anchor="middle">HotpotQA</text>
+<text x="149.0" y="280" class="ax dim" text-anchor="middle">n=189</text>
+<rect x="278.2" y="182.2" width="34.7" height="63.8" class="bar base"/>
+<text x="295.6" y="178.2" class="val" text-anchor="middle">4,638</text>
+<rect x="318.6" y="88.4" width="34.7" height="157.6" class="bar guided"/>
+<text x="336.0" y="84.4" class="val" text-anchor="middle">11,464</text>
+<rect x="359.0" y="177.4" width="34.7" height="68.6" class="bar student"/>
+<text x="376.4" y="173.4" class="val" text-anchor="middle">4,986</text>
+<rect x="399.4" y="192.3" width="34.7" height="53.7" class="bar teacher"/>
+<text x="416.8" y="188.3" class="val" text-anchor="middle">3,902</text>
+<text x="359.0" y="264" class="ax" text-anchor="middle">2WikiMultihopQA</text>
+<text x="359.0" y="280" class="ax dim" text-anchor="middle">n=170</text>
+<rect x="488.2" y="185.8" width="34.7" height="60.2" class="bar base"/>
+<text x="505.6" y="181.8" class="val" text-anchor="middle">4,382</text>
+<rect x="528.6" y="101.8" width="34.7" height="144.2" class="bar guided"/>
+<text x="546.0" y="97.8" class="val" text-anchor="middle">10,486</text>
+<rect x="569.0" y="182.6" width="34.7" height="63.4" class="bar student"/>
+<text x="586.4" y="178.6" class="val" text-anchor="middle">4,608</text>
+<rect x="609.4" y="188.8" width="34.7" height="57.2" class="bar teacher"/>
+<text x="626.8" y="184.8" class="val" text-anchor="middle">4,164</text>
+<text x="569.0" y="264" class="ax" text-anchor="middle">MuSiQue</text>
+<text x="569.0" y="280" class="ax dim" text-anchor="middle">n=203</text>
+<rect x="698.2" y="187.9" width="34.7" height="58.1" class="bar base"/>
+<text x="715.6" y="183.9" class="val" text-anchor="middle">4,224</text>
+<rect x="738.6" y="100.9" width="34.7" height="145.1" class="bar guided"/>
+<text x="756.0" y="96.9" class="val" text-anchor="middle">10,554</text>
+<rect x="779.0" y="183.4" width="34.7" height="62.6" class="bar student"/>
+<text x="796.4" y="179.4" class="val" text-anchor="middle">4,556</text>
+<rect x="819.4" y="194.8" width="34.7" height="51.2" class="bar teacher"/>
+<text x="836.8" y="190.8" class="val" text-anchor="middle">3,723</text>
+<text x="779.0" y="264" class="ax" text-anchor="middle">StrategyQA</text>
+<text x="779.0" y="280" class="ax dim" text-anchor="middle">n=185</text>
+</svg>
+<p>The trained student spends about the same tokens as the untrained one (4,672 vs 4,442 per episode);
+the live teacher 2.3× that, because every step is also sent to the teacher. The teacher acting alone is the leanest
+(3,889 tokens, 2.76 steps) and always stops voluntarily; the students mostly run to the budget.</p>
+</section>
+
+<section>
+<div class="sh"><span class="sn">4</span><h2>Cost</h2></div>
+<div class="tw"><table class=""><caption>API dollars are the per-call cost EdenAI reports (DeepSeek-V4-Flash-0731 via flexai). GPU dollars = eval wall time on one A100 × $2.00/h (assumption; change with --gpu-usd-per-hour). Training: 4.04 A100-hours = $8.08, amortized here over the 747 test episodes — the most pessimistic choice.</caption><thead><tr><th>Arm</th><th>API $ (all eps)</th><th>GPU $ (all eps)</th><th>Training $ (amortized)</th><th>$ / episode</th><th>$ / episode, excl. training</th><th>$ / correct answer</th><th>Tokens / correct</th><th>Correct / 1k tokens</th></tr></thead><tbody><tr><td><span class="tag base">Base</span></td><td>$0.000</td><td>$0.310</td><td>—</td><td><b>$0.00042</b></td><td>$0.00042</td><td>$0.00139</td><td>14,880</td><td>0.067</td></tr><tr><td><span class="tag guided">Guided</span></td><td>$0.167</td><td>$1.537</td><td>—</td><td><b>$0.00228</b></td><td>$0.00228</td><td>$0.00377</td><td>18,133</td><td>0.055</td></tr><tr><td><span class="tag student">Trained (all-4)</span></td><td>$0.000</td><td>$0.479</td><td>$8.079</td><td><b>$0.01146</b></td><td>$0.00064</td><td>$0.01750</td><td>7,138</td><td>0.140</td></tr><tr><td><span class="tag teacher">Teacher</span></td><td>$0.114</td><td>$0.000</td><td>—</td><td><b>$0.00015</b></td><td>$0.00015</td><td>$0.00021</td><td>5,380</td><td>0.186</td></tr></tbody></table></div>
+<h3>How training amortizes</h3>
+<div class="tw"><table class=""><caption>Run cost of the trained student is $0.00064 per episode. Past ~10k episodes the training cost is negligible and the trained student is the cheapest arm that clears 60% judge-correct.</caption><thead><tr><th>Episodes the adapter serves</th><th>Training $ / episode</th><th>Trained-student $ / episode (run + training)</th></tr></thead><tbody><tr><td>747</td><td>$0.010815</td><td>$0.011456</td></tr><tr><td>10,000</td><td>$0.000808</td><td>$0.001449</td></tr><tr><td>100,000</td><td>$0.000081</td><td>$0.000722</td></tr><tr><td>1,000,000</td><td>$0.000008</td><td>$0.000649</td></tr></tbody></table></div>
+<p>Charging the whole training run to these 747 episodes makes the trained student the most expensive arm ($0.01146 per episode). Excluding training it runs at $0.00064 per episode — 5.0× cheaper than the guided arm's $0.00228, and already cheaper than it once the adapter has served about 4,922 episodes. The teacher alone is cheap per episode ($0.00015) because DeepSeek-V4-Flash is priced low and it stops early — but every one of its calls leaves the machine.</p>
+</section>
+
+<section>
+<div class="sh"><span class="sn">5</span><h2>Are the differences real?</h2></div>
+<div class="tw"><table class="dense"><caption>Judge-correct difference b − a on the same questions; 95% paired-bootstrap CI (10,000 resamples). † p < 0.05, ‡ p < 0.001 (exact McNemar on discordant pairs). Wins = questions one arm gets right and the other wrong.</caption><thead><tr><th>Comparison (a → b)</th><th>HotpotQA</th><th>2WikiMultihopQA</th><th>MuSiQue</th><th>StrategyQA</th><th>Pooled</th><th>b wins / a wins</th><th>McNemar p (pooled)</th></tr></thead><tbody><tr><td><span class="tag base">Base</span> → <span class="tag student">Trained (all-4)</span></td><td><span class="mono">+21.2 pts</span> <span class="dim">[+13.8, +28.6]</span> ‡</td><td><span class="mono">+41.8 pts</span> <span class="dim">[+33.5, +49.4]</span> ‡</td><td><span class="mono">+25.1 pts</span> <span class="dim">[+18.2, +32.0]</span> ‡</td><td><span class="mono">+56.2 pts</span> <span class="dim">[+48.6, +63.8]</span> ‡</td><td><span class="mono">+35.6 pts</span> <span class="dim">[+31.7, +39.4]</span> ‡</td><td>288 / 22</td><td>&lt;1e-5</td></tr><tr><td><span class="tag base">Base</span> → <span class="tag guided">Guided</span></td><td><span class="mono">+18.5 pts</span> <span class="dim">[+12.2, +24.9]</span> ‡</td><td><span class="mono">+21.8 pts</span> <span class="dim">[+12.9, +30.6]</span> ‡</td><td><span class="mono">+25.1 pts</span> <span class="dim">[+17.7, +32.0]</span> ‡</td><td><span class="mono">+57.3 pts</span> <span class="dim">[+50.3, +64.3]</span> ‡</td><td><span class="mono">+30.7 pts</span> <span class="dim">[+26.9, +34.4]</span> ‡</td><td>257 / 28</td><td>&lt;1e-5</td></tr><tr><td><span class="tag student">Trained (all-4)</span> → <span class="tag guided">Guided</span></td><td><span class="mono">-2.6 pts</span> <span class="dim">[-9.0, +4.2]</span></td><td><span class="mono">-20.0 pts</span> <span class="dim">[-27.7, -12.3]</span> ‡</td><td><span class="mono">+0.0 pts</span> <span class="dim">[-6.9, +6.9]</span></td><td><span class="mono">+1.1 pts</span> <span class="dim">[-4.3, +6.5]</span></td><td><span class="mono">-5.0 pts</span> <span class="dim">[-8.3, -1.6]</span> †</td><td>65 / 102</td><td>0.0052</td></tr><tr><td><span class="tag student">Trained (all-4)</span> → <span class="tag teacher">Teacher</span></td><td><span class="mono">+12.7 pts</span> <span class="dim">[+6.3, +19.1]</span> ‡</td><td><span class="mono">+2.4 pts</span> <span class="dim">[-4.1, +8.8]</span></td><td><span class="mono">+13.3 pts</span> <span class="dim">[+5.9, +20.7]</span> ‡</td><td><span class="mono">-2.2 pts</span> <span class="dim">[-9.7, +4.9]</span></td><td><span class="mono">+6.8 pts</span> <span class="dim">[+3.4, +10.3]</span> ‡</td><td>116 / 65</td><td>0.00018</td></tr><tr><td><span class="tag guided">Guided</span> → <span class="tag teacher">Teacher</span></td><td><span class="mono">+15.3 pts</span> <span class="dim">[+9.0, +21.7]</span> ‡</td><td><span class="mono">+22.4 pts</span> <span class="dim">[+14.1, +30.6]</span> ‡</td><td><span class="mono">+13.3 pts</span> <span class="dim">[+5.4, +21.2]</span> †</td><td><span class="mono">-3.2 pts</span> <span class="dim">[-10.3, +3.8]</span></td><td><span class="mono">+11.8 pts</span> <span class="dim">[+8.0, +15.5]</span> ‡</td><td>152 / 64</td><td>&lt;1e-5</td></tr><tr><td><span class="tag base">Base</span> → <span class="tag teacher">Teacher</span></td><td><span class="mono">+33.9 pts</span> <span class="dim">[+27.0, +40.7]</span> ‡</td><td><span class="mono">+44.1 pts</span> <span class="dim">[+36.5, +51.8]</span> ‡</td><td><span class="mono">+38.4 pts</span> <span class="dim">[+31.5, +45.8]</span> ‡</td><td><span class="mono">+54.0 pts</span> <span class="dim">[+46.5, +61.6]</span> ‡</td><td><span class="mono">+42.4 pts</span> <span class="dim">[+38.7, +46.2]</span> ‡</td><td>327 / 10</td><td>&lt;1e-5</td></tr></tbody></table></div>
+<h3>Which questions each arm solves</h3>
+<div class="tw"><table class="dense"><caption>Diagonal = questions solved by the arm; off-diagonal = solved by both. 626 of 747 questions are solved by at least one arm, 172 by all four, 121 by none.</caption><thead><tr><th>Solved by ↓ and →</th><th>Base</th><th>Guided</th><th>Trained (all-4)</th><th>Teacher</th></tr></thead><tbody><tr><td><span class="tag base">Base</span></td><td>223</td><td>195</td><td>201</td><td>213</td></tr><tr><td><span class="tag guided">Guided</span></td><td>195</td><td>452</td><td>387</td><td>388</td></tr><tr><td><span class="tag student">Trained (all-4)</span></td><td>201</td><td>387</td><td>489</td><td>424</td></tr><tr><td><span class="tag teacher">Teacher</span></td><td>213</td><td>388</td><td>424</td><td>540</td></tr></tbody></table></div>
+</section>
+
+<section>
+<div class="sh"><span class="sn">6</span><h2>Protocol and coverage</h2></div>
+<ul>
+<li><b>Test set.</b> HotpotQA 189, 2WikiMultihopQA 170, MuSiQue 203, StrategyQA 185 = 747 questions: the 10% held-in pool of each dataset (sha256-salted split), excluded from every training fold including this all-4 fold.</li>
+<li><b>Student decoding.</b> Greedy (T=0), seed 13, budget 3 with the budget hidden from the agent; identical prompts, tools and per-question corpus for all arms.</li>
+<li><b>Teacher.</b> edenchat/flexai/DeepSeek-V4-Flash-0731 for both the guided arm and the teacher-alone arm, so the reference and the helper are the same model.</li>
+<li><b>Judge.</b> base: Kimi-K2.6 ×18,956, MiniMax-M3-MXFP8 ×28; uniform: Kimi-K2.6 ×1,494; teacher: Kimi-K2.6 ×1,755. The judge sees question, gold and final answer only.</li>
+<li><b>Training.</b> LoRA r32/α64, 2 epochs, lr 1e-4, effective batch 16, 14,477 examples from correct episodes only; final train loss 0.348, dev loss 0.269.</li>
+<li><b>Guided arm.</b> 6 episodes in flight; the student ran on the same vLLM server as the other student arms.</li>
+</ul>
+<div class="tw"><table class="dense"><thead><tr><th>Arm</th><th>HotpotQA judged/n</th><th>2WikiMultihopQA judged/n</th><th>MuSiQue judged/n</th><th>StrategyQA judged/n</th></tr></thead><tbody><tr><td><span class="tag base">Base</span></td><td>189/189</td><td>170/170</td><td>203/203</td><td>185/185</td></tr><tr><td><span class="tag guided">Guided</span></td><td>189/189</td><td>170/170</td><td>203/203</td><td>185/185</td></tr><tr><td><span class="tag student">Trained (all-4)</span></td><td>189/189</td><td>170/170</td><td>203/203</td><td>185/185</td></tr><tr><td><span class="tag teacher">Teacher</span></td><td>189/189</td><td>170/170</td><td>203/203</td><td>185/185</td></tr></tbody></table></div>
+<h3>Caveats</h3>
+<ul>
+<li>One seed, one budget. Bootstrap CIs cover question sampling, not decoding or training variance.</li>
+<li>Guided-arm plan-phase tokens and their teacher cost are not logged (see §3); its true token and API cost per episode is somewhat higher than shown.</li>
+<li>GPU cost uses an assumed hourly rate; the teacher API price is EdenAI's reported per-call cost at run time.</li>
+<li>The judge is a single model; EM/F1/cover are shown alongside so the reader can check it is not systematically generous to any arm.</li>
+</ul>
+</section>
+</div>

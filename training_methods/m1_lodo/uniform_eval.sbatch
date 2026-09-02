@@ -21,8 +21,15 @@ cd /shared/al-maamari/DeKIS/teacher-guidence
 export HF_HOME=$PWD/.hf_cache HF_HUB_CACHE=$PWD/.hf_cache/hub
 export XDG_CACHE_HOME=$PWD/.cache VLLM_CACHE_ROOT=$PWD/.cache/vllm
 export TRITON_CACHE_DIR=$PWD/.cache/triton TORCHINDUCTOR_CACHE_DIR=$PWD/.cache/inductor
+# /home is read-only on compute nodes: vLLM's usage-stats thread and flashinfer still
+# resolve '~' (this killed the 4047988 eval phase) -> point HOME at /shared too.
+export HOME=$PWD/.cache VLLM_NO_USAGE_STATS=1 DO_NOT_TRACK=1
+mkdir -p .cache/vllm .cache/triton .cache/inductor .hf_cache/hub
 OUT=training_methods/m1_lodo/runs/uniform
 mkdir -p "$OUT/logs"
+# pre-flight: fail before burning GPU time if either eval agent cannot even import
+.venv_train/bin/python -c "import training_methods.common.eval_agent, training_methods.common.teacher_eval_agent" \
+  2>/dev/null || { echo "PRE-FLIGHT FAILED: eval agents do not import in .venv_train"; exit 1; }
 echo "node $(hostname) | $(date -u +%FT%TZ)"
 nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader
 
@@ -47,9 +54,15 @@ echo "=== starting vLLM $(date -u +%FT%TZ) ==="
     --enable-lora --max-lora-rank 32 --max-loras 1 \
     --lora-modules "all4=$OUT/train/adapter" > "$OUT/logs/vllm.log" 2>&1 &
 VLLM=$!
+ready=0
 for i in $(seq 1 300); do
-  curl -sf http://127.0.0.1:8500/v1/models >/dev/null && break || sleep 10
+  curl -sf http://127.0.0.1:8500/v1/models >/dev/null && { ready=1; break; }
+  kill -0 $VLLM 2>/dev/null || break            # server died -> stop waiting
+  sleep 10
 done
+if [ "$ready" != 1 ]; then
+  echo "vLLM FAILED to come up after $((i*10))s -- see $OUT/logs/vllm.log"; tail -30 "$OUT/logs/vllm.log"; exit 1
+fi
 echo "vllm ready after $((i*10))s"
 trap 'kill $VLLM 2>/dev/null || true' EXIT
 
@@ -77,6 +90,7 @@ for ds in hotpotqa 2wikimultihopqa musique strategyqa; do
       --questions "training_methods/m1_lodo/data/tests/heldin_${ds}_questions.jsonl" \
       --corpus "data/datasets/tg_v1/${ds}/${ds}_train_corpus.jsonl" \
       --out "$OUT/eval" --tag "$tag" --budget 3 --hidden-budget --student-temperature 0 \
+      --backend vllm --server-url http://127.0.0.1:8500 --served-model student \
       --concurrency 6 --teacher-router "edenchat/flexai/DeepSeek-V4-Flash-0731" > "$OUT/logs/$tag.log" 2>&1 && touch "$OUT/eval/$tag.done"
   echo "  done $tag"
 done
